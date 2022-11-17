@@ -31,29 +31,14 @@ string b2a_bin(const uint8_t* p, const size_t n) {
     return res;
 }
 
-void ByteArray_to_GInteger(const uint8_t* input, Integer &output, const size_t input_size) {
-    output = 0;
-    if(input_size>0)
-    {
-        output = input[0];
-        if(input_size>1)
-        {
-            int i;
-            uint32_t shift = 256;
-            for(i=1;i<input_size;i++)
-            {
-                output *= shift;
-                output += input[i];
-            }
-        }
-    }
-}
-
-void GInteger_to_ByteArray(const Integer input, uint8_t* output, const size_t output_size) {
-    int i;
-    Integer last_byte(0xFF);
-    for(i=0;i<output_size;i++)
-        output[i] = (input >> ((output_size-1-i) << 3)) & last_byte;
+template <typename T>
+uint8_t* Vector_to_ByteArray(const vector<T> v, uint8_t* a) {
+    memset(a,0xFF,sizeof(T)*v.size());
+    typename vector<T>::const_iterator iter;
+    for(auto i=0;i<v.size();i++)
+        for(auto j=0;j<sizeof(T);j++)
+            *(a+i*sizeof(T)+j) = ((v[i]>>((sizeof(T)-j-1)<<3)) & 0xFF);
+    return a;
 }
 
 template <typename T>
@@ -84,19 +69,46 @@ void v2v_unaligned(const vector<T>& input, vector<uint32_t>& output, uint32_t el
         msk[0] = (vword_mask >> ofs0) & (vword_mask << free_rbits0);  
 
         uint32_t element = (*(input.data()+idx0) & msk[0]) >> free_rbits0;
-
-        uint8_t overflow_bit_consumed = 0;
         
         for(auto i=1;i<max_overlap;i++)
         {
-            sz[i] = max(min(bit_overflow - overflow_bit_consumed, (int)vword_bit_size),0);            
-            overflow_bit_consumed = sz[i];
+            sz[i] = max(min((int)bit_overflow, (int)vword_bit_size),0);            
 
             msk[i] = vword_mask & ~(vword_mask >> sz[i]);                                                 
 
             element <<= sz[i];
             element += (*(input.data()+idx0+i) & msk[i]) >> (vword_bit_size - sz[i]);
+
+            if(bit_overflow<=0)
+                break;                  // no more overlap => end
+            else
+                bit_overflow -= sz[i];  // => next vword
         }
         output.push_back(element);
     }
+}
+
+void ByteArray_to_GInteger(const uint8_t* input, Integer &output, const size_t input_size) {
+    output = 0;
+    if(input_size>0)
+    {
+        output = input[0];
+        if(input_size>1)
+        {
+            int i;
+            uint32_t shift = 256;
+            for(i=1;i<input_size;i++)
+            {
+                output *= shift;
+                output += input[i];
+            }
+        }
+    }
+}
+
+void GInteger_to_ByteArray(const Integer input, uint8_t* output, const size_t output_size) {
+    int i;
+    Integer last_byte(0xFF);
+    for(i=0;i<output_size;i++)
+        output[i] = (input >> ((output_size-1-i) << 3)) & last_byte;
 }
