@@ -41,34 +41,35 @@ uint8_t* Vector_to_ByteArray(const vector<T> v, uint8_t* a) {
     return a;
 }
 
-template <typename T>
-void v2v_unaligned(const vector<T>& input, vector<uint32_t>& output, uint32_t element_bit_size, uint32_t element_count)
+template <typename T, typename P>
+void v2v_unaligned(const vector<T>& input, vector<P>& output, uint32_t element_bit_size, uint32_t element_count)
 {
+    //the output vector word must be large enough for the specified element size
+    assert((sizeof(P)<<3) >= element_bit_size);
+
     uint8_t vword_bit_size = (sizeof(input[0])<<3);
     uint128_t vword_mask = ~uint128_t(0) >> ((vword_bit_size << 8) - vword_bit_size);    
-
-    uint16_t word_mask = 0xFFFF >> (0x10 - element_bit_size);
 
     uint32_t max_overlap = (element_bit_size > 1 ? 2 + div(element_bit_size - 2, vword_bit_size).quot : 1);
     
     uint8_t sz[max_overlap];
     uint128_t msk[max_overlap];
 
-    for(uint8_t element_rank=0;element_rank<element_count;element_rank++)
+    for(uint32_t element_rank=0;element_rank<element_count;element_rank++)
     {
-        uint16_t word_bit_rank = element_bit_size * element_rank;
+        uint64_t element_bit_offset = element_bit_size * element_rank;
 
-        div_t d = div(word_bit_rank, vword_bit_size);
+        div_t d = div(element_bit_offset, vword_bit_size);
 
-        uint8_t idx0 = d.quot;
+        uint32_t idx0 = d.quot;
         uint8_t ofs0 = d.rem;
-        int8_t bit_overflow = ofs0 + element_bit_size - vword_bit_size;
-        int8_t free_rbits0 = max(-bit_overflow, 0);
+        int32_t bit_overflow = ofs0 + element_bit_size - vword_bit_size; // > 0 => overlaps next vword
+        uint32_t free_rbits0 = max(-bit_overflow, 0);
 
         sz[0] = min(vword_bit_size - ofs0, (int)element_bit_size);
         msk[0] = (vword_mask >> ofs0) & (vword_mask << free_rbits0);  
 
-        uint32_t element = (*(input.data()+idx0) & msk[0]) >> free_rbits0;
+        P element = (*(input.data()+idx0) & msk[0]) >> free_rbits0;
         
         for(auto i=1;i<max_overlap;i++)
         {
