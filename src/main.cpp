@@ -69,14 +69,19 @@ int main(int argc, char** argv)
     e->add_n_bits_of_entropy(0b0111111, 7);
     e->add_n_bits_of_entropy(0b0110101, 7);
     e->add_n_bits_of_entropy(0b0110001, 7);
-    //e->add_n_bits_of_entropy(0b10, 2);
+    e->add_n_bits_of_entropy(0b10, 2);
     e->print();
 
-    const vector<uint64_t> entropy= { 0b1010100010011110110001001110100000110010011101010111011101000001,
-                                      0b0001101000010000010011111011111011001011101111110110101011000110 };
-    BIP39::mnemonic* mnc = new BIP39::mnemonic(entropy);
+    uint32_t word;
+    e->get_nth_word(0,11,word);
+    e->get_nth_word(2,11,word);
+    e->get_nth_word(5,25,word);
+
+    //const vector<uint64_t> entropy= { 0b1010100010011110110001001110100000110010011101010111011101000001,
+    //                                  0b0001101000010000010011111011111011001011101111110110101011000110 };
+    //BIP39::mnemonic* mnc = new BIP39::mnemonic(entropy);
     //mnemonic* mnc = new mnemonic(" possible    WAGE Deliver gossip first party hair antique salute fuel survey miracle  ");
-    mnc->print();
+    //mnc->print();
 
     return 0;
 }

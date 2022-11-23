@@ -6,8 +6,78 @@
 //#include <openssl/hmac.h>
 #include <openssl/sha.h>
 #include <Common.h>
+#include <iomanip>
+#include <iostream>
 
 using namespace BIP39;
+
+entropy::entropy(size_t bitsize)
+    : max_entropy_bitsize(bitsize)
+    , current_entropy_bitsize(0)
+{
+    the_entropy.clear();
+}
+
+bool entropy::add_n_bits_of_entropy(const uint32_t extra_e, const uint8_t n_bits)
+{
+    bool res = false;
+    if( (current_entropy_bitsize + n_bits) <= max_entropy_bitsize )
+    {
+        div_t d = div(current_entropy_bitsize , 32);
+        if(!d.rem)
+            the_entropy.push_back(extra_e);
+        else
+        {   uint8_t current_elem_new_bits_count = min(32 - d.rem, (int32_t)n_bits);
+            uint8_t next_elem_new_bits_count = max(d.rem + n_bits - 32, 0);
+            the_entropy[d.quot] <<= current_elem_new_bits_count;
+            the_entropy[d.quot] += (extra_e >> next_elem_new_bits_count);
+            if( next_elem_new_bits_count )
+                the_entropy.push_back(extra_e & (0xFFFFFFFF >> (32 - next_elem_new_bits_count)));
+        }
+        current_entropy_bitsize += n_bits;
+        res = true;
+    }
+    return res;
+}
+
+bool entropy::get_nth_word(const uint32_t n, const uint8_t word_bitsize, uint32_t& nth_word) const
+{
+    bool res = false;
+    if( word_bitsize <= 32 ) 
+    {
+        div_t d = div(n * word_bitsize, 32);
+        if( d.quot < the_entropy.size() )
+        {
+            uint8_t nthwbitsize = word_bitsize - max((d.quot << 5) + d.rem + word_bitsize - (int)current_entropy_bitsize, 0);
+            int8_t next_elem_new_bits_count = d.rem + nthwbitsize - 32;
+            uint32_t nthw = the_entropy[d.quot] & (0xFFFFFFFF >> d.rem);
+            if(next_elem_new_bits_count < 0)
+                nthw >>= -next_elem_new_bits_count;
+            else if(next_elem_new_bits_count > 0)
+            {
+                nthw <<= next_elem_new_bits_count;
+                nthw += the_entropy[d.quot+1] >> (32 - next_elem_new_bits_count);
+            }
+            nth_word = nthw;
+            res = true;
+        }
+    }
+    return res;
+}
+
+void entropy::print() const
+{
+    //TODO: display leading zeroes for each word
+    div_t d = div(current_entropy_bitsize , 32);
+    int i;
+    cout << "0x";
+    for(i=0;i<d.quot;i++) 
+        cout << hex << the_entropy[i];
+    cout << " (" << dec << (d.quot << 5) << " bits)";
+    if(d.rem)
+        cout << " + 0x" << hex << the_entropy[d.quot] << " (" << dec << d.rem << " bits)";;
+    cout << endl;
+}
 
 template <typename T> mnemonic::mnemonic(const vector<T>& entropy, const string& pwd)
     : password(pwd)
