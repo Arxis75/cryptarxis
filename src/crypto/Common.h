@@ -1,15 +1,8 @@
 #pragma once
 
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#include <openssl/sha.h>
-
 #include <ethash/keccak.hpp>
 
-#include "secp256k1/Common.h"
-#include "secp256k1/Point.h"
-#include "secp256k1/Curve.h"
-#include "secp256k1/EllipticCurve.h"
+#include "EllipticCurve.h"
 
 #include "bip39_dictionnary.h"
 
@@ -18,136 +11,6 @@
 
 using namespace std;
 using namespace Givaro;
-
-static char hexa[] = "0123456789ABCDEF"; 
-
-typedef enum ARRAY_SIZE {
-    _4_BYTES = 4,
-    _20_BYTES = 20,
-    _32_BYTES = 32,
-    _33_BYTES = 33,
-    _COMPRESSED_33_BYTES = 33,
-    _64_BYTES = 64,
-    _UNCOMPRESSED_64_BYTES = 64,
-    _UNCOMPRESSED_65_BYTES = 65,
-    _128_BYTES = 128
-} PUBKEY_FORMAT;
-
-int pbkdf2_hmac_sha512( const char* pass,
-                        const unsigned char* salt,
-                        char* hexResult, uint8_t* binResult)
-{
-    //Cf https://www.openssl.org/docs/manmaster/man3/PKCS5_PBKDF2_HMAC.html
-
-    unsigned char digest[_64_BYTES];
-
-    int ret = PKCS5_PBKDF2_HMAC( pass, strlen(pass),
-                                 salt, strlen(reinterpret_cast<const char *>(salt)),
-                                 2048,
-                                 EVP_sha512(),
-                                 sizeof(digest),
-                                 digest );
-    assert(ret);
-
-    unsigned int i;
-    for (i = 0; i < _64_BYTES; i++)
-    {
-        sprintf(hexResult + (i * 2), "%02x", 255 & digest[i]);
-        binResult[i] = digest[i];
-    };
-    hexResult[_128_BYTES] = 0x00;
-    
-    return ret;
-}
-
-unsigned char* hmac_sha512( const char* key, const size_t klen,
-                            const uint8_t* data, const size_t dlen,
-                            char* hexResult, uint8_t* binResult ) 
-{
-    //Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
-    //Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
-
-    unsigned char digest[_64_BYTES];
-    uint32_t dilen;
-
-    unsigned char* ret = ::HMAC( ::EVP_sha512(),
-                                 key, klen,
-                                 data, dlen,
-                                 digest, &dilen );
-    
-    assert(ret && dilen == _64_BYTES);
-
-    unsigned int i;
-    for (i = 0; i < _64_BYTES; i++)
-    {
-        sprintf(hexResult + (i * 2), "%02x", 255 & digest[i]);
-        binResult[i] = digest[i];
-    };
-    hexResult[_128_BYTES] = 0x00;
-
-    return ret;
-}
-
-unsigned char* sha256( const unsigned char* input, const size_t input_size,
-                       char* hexResult, uint8_t* binResult )
-{
-    //Cf https://www.openssl.org/docs/manmaster/man3/SHA256.html
-
-    unsigned char digest[_32_BYTES];
-   
-    unsigned char* ret = SHA256(input, input_size, digest);
-
-    assert(ret);
-    
-    unsigned int i;
-    for (i = 0; i < _32_BYTES; i++)
-    {
-        sprintf(hexResult + (i * 2), "%02x", 255 & digest[i]);
-        binResult[i] = digest[i];
-    };
-    hexResult[_64_BYTES] = 0x00;
-
-    return ret;
-}
-
-string b2a_hex(const uint8_t* p, const size_t n) {
-    static const char hex[] = "0123456789abcdef";
-    string res;
-    res.reserve(n * 2);
-
-    for (auto end = p + n; p != end; ++p) {
-        const uint8_t v = (*p);
-        res += hex[(v >> 4) & 0x0F];
-        res += hex[v & 0x0F];
-    }
-
-    return res;
-}
-
-void ByteArray_to_GInteger(const uint8_t* input, Integer &output, const size_t input_size) {
-    output = 0;
-    if(input_size>0)
-    {
-        output = input[0];
-        if(input_size>1)
-        {
-            int i;
-            uint32_t shift = 256;
-            for(i=1;i<input_size;i++)
-            {
-                output *= shift;
-                output += input[i];
-            }
-        }
-    }
-}
-
-void GInteger_to_ByteArray(const Integer input, uint8_t* output, const size_t output_size) {
-    int i;
-    Integer last_byte(0xFF);
-    for(i=0;i<output_size;i++)
-        output[i] = (input >> ((output_size-1-i) << 3)) & last_byte;
-}
 
 //TODO: specifier privatekey sur 32 ou 33 bytes
 //      specifier format publickey (compressed, uncompressed bitcoin, uncompressed ethereum)
@@ -414,7 +277,7 @@ int power(int x, int y) {
    return power;
 }
 
-template <typename T> void mnemonic_from_entropy( const vector<T> entropy, 
+/*template <typename T> void mnemonic_from_entropy( const vector<T> entropy, 
                                                   vector<const char*> &mnc )
 {  
     assert(sizeof(T)>0);
@@ -451,33 +314,5 @@ template <typename T> void mnemonic_from_entropy( const vector<T> entropy,
         index = (GI_entropy >> (11 * (word_count - k - 1))) & word_mask;
         mnc.push_back(Bip39::Dictionary::WordList_english.at(index));
     }
-}
+}*/
 
-void find_mnemonic_last_words( const vector<const char*> incomplete_word_list,
-                               vector<const char*> &last_word_list)
-{
-    vector<uint16_t> incomplete_word_index_list;
-    vector<uint16_t> last_word_index_list;
-
-    vector<const char*>::const_iterator mnc_it, dic_it;
-    for(mnc_it=incomplete_word_list.begin();mnc_it<incomplete_word_list.end();mnc_it++)
-    {
-        dic_it = find(Bip39::Dictionary::WordList_english.begin(), Bip39::Dictionary::WordList_english.end(), *mnc_it);
-        assert(dic_it != Bip39::Dictionary::WordList_english.end());
-        uint16_t index = distance(Bip39::Dictionary::WordList_english.begin(), dic_it);
-        incomplete_word_index_list.push_back(index);
-    }
-
-    find_mnemonic_last_words(incomplete_word_index_list, last_word_index_list);
-
-    last_word_list.clear();
-
-    vector<uint16_t>::const_iterator last_word_index_it;
-    for(last_word_index_it=last_word_index_list.begin();last_word_index_it<last_word_index_list.end();last_word_index_it++)
-        last_word_list.push_back(Bip39::Dictionary::WordList_english.at(*last_word_index_it));
-}
-
-template <typename T> ostream& operator<< (ostream& out, const vector<T>& v) {
-    for(auto i: v) out << i;
-    return out;
-}

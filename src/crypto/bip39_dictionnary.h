@@ -2,9 +2,11 @@
 
 #include <vector>
 
-namespace Bip39 { 
+using namespace std;
+
+namespace BIP39 { 
     namespace Dictionary {
-        const std::vector<const char*> WordList_english =
+        const vector<string> WordList_english =
         {
             "abandon",
             "ability",

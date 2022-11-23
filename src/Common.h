@@ -1,9 +1,11 @@
 #pragma once
 
+#include <givaro/modular-integer.h>
+
 using namespace std;
 using namespace Givaro;
 
-string b2a_hex(const uint8_t* p, const size_t n) {
+/*string b2a_hex(const uint8_t* p, const size_t n) {
     static const char hex[] = "0123456789abcdef";
     string res;
     res.reserve(n * 2);
@@ -29,10 +31,10 @@ string b2a_bin(const uint8_t* p, const size_t n) {
     }
 
     return res;
-}
+}*/
 
 template <typename T>
-uint8_t* Vector_to_ByteArray(const vector<T> v, uint8_t* a) {
+uint8_t* Vector_to_ByteArray(const vector<T>& v, uint8_t* a) {
     memset(a,0xFF,sizeof(T)*v.size());
     typename vector<T>::const_iterator iter;
     for(auto i=0;i<v.size();i++)
@@ -42,7 +44,8 @@ uint8_t* Vector_to_ByteArray(const vector<T> v, uint8_t* a) {
 }
 
 template <typename T, typename P>
-void v2v_unaligned(const vector<T>& input, vector<P>& output, uint32_t element_bit_size, uint32_t element_count)
+void v2v_unaligned( const vector<T>& input, vector<P>& output,
+                    uint32_t element_bit_size, uint32_t element_count, uint32_t first_element_bit_offset = 0)
 {
     //the output vector word must be large enough for the specified element size
     assert((sizeof(P)<<3) >= element_bit_size);
@@ -52,44 +55,46 @@ void v2v_unaligned(const vector<T>& input, vector<P>& output, uint32_t element_b
 
     uint32_t max_overlap = (element_bit_size > 1 ? 2 + div(element_bit_size - 2, vword_bit_size).quot : 1);
     
-    uint8_t sz[max_overlap];
-    uint128_t msk[max_overlap];
+    uint8_t sz;
+    uint128_t msk;
 
     for(uint32_t element_rank=0;element_rank<element_count;element_rank++)
     {
-        uint64_t element_bit_offset = element_bit_size * element_rank;
+        uint64_t element_bit_offset = first_element_bit_offset + element_rank * element_bit_size;
 
         div_t d = div(element_bit_offset, vword_bit_size);
 
-        uint32_t idx0 = d.quot;
+        // index (bits) of initial vword
+        uint32_t idx = d.quot;
+        // initial offset (bits) in vword
         uint8_t ofs0 = d.rem;
-        int32_t bit_overflow = ofs0 + element_bit_size - vword_bit_size; // > 0 => overlaps next vword
+        // > 0 (bits) => overlaps next vword
+        int32_t bit_overflow = ofs0 + element_bit_size - vword_bit_size;
+        // >= 0 (bits) if element entirely in initial vword
         uint32_t free_rbits0 = max(-bit_overflow, 0);
+          
+        msk = (vword_mask >> ofs0) & (vword_mask << free_rbits0);
 
-        sz[0] = min(vword_bit_size - ofs0, (int)element_bit_size);
-        msk[0] = (vword_mask >> ofs0) & (vword_mask << free_rbits0);  
-
-        P element = (*(input.data()+idx0) & msk[0]) >> free_rbits0;
+        P element = (*(input.data()+idx) & msk) >> free_rbits0;
         
-        for(auto i=1;i<max_overlap;i++)
+        while(bit_overflow > 0)
         {
-            sz[i] = max(min((int)bit_overflow, (int)vword_bit_size),0);            
+            idx++;  //next vword
 
-            msk[i] = vword_mask & ~(vword_mask >> sz[i]);                                                 
+            sz = max(min((int)bit_overflow, (int)vword_bit_size),0);            
 
-            element <<= sz[i];
-            element += (*(input.data()+idx0+i) & msk[i]) >> (vword_bit_size - sz[i]);
+            msk = vword_mask & ~(vword_mask >> sz);                                                 
 
-            if(bit_overflow<=0)
-                break;                  // no more overlap => end
-            else
-                bit_overflow -= sz[i];  // => next vword
+            element <<= sz;
+            element += (*(input.data()+idx) & msk) >> (vword_bit_size - sz);
+            
+            bit_overflow -= sz;  
         }
         output.push_back(element);
     }
 }
 
-void ByteArray_to_GInteger(const uint8_t* input, Integer &output, const size_t input_size) {
+/*void ByteArray_to_GInteger(const uint8_t* input, Integer& output, const size_t input_size) {
     output = 0;
     if(input_size>0)
     {
@@ -107,9 +112,24 @@ void ByteArray_to_GInteger(const uint8_t* input, Integer &output, const size_t i
     }
 }
 
-void GInteger_to_ByteArray(const Integer input, uint8_t* output, const size_t output_size) {
+void GInteger_to_ByteArray(const Integer& input, uint8_t* output, const size_t output_size) {
     int i;
     Integer last_byte(0xFF);
     for(i=0;i<output_size;i++)
         output[i] = (input >> ((output_size-1-i) << 3)) & last_byte;
+}*/
+
+template <typename T> int32_t getIndex(const vector<T>& v, const T elem)
+{
+    int32_t index = -1;
+    //elem = "possible";
+    auto it = find(v.begin(), v.end(), elem);
+    if (it != v.end())
+        index = it - v.begin();
+    return index;
+}
+
+template <typename T> ostream& operator<< (ostream& out, const vector<T>& v) {
+    for(auto i: v) out << i;
+    return out;
 }
