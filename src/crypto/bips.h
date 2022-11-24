@@ -2,13 +2,17 @@
 
 #include <openssl/sha.h>
 
-//#include <Common.h>
-#include <iostream>
+#include <Common.h>
+#include "bip39_dictionnary.h"
+/*#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <bitset>
+#include <assert.h>
+#include <bit>
+#include <bitset>*/
 
 using namespace std;
 
@@ -17,36 +21,40 @@ namespace BIP39 {
 class entropy
 {
     public:
-        entropy(size_t bitsize);
+        entropy();
 
-        bool add_n_bits_of_entropy(uint32_t extra_e, uint8_t n_bits);
-        bool get_nth_word(const uint32_t n, const uint8_t word_bitsize, uint32_t& nth_word) const;
+        void add_n_bits_of_entropy(const uint32_t extra_e, const uint8_t n_bits);
+        void clear();
+        bool get_nth_word(const uint8_t n, const uint8_t word_bitsize, uint32_t& nth_word) const;
+        uint16_t getCurrentBitSize() const { return current_bitsize; };
+        uint8_t checksum(const uint8_t checksum_bitsize) const;
         void print() const;
 
     private:
-        size_t max_entropy_bitsize;
-        size_t current_entropy_bitsize;
+        uint16_t current_bitsize;
         vector<uint32_t> the_entropy;
 };
 
 class mnemonic
 {
     public:
-        mnemonic(const string& words, const string& pwd = "");
-        template <typename T> mnemonic(const vector<T>& entropy, const string& pwd = "");
-        
-        void list_possible_last_words( const string& incomplete_word_list,
-                                       vector<const char*> &last_word_list );
-        
-        void print(bool as_index_in_dictionnary = false);
-    
-    protected:
-        void load_word_index_list(const string& words, vector<uint16_t> list);
-        template <typename T> uint16_t find_last_word_index(const vector<T>& entropy);
-    
-    private:
-        vector<uint16_t> word_index_list;
-        string password;
+        mnemonic(const size_t entropy_bitsize, const vector<string>* dictionnary = 0);
+
+        bool add_word(const string word);
+        bool is_valid() { return (e.getCurrentBitSize() == ent); }
+        void clear();
+        bool list_possible_last_word(vector<string>& list);
+        bool generate_seed(string pwd) {}
+        void print(bool as_index_list = false) const;
+
+private:
+        entropy e;
+        string last_word;
+        const vector<string>* dic;
+        uint8_t went;
+        uint16_t ent;
+        uint8_t ms;
+        uint8_t cs;
 };
 }
 

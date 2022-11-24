@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     /*mnemonic* mnc = new mnemonic({"diamond","recycle","math","quantum","earn","save","nut","spice","hen","rice","soft","wire",
                                   "artefact","say","twin","drum","rival","live","mask","lens","actress","peasant","abstract","hint"});*/
     
-    BIP39::entropy* e = new BIP39::entropy(128);
+    /*BIP39::entropy* e = new BIP39::entropy();
     e->add_n_bits_of_entropy(0b1010100, 7);
     e->add_n_bits_of_entropy(0b0100111, 7);
     e->add_n_bits_of_entropy(0b1011000, 7);
@@ -75,7 +75,58 @@ int main(int argc, char** argv)
     uint32_t word;
     e->get_nth_word(0,11,word);
     e->get_nth_word(2,11,word);
-    e->get_nth_word(5,25,word);
+    e->get_nth_word(5,25,word);*/
+
+    BIP39::mnemonic* mnc = new BIP39::mnemonic(128);
+    mnc->add_word("possible");
+    mnc->add_word("wage");
+    mnc->add_word("deliver");
+    mnc->add_word("gossip");
+    mnc->add_word("first");
+    mnc->add_word("party");
+    mnc->add_word("hair");
+    mnc->add_word("antique");
+    mnc->add_word("salute");
+    mnc->add_word("fuel");
+    mnc->add_word("survey");
+    //mnc->add_word("miracle");
+    vector<string> v;
+    mnc->list_possible_last_word(v);
+    mnc->print();
+
+    delete mnc;
+
+    mnc = new BIP39::mnemonic(256);
+
+    mnc->add_word("diamond");
+    mnc->add_word("recycle");
+    mnc->add_word("math");
+    mnc->add_word("quantum");
+    mnc->add_word("earn");
+    mnc->add_word("save");
+    mnc->add_word("nut");
+    mnc->add_word("spice");
+    mnc->add_word("hen");
+    mnc->add_word("rice");
+    mnc->add_word("soft");
+    mnc->add_word("wire");
+    mnc->add_word("artefact");
+    mnc->add_word("say");
+    mnc->add_word("twin");
+    mnc->add_word("drum");
+    mnc->add_word("rival");
+    mnc->add_word("live");
+    mnc->add_word("mask");
+    mnc->add_word("lens");
+    mnc->add_word("actress");
+    mnc->add_word("peasant");
+    mnc->add_word("abstract");
+    //mnc->add_word("hint");
+    //vector<string> v;
+    mnc->list_possible_last_word(v);
+    mnc->print();
+
+    delete mnc;
 
     //const vector<uint64_t> entropy= { 0b1010100010011110110001001110100000110010011101010111011101000001,
     //                                  0b0001101000010000010011111011111011001011101111110110101011000110 };

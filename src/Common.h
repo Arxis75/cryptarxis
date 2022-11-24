@@ -1,6 +1,7 @@
 #pragma once
 
 #include <givaro/modular-integer.h>
+#include <stdint.h>
 
 using namespace std;
 using namespace Givaro;
@@ -132,4 +133,13 @@ template <typename T> int32_t getIndex(const vector<T>& v, const T elem)
 template <typename T> ostream& operator<< (ostream& out, const vector<T>& v) {
     for(auto i: v) out << i;
     return out;
+}
+
+static inline uint32_t log2(const uint32_t x) {
+  uint32_t y;
+  asm ( "\tbsr %1, %0\n"
+      : "=r"(y)
+      : "r" (x)
+  );
+  return y;
 }
