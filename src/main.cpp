@@ -78,21 +78,22 @@ int main(int argc, char** argv)
     e->get_nth_word(5,25,word);*/
 
     BIP39::mnemonic* mnc = new BIP39::mnemonic(128);
-    mnc->add_word("possible");
-    mnc->add_word("wage");
-    mnc->add_word("deliver");
-    mnc->add_word("gossip");
-    mnc->add_word("first");
-    mnc->add_word("party");
-    mnc->add_word("hair");
-    mnc->add_word("antique");
-    mnc->add_word("salute");
-    mnc->add_word("fuel");
-    mnc->add_word("survey");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
+    mnc->add_word("abandon");
     //mnc->add_word("miracle");
     vector<string> v;
     mnc->list_possible_last_word(v);
-    mnc->print();
+    mnc->print(true);
+    for(int i=0;i<v.size();i++) cout <<  v[i] << endl;
 
     delete mnc;
 
