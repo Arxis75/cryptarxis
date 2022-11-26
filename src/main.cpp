@@ -1,5 +1,6 @@
-//#include "Common.h"
 #include "crypto/bips.h"
+
+#include <iostream>
 
 //using namespace Givaro;
 //using namespace BIP39;
@@ -78,6 +79,7 @@ int main(int argc, char** argv)
     e->get_nth_word(5,25,word);*/
 
     BIP39::mnemonic* mnc = new BIP39::mnemonic(128);
+    /*mnc->add_word("abandon");
     mnc->add_word("abandon");
     mnc->add_word("abandon");
     mnc->add_word("abandon");
@@ -88,12 +90,13 @@ int main(int argc, char** argv)
     mnc->add_word("abandon");
     mnc->add_word("abandon");
     mnc->add_word("abandon");
-    mnc->add_word("abandon");
-    //mnc->add_word("miracle");
+    mnc->add_word("wrap");*/
+    mnc->set_full_word_list(" abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon wrap");
     vector<string> v;
     mnc->list_possible_last_word(v);
-    mnc->print(true);
     for(int i=0;i<v.size();i++) cout <<  v[i] << endl;
+
+    cout << "/" << mnc->get_word_list() << "/" << endl;
 
     delete mnc;
 
@@ -125,6 +128,7 @@ int main(int argc, char** argv)
     //mnc->add_word("hint");
     //vector<string> v;
     mnc->list_possible_last_word(v);
+    for(int i=0;i<v.size();i++) cout <<  v[i] << endl;
     mnc->print();
 
     delete mnc;

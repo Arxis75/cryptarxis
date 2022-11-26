@@ -1,10 +1,12 @@
 #pragma once
 
-#include <givaro/modular-integer.h>
-#include <stdint.h>
+//#include <givaro/modular-integer.h>
+#include <vector>
+#include <sstream>
+#include <cstring>
 
 using namespace std;
-using namespace Givaro;
+//using namespace Givaro;
 
 /*string b2a_hex(const uint8_t* p, const size_t n) {
     static const char hex[] = "0123456789abcdef";
@@ -44,7 +46,7 @@ uint8_t* Vector_to_ByteArray(const vector<T>& v, uint8_t* a) {
     return a;
 }
 
-template <typename T, typename P>
+/*template <typename T, typename P>
 void v2v_unaligned( const vector<T>& input, vector<P>& output,
                     uint32_t element_bit_size, uint32_t element_count, uint32_t first_element_bit_offset = 0)
 {
@@ -93,7 +95,7 @@ void v2v_unaligned( const vector<T>& input, vector<P>& output,
         }
         output.push_back(element);
     }
-}
+}*/
 
 /*void ByteArray_to_GInteger(const uint8_t* input, Integer& output, const size_t input_size) {
     output = 0;
@@ -142,4 +144,21 @@ static inline uint32_t log2(const uint32_t x) {
       : "r" (x)
   );
   return y;
+}
+
+// This function basically removes all separators and spreads the remaining words inside a vector
+// The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
+// are not interpreted as empty word(s); they are just removed)
+vector<string> split(const string list, const string separator)
+{
+    vector<string> v;   
+    int start = 0;
+    int end = list.find(separator);
+    while (end != -1) {
+        if(end > start ) v.push_back(list.substr(start, end - start));
+        start = end + separator.size();
+        end = list.find(separator, start);
+    }
+    if(start != list.size()) v.push_back(list.substr(start, list.size() - start));
+    return v;
 }

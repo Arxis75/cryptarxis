@@ -1,3 +1,4 @@
+#include <Common.h>
 #include "EllipticCurve.h"
 #include "bips.h"
 #include "bip39_dictionnary.h"
@@ -5,7 +6,6 @@
 #//include <openssl/evp.h>
 //#include <openssl/hmac.h>
 #include <openssl/sha.h>
-#include <Common.h>
 #include <iomanip>
 #include <iostream>
 
@@ -69,6 +69,7 @@ bool entropy::get_nth_word(const uint8_t n, const uint8_t word_bitsize, uint32_t
 
 uint8_t entropy::checksum(const uint8_t checksum_bitsize) const
 {
+    assert(checksum_bitsize <= 8);
     assert(current_bitsize % 32 == 0);
     uint8_t array2hash[current_bitsize >> 3];
     Vector_to_ByteArray(the_entropy,array2hash);
@@ -111,58 +112,72 @@ mnemonic::mnemonic(const size_t entropy_bitsize, const vector<string>* dictionna
     cs = went - d.rem;
 }
 
-bool mnemonic::add_word(const string word)
+bool mnemonic::add_word(const string& word)
 {
     bool res = false;
-    if( e.getCurrentBitSize() < ent )
+    //TODO: remove case-sensitive
+    vector<string>::const_iterator dic_it;
+    dic_it = find(dic->begin(), dic->end(), word);
+    if( dic_it != dic->end() && e.getCurrentBitSize() < ent )
     {
         bool is_last_word = (e.getCurrentBitSize() + went > ent);
         uint32_t controlled_went = went;
-        if( is_last_word )
-            controlled_went -= cs;
-        vector<string>::const_iterator dic_it;
-        dic_it = find(dic->begin(), dic->end(), word);
-        if( dic_it != dic->end() )
+        if( is_last_word ) controlled_went -= cs;
+        uint32_t index = distance(dic->begin(), dic_it);
+        entropy tmp_e(e);
+        tmp_e.add_n_bits_of_entropy(index >> (went - controlled_went), controlled_went);
+        if( !is_last_word || tmp_e.checksum(cs) == (index & (0xFF >> (8 - cs))) )
         {
-            uint32_t index = distance(dic->begin(), dic_it);
-            entropy tmp_e(e);
-            tmp_e.add_n_bits_of_entropy(index >> (went - controlled_went), controlled_went);
-            if( !is_last_word || tmp_e.checksum(cs) == (index & (0xFF >> (8 - cs))) )
-            {
-                e = tmp_e;
-                if(is_last_word) last_word = word;
-                res = true;
-            }
+            e = tmp_e;
+            res = true;
         }
     }
-    if(!res) cout << "invalid word!" << endl;
+    if(!res) cout << "invalid word addition!" << endl;
     return res;
+}
+
+bool mnemonic::set_full_word_list(const string& list)
+{
+    bool res = false;
+    vector<string> v = split(list, " ");
+    if(v.size() == ms)
+        for(int i=0;i<v.size();i++)
+        {
+            res = add_word(v[i]);
+            if(!res) {
+                clear();
+                break;
+            }
+        }
+    return res;
+}
+
+bool mnemonic::is_valid() const
+{
+    return (e.getCurrentBitSize() == ent);
 }
 
 void mnemonic::clear()
 {
-    last_word.clear();
     e.clear();
 }
 
-void mnemonic::print(bool as_index_list) const
+const string mnemonic::get_word_list() const
 {
-    if( as_index_list )
-        e.print();
-    else
+    string ret("");
+    uint32_t nth_word;
+    div_t d = div(e.getCurrentBitSize(),went);
+    for(int i=0;i<d.quot;i++)
     {
-        uint32_t nth_word;
-        for(int i=0;i<(e.getCurrentBitSize()/went);i++)
-        {
-            if( e.get_nth_word(i,went,nth_word) )
-                cout << dic->at(nth_word) << " ";
-        }
-        if(last_word != "") cout << last_word;
-        cout << endl;
+        if(ret.size()>0) ret += " ";
+        if( e.get_nth_word(i,went,nth_word) )
+            ret += dic->at(nth_word);
     }
+    if( d.rem && is_valid() ) ret += " " + get_last_word();
+    return ret;
 }
 
-bool mnemonic::list_possible_last_word(vector<string>& list)
+bool mnemonic::list_possible_last_word(vector<string>& list) const
 {
     bool res = false;
     if( e.getCurrentBitSize() == went * (ms-1) )
@@ -179,6 +194,24 @@ bool mnemonic::list_possible_last_word(vector<string>& list)
     return res;
 }
 
+const string mnemonic::get_last_word() const {
+    string ret("");
+    if( is_valid() )
+    {
+        uint32_t nthw;
+        if( e.get_nth_word(ms-1, went, nthw) )
+            ret = dic->at((nthw << cs) + e.checksum(cs));
+    }
+    return ret;
+}
+
+void mnemonic::print(bool as_index_list) const
+{
+    if( as_index_list )
+        e.print();
+    else
+        cout << get_word_list() << endl;
+}
 
 /*
 int pbkdf2_hmac_sha512( const char* pass,

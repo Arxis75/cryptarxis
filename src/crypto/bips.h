@@ -2,17 +2,7 @@
 
 #include <openssl/sha.h>
 
-#include <Common.h>
 #include "bip39_dictionnary.h"
-/*#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <bitset>
-#include <assert.h>
-#include <bit>
-#include <bitset>*/
 
 using namespace std;
 
@@ -23,8 +13,9 @@ class entropy
     public:
         entropy();
 
-        void add_n_bits_of_entropy(const uint32_t extra_e, const uint8_t n_bits);
         void clear();
+        void add_n_bits_of_entropy(const uint32_t extra_e, const uint8_t n_bits);
+
         bool get_nth_word(const uint8_t n, const uint8_t word_bitsize, uint32_t& nth_word) const;
         uint16_t getCurrentBitSize() const { return current_bitsize; };
         uint8_t checksum(const uint8_t checksum_bitsize) const;
@@ -40,16 +31,19 @@ class mnemonic
     public:
         mnemonic(const size_t entropy_bitsize, const vector<string>* dictionnary = 0);
 
-        bool add_word(const string word);
-        bool is_valid() { return (e.getCurrentBitSize() == ent); }
         void clear();
-        bool list_possible_last_word(vector<string>& list);
-        bool generate_seed(string pwd) {}
+        bool add_word(const string& word);
+        bool set_full_word_list(const string& list);
+        bool generate_seed(const string& pwd) {}
+      
+        bool is_valid() const;
+        bool list_possible_last_word(vector<string>& list) const;
+        const string get_word_list() const;
+        const string get_last_word() const;
         void print(bool as_index_list = false) const;
 
 private:
         entropy e;
-        string last_word;
         const vector<string>* dic;
         uint8_t went;
         uint16_t ent;
