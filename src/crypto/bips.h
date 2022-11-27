@@ -1,10 +1,9 @@
 #pragma once
 
-#include <openssl/sha.h>
-
-#include "bip39_dictionnary.h"
+#include "EllipticCurve.h"
 
 using namespace std;
+using namespace Givaro;
 
 namespace BIP39 {
 
@@ -34,7 +33,6 @@ class mnemonic
         void clear();
         bool add_word(const string& word);
         bool set_full_word_list(const string& list);
-        bool generate_seed(const string& pwd) {}
       
         bool is_valid() const;
         bool list_possible_last_word(vector<string>& list) const;
@@ -52,83 +50,47 @@ private:
 };
 }
 
+namespace BIP32 {
+
+class extpubkey: public Point
+{
+    public:
+        extpubkey(Secp256k1& curve, Integer k, Integer cc);
+
+        const Integer getKey(size_t size) const;
+        const Integer getChainCode() const { return chaincode; }
+        Integer getAddress() const;
+
+    private:
+        Point key;
+        Integer chaincode;
+        Integer the_address;
+};
+
 class seed
 {
     public:
-        seed(vector<uint8_t> s);
-    
-    private:
+        seed(const BIP39::mnemonic& mnc, const string& pwd);
 
+        const uint8_t* get() const { return the_seed; }
+        void print() const;
+
+    private:
+        uint8_t the_seed[64];
 };
 
-/*
-namespace BIP32 {
-class pubkey
+class extprivkey
 {
     public:
-        pubkey(x,y);
-        pubkey(px);
-        pubkey(pxy);
-        pubkey(xy);
-    
-    protected:
-        bool is_valid();
+        extprivkey(const seed& s);
+        extprivkey(const extprivkey& parent_secret, const int32_t index, const bool hardened);
+        const Integer getSecret() const { return secret; }
+        const extpubkey& getExtPubKey() const { return *pubkey; }
+        extprivkey* derive(int32_t child_index, bool child_is_hardened);
 
     private:
-        Integer X, Y;
-        vector<uint8_t> prefixed_x_y;
+        Integer secret;
+        extpubkey* pubkey;
+        extprivkey* child;
 };
-
-class secret
-{
-        public:
-        secret::secret(s);
-        secret::secret(prefixed_s);
-    
-    protected:
-        bool is_valid();
-
-    private:
-        Integer ;
-        uint8_t prefix;       
-};
-
-class Factory{ 
-    public:
-        static Bip32* getInstance()
-        {
-            if (instancePtr == NULL) {
-                instancePtr = new Bip32();
-                return instancePtr;
-            }
-            else
-                return instancePtr;
-        }
-
-        // deleting copy constructor
-        Bip32(const Bip32& obj) = delete;
-
-        bip39_seed* derive_seed(const bip39_mnemonic& mnc);
-
-        bip32_secret* derive_m_child(const bip32_seed& seed); 
-        bip32_secret* derive_child(const bip32_secret& parent_secret, uint32_t child_index, bool hardened);
-        bip32_pubkey* derive_child(const bip32_pubkey& parent_pubkey, uint32_t child_index);    //secret remains unknown
-
-    private:
-        // Default constructor
-        Bip32() {}
-
-    public:
-
-    private:
-        static Bip32* instancePtr;
-};
-
-// initializing instancePtr with NULL
-Factory* Factory::instancePtr = NULL;
 }
-
-namespace BIP44
-{
-
-}*/
