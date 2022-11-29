@@ -16,10 +16,13 @@ class bitstream
         bitstream(const Integer& val, uint32_t bitsize);
         bitstream(const uint8_t* p, uint32_t bitsize);
         
+        void from_bitstream(const bitstream&);
+        void from_integer(const Integer& val, const uint32_t bitsize);
+        void from_ptr(const uint8_t* p, const uint32_t bitsize);
         void push_back(const Integer& bits_value, const uint32_t bitsize);
         void clear();
         
-        const bitstream at(uint32_t bitoffset, uint32_t bitsize) const;
+        const bitstream at(const uint32_t bitoffset, const uint32_t bitsize) const;
         const uint32_t bitsize() const { return end_boffset; }
 
         const bitstream sha256() const;

@@ -56,10 +56,10 @@ extprivkey::extprivkey(const extprivkey& parent, const int32_t index, const bool
     bitstream parent_cc(parent.getChainCode());
     uint32_t suffix = index;
     if(!hardened)
-        parent_data.push_back(parent.getExtPubKey().getKey(33),8+256);
+        parent_data.from_bitstream(parent.getExtPubKey().getKey(33));
     else
     {
-        parent_data.push_back(0x00,8);
+        parent_data.from_integer(0x00, 8);
         parent_data.push_back(parent.getSecret(),256);
         suffix += 0x80000000;
     }      
@@ -78,7 +78,7 @@ extprivkey::extprivkey(const extprivkey& parent, const int32_t index, const bool
         Integer s = a2Integer(&digest[0], 256);
         s += parent.getSecret();
         s %= Secp256k1::GetInstance().getCurveOrder();
-        secret.push_back(s, 256);
+        secret.from_integer(s, 256);
 
         bitstream cc(&digest[32], 256);
         pubkey = new extpubkey(Secp256k1::GetInstance(), secret, cc);

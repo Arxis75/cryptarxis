@@ -13,29 +13,53 @@ bitstream::bitstream()
 {}
 
 bitstream::bitstream(const uint32_t reserve_bitsize)
-    : end_boffset(0)
+    : end_boffset(reserve_bitsize)
 {
-    push_back(0, reserve_bitsize);
+    div_t d = div(reserve_bitsize, 8);
+    uint32_t bytes = d.quot + (d.rem ? 1 : 0);
+    for(uint32_t i=0;i<bytes;i++) vvalue.push_back(0);
 }
 
 bitstream::bitstream(const bitstream& b)
     : end_boffset(0)
 {
-    push_back(b, b.bitsize());
+    from_bitstream(b);   
 }
 
 bitstream::bitstream(const Integer& val, uint32_t bitsize)
     : end_boffset(0)
 {
-    if(bitsize)
-        push_back(val, bitsize);
+    if(bitsize) from_integer(val, bitsize);
 }
 
 bitstream::bitstream(const uint8_t* p, uint32_t bitsize)
     : end_boffset(0)
 {
-    if(bitsize)
-        push_back(a2Integer(p, bitsize), bitsize);
+    if(bitsize) from_ptr(p, bitsize);
+}
+
+void bitstream::from_bitstream(const bitstream& b)
+{
+    end_boffset = b.bitsize();
+    vvalue = b.vvalue;
+}
+
+void bitstream::from_integer(const Integer& val, uint32_t bitsize)
+{
+    if(end_boffset) clear();
+    push_back(val, bitsize);
+}
+
+void bitstream::from_ptr(const uint8_t* p, uint32_t bitsize)
+{
+    if(end_boffset) clear();
+    div_t d = div(bitsize, 8);
+    for(uint32_t i=0;i<d.quot;i++) vvalue.push_back(0);
+    if(d.quot)
+        memcpy(vvalue.data(), p, d.quot);
+    if(d.rem)
+        vvalue.push_back(p[d.quot] & ~(0xFF >> d.rem));
+    end_boffset = bitsize;
 }
 
 void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
@@ -48,7 +72,7 @@ void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
         uint8_t nbits_to_push = min(8-(end_boffset%8), nbitsleft);
         bits_to_push = bits_value & (max_size_mask >> (bitsize - nbitsleft));
         bits_to_push >>= nbitsleft - nbits_to_push;
-        if((end_boffset>>3) >= vvalue.size()) vvalue.push_back(0u);  //overflow => resize
+        if((end_boffset>>3) >= vvalue.size()) vvalue.push_back(0);  //overflow => resize
         vvalue[end_boffset>>3] += uint8_t(bits_to_push << (8-(end_boffset%8)-nbits_to_push));                
         end_boffset += nbits_to_push;
         nbitsleft -= nbits_to_push;
