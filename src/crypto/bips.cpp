@@ -138,7 +138,7 @@ mnemonic::mnemonic(const size_t entropy_bitsize, const vector<string> *dictionna
     d = div(ent, 32);
     assert(!d.rem); // multiple of 32
 
-    d = div(ent, (int)went);
+    d = div(ent, went);
     ms = d.quot + 1; // 1 extra word for checksum/alignment
     cs = went - d.rem;
 }
