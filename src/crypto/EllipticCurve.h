@@ -99,7 +99,7 @@ class Secp256k1: public EllipticCurve
     public:
         static Secp256k1& GetInstance();
         Secp256k1(const Secp256k1& obj) = delete;
-        Point Gmul(Integer& k);
+        Point Gmul(const Integer& k);
         const Integer getFieldOrder() const { return p; }
         const Integer getCurveOrder() const { return n; }
 

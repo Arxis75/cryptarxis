@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 
     const char* xx = "bonjour";
     int y = sizeof(xx);
-
+    // diamond recycle math quantum earn save nut spice hen rice soft wire artefact say twin drum rival live mask lens actress peasant abstract hint
     mnc->add_word("diamond");
     mnc->add_word("recycle");
     mnc->add_word("math");
@@ -64,8 +64,7 @@ int main(int argc, char** argv)
     mnc->add_word("hint");
     mnc->print();
 
-    seed s(*mnc, "toto");
-    extprivkey m(s);
+    extprivkey m(mnc->get_seed("toto"));
     extprivkey m_h44(m,44,true);
     extprivkey m_h44_h60(m_h44,60,true);
     extprivkey m_h44_h60_h0(m_h44_h60,0,true);
@@ -73,7 +72,7 @@ int main(int argc, char** argv)
     int32_t x = 3;
     extprivkey m_h44_h60_h0_0_x(m_h44_h60_h0_0,x,false);
 
-    cout << hex << m_h44_h60_h0_0_x.getExtPubKey().getAddress() << endl;
+    cout << "Address: " << hex << m_h44_h60_h0_0_x.getExtPubKey().getAddress() << endl << endl;;
 
     delete mnc;
 

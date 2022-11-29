@@ -308,7 +308,7 @@ Secp256k1& Secp256k1::GetInstance()
     return *instancePtr;
 }
 
-Point Secp256k1::Gmul(Integer& k)
+Point Secp256k1::Gmul(const Integer& k)
 {
     Point R;
     assert(k > 0 && k < getCurveOrder());

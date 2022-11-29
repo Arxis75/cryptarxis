@@ -8,6 +8,22 @@
 using namespace std;
 using namespace Givaro;
 
+bitstream::bitstream()
+    : end_boffset(0)
+{}
+
+bitstream::bitstream(const uint32_t reserve_bitsize)
+    : end_boffset(0)
+{
+    push_back(0, reserve_bitsize);
+}
+
+bitstream::bitstream(const bitstream& b)
+    : end_boffset(0)
+{
+    push_back(b, b.bitsize());
+}
+
 bitstream::bitstream(const Integer& val, uint32_t bitsize)
     : end_boffset(0)
 {
@@ -18,29 +34,14 @@ bitstream::bitstream(const Integer& val, uint32_t bitsize)
 bitstream::bitstream(const uint8_t* p, uint32_t bitsize)
     : end_boffset(0)
 {
-    if(bitsize>0)
-        push_back(getInteger(p, bitsize), bitsize);
-}
-
-bitstream::bitstream(const char* p, uint32_t size)
-    : end_boffset(0)
-{
-    if(size>0)
-    {
-        Integer val(p[0]);
-        for(uint32_t index=1;index<size;index++)
-        {
-            val <<= 8;
-            val += p[index];
-        }
-        push_back(val, size<<3);
-    }
+    if(bitsize)
+        push_back(a2Integer(p, bitsize), bitsize);
 }
 
 void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
 {
     Integer max_size_mask = pow(Integer(2),bitsize) - 1;
-    Integer bits_to_push(0u);
+    Integer bits_to_push(0);
     uint32_t nbitsleft = bitsize;
     while(nbitsleft)
     {   
@@ -54,44 +55,12 @@ void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
     }
 }
 
-bitstream::operator const Integer() const
-{
-    return getInteger(vvalue.data(), end_boffset);
-}
-
-const Integer bitstream::getInteger(const uint8_t* p, int32_t bitsize) const    // aligned
-{
-    Integer val(0u);
-    if(bitsize>0)
-    {
-        div_t d = div(bitsize,8);
-        for(uint32_t index=0;index<d.quot;index++)
-        {
-            val += p[index];
-            val <<= min(bitsize - int32_t((index+1)<<3), 8);
-        }
-        if(d.rem)
-            val += p[d.quot] >> (8 - d.rem);
-    }
-    return val;
-}
-
-const uint8_t* bitstream::ptr(uint32_t bytes_offset) const                      // aligned
-{
-    assert(((bytes_offset+1)<<3) <= end_boffset);
-    return vvalue.data() + bytes_offset;
-}
-
 const bitstream bitstream::at(uint32_t bitoffset, uint32_t bitsize) const       // not aligned
 {
-    Integer v(0u);
-    uint32_t at_end = bitoffset + bitsize;
-    if( at_end <= end_boffset )
-    {
-        Integer mask = pow(Integer(2), bitsize) - 1;
-        uint32_t rshift = end_boffset - at_end;
-        v = mask & (getInteger(vvalue.data(),end_boffset)>>rshift);
-    }
+    assert(bitoffset+bitsize <= end_boffset);
+    Integer mask = pow(Integer(2), bitsize) - 1;
+    uint32_t rshift = end_boffset - bitoffset - bitsize;
+    Integer v = mask & (Integer(*this)>>rshift);
     return bitstream(v, bitsize);
 }
 
@@ -104,7 +73,7 @@ void bitstream::clear()
 const bitstream bitstream::sha256() const
 {
     assert(!(end_boffset%8));
-    bitstream digest(Integer(0),256);
+    bitstream digest(256);
     SHA256(*this, end_boffset>>3, digest);
     return digest;
 }
@@ -126,77 +95,25 @@ const bitstream bitstream::address() const
 }
 
 ostream& operator<< (ostream& out, const bitstream& v) {
-    out << hex << v.getInteger(v.vvalue.data(), v.end_boffset);
+    out << hex << Integer(v);
     return out;
 }
 
-string b2a_hex(const uint8_t* p, const size_t n) {
-    static const char hex[] = "0123456789abcdef";
-    string res;
-    res.reserve(n * 2);
-
-    for (auto end = p + n; p != end; ++p) {
-        const uint8_t v = (*p);
-        res += hex[(v >> 4) & 0x0F];
-        res += hex[v & 0x0F];
-    }
-
-    return res;
-}
-
-string b2a_bin(const uint8_t* p, const size_t n) {
-    static const char bin[] = "01";
-    string res;
-    res.reserve(n * 2);
-
-    for (auto end = p + n; p != end; ++p) {
-        const uint8_t v = (*p);
-        for(int i=7;i>=0;i--)
-            res += bin[(v >> i) & 1];
-    }
-
-    return res;
-}
-
-template <typename T>
-uint8_t* Vector_to_ByteArray(const vector<T>& v, uint8_t* a) {
-    memset(a,0xFF,sizeof(T)*v.size());
-    typename vector<T>::const_iterator iter;
-    for(auto i=0;i<v.size();i++)
-        for(auto j=0;j<sizeof(T);j++)
-            *(a+i*sizeof(T)+j) = ((v[i]>>((sizeof(T)-j-1)<<3)) & 0xFF);
-    return a;
-}
-template uint8_t* Vector_to_ByteArray<uint32_t>(const vector<uint32_t>& v, uint8_t* a); //for the linker
-
-void ByteArray_to_GInteger(const uint8_t* input, Integer& output, const size_t input_size) {
-    output = 0;
-    if(input_size>0)
+Integer a2Integer(const uint8_t* input, const int32_t bitsize)
+{
+    Integer output = 0;
+    if(bitsize>0)
     {
-        output = input[0];
-        if(input_size>1)
+        div_t d = div(bitsize,8);
+        for(int32_t index=0;index<d.quot;index++)
         {
-            int i;
-            uint16_t shift = 8;
-            for(i=1;i<input_size;i++)
-            {
-                output <<= shift;
-                output += input[i];
-            }
+            output += input[index];
+            output <<= min(bitsize - ((index+1)<<3), 8);
         }
+        if(d.rem)
+            output += input[d.quot] >> (8 - d.rem);
     }
-}
-
-void GInteger_to_ByteArray(const Integer& input, uint8_t* output, const size_t output_size) {
-    int i;
-    Integer last_byte(0xFF);
-    for(i=0;i<output_size;i++)
-        output[i] = (input >> ((output_size-1-i) << 3)) & last_byte;
-}
-
-template <typename T> ostream& operator<< (ostream& out, const vector<T>& v) {
-    for(auto i: v) out << i;
-    return out;
+    return output;
 }
 
 // This function basically removes all separators and spreads the remaining words inside a vector

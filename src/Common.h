@@ -5,17 +5,20 @@
 using namespace std;
 using namespace Givaro;
 
+Integer a2Integer(const uint8_t* input, const int32_t bitsize);
+
 class bitstream
 {
     public:
+        bitstream();
+        bitstream(const uint32_t reserve_bitsize);
+        bitstream(const bitstream&);
         bitstream(const Integer& val, uint32_t bitsize);
         bitstream(const uint8_t* p, uint32_t bitsize);
-        bitstream(const char* p, uint32_t size);
         
         void push_back(const Integer& bits_value, const uint32_t bitsize);
         void clear();
         
-        const uint8_t* ptr(uint32_t bytes_offset) const;
         const bitstream at(uint32_t bitoffset, uint32_t bitsize) const;
         const uint32_t bitsize() const { return end_boffset; }
 
@@ -26,32 +29,18 @@ class bitstream
         friend ostream& operator<< (ostream& out, const bitstream& v);
         
         operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
-        operator const uint8_t*() { return reinterpret_cast<const uint8_t*>(vvalue.data()); }
-        operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }      
-        operator char*() { return reinterpret_cast<char*>(vvalue.data()); }
-        operator const char*() const { return reinterpret_cast<const char*>(vvalue.data()); }
-        operator const Integer() const;
+        operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
+        operator const Integer() const { return a2Integer(vvalue.data(), end_boffset); }
 
-    protected:
-        const Integer getInteger(const uint8_t* p, int32_t bitsize) const;
-        //uint8_t ushort_min(uint8_t a, uint8_t b) {return (a<b?a:b);}
+        uint8_t as_uint8(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+8,end_boffset) - bofs)); }
+        uint16_t as_uint16(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+16,end_boffset) - bofs)); }
+        uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
+        uint64_t as_uint64(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+64,end_boffset) - bofs)); }
 
     private:
         uint32_t end_boffset;
         vector<uint8_t> vvalue;
 };
-
-string b2a_hex(const uint8_t* p, const size_t n);
-string b2a_bin(const uint8_t* p, const size_t n);
-
-template <typename T>
-uint8_t* Vector_to_ByteArray(const vector<T>& v, uint8_t* a);
-
-void ByteArray_to_GInteger(const uint8_t* input, Integer& output, const size_t input_size);
-
-void GInteger_to_ByteArray(const Integer& input, uint8_t* output, const size_t output_size);
-
-template <typename T> ostream& operator<< (ostream& out, const vector<T>& v);
 
 // This function basically removes all separators and spreads the remaining words inside a vector
 // The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
