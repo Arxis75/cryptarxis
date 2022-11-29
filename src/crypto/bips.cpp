@@ -358,6 +358,8 @@ seed::seed(const BIP39::mnemonic& mnc, const string& pwd)
         char salt[8 + pwd.size()];
         strcpy(salt, "mnemonic");
         strcat(salt, pwd.c_str()); // salt = "mnemonic" + password
+        
+        int a = strlen(reinterpret_cast<const char *>(salt));
 
         // Cf https://www.openssl.org/docs/manmaster/man3/PKCS5_PBKDF2_HMAC.html
 

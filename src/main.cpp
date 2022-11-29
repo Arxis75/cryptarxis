@@ -1,11 +1,37 @@
 #include "crypto/bips.h"
+#include "Common.h"
+
+#include <string>
+
+using namespace std;
 
 using namespace BIP39;
 using namespace BIP32;
 
 int main(int argc, char** argv)
 {
+    uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
+                         0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
+                         0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
+                         0b10100000 };
+    bitstream a(toto,771);
+    bitstream c(a.at(2,3));
+    //cout << hex << Integer(a) << endl;
+    cout << hex << c << endl;
+
+    bitstream d(77,8);
+    cout << d.sha256() << endl;
+    cout << d.keccak256() << endl;
+    cout << d.address() << endl;
+
+    bitstream b("toto",sizeof("toto"));
+    //cout << hex << Integer(a) << endl;
+    cout << hex << b << endl;
+
     mnemonic* mnc = new mnemonic(256);
+
+    const char* xx = "bonjour";
+    int y = sizeof(xx);
 
     mnc->add_word("diamond");
     mnc->add_word("recycle");
