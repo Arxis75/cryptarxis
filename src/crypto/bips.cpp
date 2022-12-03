@@ -15,6 +15,7 @@ using namespace BIP32;
 using namespace ethash;
 
 //----------------------------------------------------------- BIP32 -----------------------------------------------------------------
+
 extpubkey::extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc)   //from Curve + private key
     : key(curve.Gmul(k))
     , chaincode(cc)

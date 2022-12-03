@@ -29,13 +29,13 @@ bitstream::bitstream(const bitstream& b)
 bitstream::bitstream(const Integer& val, uint32_t bitsize)
     : end_boffset(0)
 {
-    if(bitsize) from_integer(val, bitsize);
+    from_integer(val, bitsize);
 }
 
 bitstream::bitstream(const uint8_t* p, uint32_t bitsize)
     : end_boffset(0)
 {
-    if(bitsize) from_ptr(p, bitsize);
+    from_ptr(p, bitsize);
 }
 
 void bitstream::from_bitstream(const bitstream& b)
@@ -46,13 +46,15 @@ void bitstream::from_bitstream(const bitstream& b)
 
 void bitstream::from_integer(const Integer& val, uint32_t bitsize)
 {
-    if(end_boffset) clear();
+    if(end_boffset)
+        clear();
     push_back(val, bitsize);
 }
 
 void bitstream::from_ptr(const uint8_t* p, uint32_t bitsize)
 {
-    if(end_boffset) clear();
+    if(end_boffset)
+        clear();
     div_t d = div(bitsize, 8);
     for(uint32_t i=0;i<d.quot;i++) vvalue.push_back(0);
     if(d.quot)

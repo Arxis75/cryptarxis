@@ -73,7 +73,8 @@ class Curve
 
     class EllipticCurve
 {
-private:
+//private:
+public:
     typedef ZP::Element Element;
     Curve *curve;
     ZP *FField;
@@ -101,6 +102,7 @@ class Secp256k1: public EllipticCurve
         Secp256k1(const Secp256k1& obj) = delete;
         Point Gmul(const Integer& k);
         const Integer getFieldOrder() const { return p; }
+        const Point getGenerator() const { return G; }
         const Integer getCurveOrder() const { return n; }
 
     private:
