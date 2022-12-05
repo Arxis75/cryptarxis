@@ -62,7 +62,7 @@ EllipticCurve::EllipticCurve(const Integer& p, const Integer& A, const Integer& 
     , _n(0)
 {
 	assert( !isZeroDiscriminant() );
-	assert( isPrimeNumber(_p) );
+	//assert( isPrimeNumber(_p) );
 	assert( _p%4 == 3 );			//for fast sqrt
 }
 
@@ -75,10 +75,10 @@ EllipticCurve::EllipticCurve(const Integer& p, const Integer& A, const Integer& 
     , _n(n)
 {
 	assert( !isZeroDiscriminant() );
-	assert( isPrimeNumber(_p) );
+	//assert( isPrimeNumber(_p) );
 	assert( _p%4 == 3 );			//for fast sqrt
 	assert( verifyPoint(G) );
-	assert( isPrimeNumber(_n) );	//TODO: calculate pointOrder instead of passing it as a parameter
+	//assert( isPrimeNumber(_n) );	//TODO: calculate pointOrder instead of passing it as a parameter
 }
 
 bool EllipticCurve::sqrtmod(Integer& root, const Integer& n, const bool parity) const
@@ -95,42 +95,46 @@ bool EllipticCurve::sqrtmod(Integer& root, const Integer& n, const bool parity) 
 
 bool EllipticCurve::ecrecover(Point& pubkeyPoint,
                 			  const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
-                			  const bitstream& from_address ) const
+                			  const bitstream& from_address) const
 {
-
     assert(msg_hash.bitsize() == 256);
     assert(r < _n);
     assert(s < _n);
-    assert(from_address.bitsize() == 160);
 
     bool ret = false;
+
 	Point Q_candidate;
     Integer r_candidate = r;
+	Integer y_candidate;
+
+	Point hG =  p_scalar(_G, msg_hash);
+	//cout << hex << "hG = (0x" << hG.getX() << ", 0x" << hG.getY() << ")" << endl;
+	Point _hG = p_inv(hG);
+	//cout << hex << "_hG = (0x" << _hG.getX() << ", 0x" << _hG.getY() << ")" << endl;
+	Integer r_1;
+	inv(r_1, r_candidate, _n);
+	//cout << hex << "r^(-1) = 0x" << r_1 << endl;
+
     while(!ret && r_candidate < _p)
     {
-        Integer y_candidate;
         if( sqrtmod(y_candidate, getY2(r_candidate), parity) )
         {
             Point R = Point(r_candidate, y_candidate);
-			cout << dec << "R_candidate = (" << R.getX() << "," << R.getY() << ")" << endl;
+			//cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
             Point sR = p_scalar(R, s);
-			cout << dec << "sR = (" << sR.getX() << "," << sR.getY() << ")" << endl;
-            Point hG =  p_scalar(_G, msg_hash);
-			cout << dec << "hG = (" << hG.getX() << "," << hG.getY() << ")" << endl;
-            Point _hG = p_inv(hG);
-			cout << dec << "_hG = (" << _hG.getX() << "," << _hG.getY() << ")" << endl;
-            Point sR_hG = p_add(sR, _hG);
-			cout << dec << "sR_hG = (" << sR_hG.getX() << "," << sR_hG.getY() << ")" << endl;
-            Integer r_1;
-			inv(r_1, r_candidate, _n);
-			cout << dec << "r^(-1) = " << r_1 << endl;
-            Q_candidate = p_scalar(sR_hG, r_1);
-        	cout << dec << "Q_candidate = (" << Q_candidate.getX() << "," << Q_candidate.getY() << ")" << endl;
+			//cout << hex << "sR = (0x" << sR.getX() << ", 0x" << sR.getY() << ")" << endl;
+			Point sR_hG = p_add(sR, _hG);
+			//cout << hex << "sR_hG = (0x" << sR_hG.getX() << ", 0x" << sR_hG.getY() << ")" << endl;
+			Q_candidate = p_scalar(sR_hG, r_1);
+			//cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
 			BIP32::pubkey pubkey_candidate(Q_candidate);
-        	cout << dec << "Address(Q_candidate) = 0x" << pubkey_candidate.getAddress() << endl;
-            ret = (pubkey_candidate.getAddress() == from_address);
+			//cout << hex << "Address(Q_candidate) = 0x" << pubkey_candidate.getAddress() << endl;
+			
+			// if no address/invalid address format, we assume that
+			// the first pubkey found is the one we're looking for (very likely!)
+			ret = (from_address.bitsize() != 160 || pubkey_candidate.getAddress() == from_address);
         }
-        r_candidate += _n;
+        r_candidate += _n;	// r may have been truncated if _n <= r < _p
     }
 	if(ret)
 		pubkeyPoint = Q_candidate;
@@ -212,58 +216,44 @@ Point EllipticCurve::p_double(const Point& P) const
 Point EllipticCurve::p_add(const Point& P, const Point& Q) const
 {
 	Point R;
-	Point tmp1, tmp2;
-	tmp1 = p_inv(P);
-	tmp2 = p_inv(Q);
-	if((P.isIdentity() && Q.isIdentity()) || (tmp1 == Q) || (tmp2 == P))
-		{
-	    R.setIdentity(true);
-	    return R;
-	    }
-	if (P.isIdentity())
-	    {
+	if( (P.isIdentity() && Q.isIdentity()) || Q == p_inv(P) || P == p_inv(Q) )
+		R.setIdentity(true);
+	else if (P.isIdentity())
 	    R = Q;
-	    return R;
-	    }
-	if (Q.isIdentity())
-	    {
+	else if (Q.isIdentity())
 	    R = P;
-	    return R;
-	    }
-	if(P==Q)
-	   {
-		return p_double(P);
-	   }
-	//
-    R.setIdentity(false);
-	Element tmp;
-	Element num; // y2 - y1
-	_FField.sub(num,Q.getY(),P.getY());
-	//
-	Element den; // x2 - x1
-	_FField.sub(den,Q.getX(),P.getX());
-	//
-	Element slope; // m
-	_FField.div(slope,num,den);
-	//
-	Element slope2; // m^2
-	_FField.mul(slope2,slope,slope);
-	// 
-	Element x3; // x_3
-	_FField.sub(x3,slope2,_FField.add(tmp,Q.getX(),P.getX()));
-	//
-	Element diffx3; // x_1 - x_3
-	_FField.sub(diffx3,P.getX(),x3);
-	//
-	Element y3; // y_3
-	_FField.mul(tmp,slope,diffx3);
-	_FField.sub(y3,tmp,P.getY());
-	
-    R.setX(x3);
-    R.setY(y3);
+	else if(P==Q)
+		R = p_double(P);
+	else
+	{
+		R.setIdentity(false);
+		Element num; // y2 - y1
+		_FField.sub(num, Q.getY(), P.getY());
+
+		Element den; // x2 - x1
+		_FField.sub(den, Q.getX(), P.getX());
+
+		Element slope; // m
+		_FField.div(slope, num,den);
+
+		Element slope2; // m^2
+		_FField.mul(slope2, slope, slope);
+
+		Element tmp, x3; // x_3
+		_FField.sub(x3, slope2, _FField.add(tmp, Q.getX(), P.getX()));
+
+		Element diffx3; // x_1 - x_3
+		_FField.sub(diffx3, P.getX(), x3);
+
+		Element y3; // y_3
+		_FField.mul(tmp, slope, diffx3);
+		_FField.sub(y3, tmp, P.getY());
+		
+		R.setX(x3);
+		R.setY(y3);
+	}
     return R;
 }
-
 
 Point EllipticCurve::p_scalar(const Point& P, const Integer& k) const
 {

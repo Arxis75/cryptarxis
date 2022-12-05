@@ -40,6 +40,7 @@ class EllipticCurve
         EllipticCurve(const Integer& p, const Integer& A, const Integer& B);
         EllipticCurve(const Integer& p, const Integer& A, const Integer& B, const Point& G, const Integer& n);
 
+        bool isZeroDiscriminant() const;
         const Integer& getFieldOrder() const { return _p; }
         const Point& getGenerator() const { return _G; }
         const Integer& getCurveOrder() const { return _n; }
@@ -51,7 +52,7 @@ class EllipticCurve
 
         bool ecrecover(Point& pubkeyPoint,
                 	   const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
-                	   const bitstream& from_address ) const;
+                	   const bitstream& from_address = bitstream()) const;
 
         bool verifyPoint(const Point& P) const;
         void print() const;
@@ -65,7 +66,6 @@ class EllipticCurve
         const Element& getB()const { return _B; };
 
         bool isInv(const Point& Q, const Point& P) const;
-        bool isZeroDiscriminant() const;
 
     private:
         const ZP _FField;
