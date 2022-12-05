@@ -2,97 +2,77 @@
 
 #include <stdlib.h>
 #include <givaro/modular-integer.h>
+#include <Common.h>
 
 using namespace Givaro;
 
 typedef Modular<Integer> ZP;
 typedef ZP::Element Element;
 
+bool isPrimeNumber(const Integer& n);
+
 class Point
 {
-private:
-    
-    bool identity;
-    Element x,y;
-public:
+    public:
+        Point();
+        Point(const Element& _x, const Element& _y);
+        
+        const Element& getX() const { return x; }
+        const Element& getY() const { return y; }
+        bool isIdentity() const { return identity; }
 
-    Point() : identity(true) {}
-    Point(bool b);
-    Point(Element x, Element y);
-    Element getX() const{
-        return this->x;
-    };
-    void setX(Element _x){
-        this->x = _x;
-    }
-    Element getY() const{
-        return this->y;
-    };
+        void setX(Element _x) { x = _x; }
+        void setY(Element _y) { y = _y; }
+        void setIdentity(bool _identity) { identity = _identity; }
 
-    void setY(Element _y) {
-        this->y = _y;
-    };
-
-    bool isIdentity() const{
-        return this->identity;
-    };
-
-    void setIdentity(bool _identity){
-        this->identity = _identity;
-    };
-
-    Point operator=(const Point& P);
-    bool operator==(const Point& P) const;
-    void print();
+        Point operator=(const Point& P);
+        bool operator==(const Point& P) const;
+        void print() const;
+        
+    private:    
+        bool identity;
+        Element x,y;
 };
 
-class Curve
-    {
-    private:
-        ZP* FField;
-        Element A,B;
-
-    public:
-        Curve();
-        Curve(Integer primeField, Integer A, Integer B);
-        ~Curve();
-        bool isZeroDiscriminant();
-        ZP *getField()
-            {
-            return this->FField;
-            };
-
-        Element getA(){
-            return this->A;
-        };
-        Element getB(){
-            return this->B;
-        };
-        void print(); 
-    };
-
-    class EllipticCurve
+class EllipticCurve
 {
-//private:
-public:
-    typedef ZP::Element Element;
-    Curve *curve;
-    ZP *FField;
-    Point identity;
-public:
-    EllipticCurve(Curve *c);
-    EllipticCurve(Integer primeField, Integer A, Integer B);
-    ~EllipticCurve();
+    public:
+        EllipticCurve(const Integer& p, const Integer& A, const Integer& B);
+        EllipticCurve(const Integer& p, const Integer& A, const Integer& B, const Point& G, const Integer& n);
 
-    const Point& _inv(Point& Q, const Point& P);
-    bool _isInv(const Point& Q, const Point& P);
-    Point& _double(Point& R, const Point& P);
-    Point& _add(Point&R, const Point &P, const Point& Q);
-    Point& _scalar(Point& R, const Point& P,Integer k);
+        const Integer& getFieldOrder() const { return _p; }
+        const Point& getGenerator() const { return _G; }
+        const Integer& getCurveOrder() const { return _n; }
 
-    bool verifyPoint(const Point& P) const;
-    void print();
+        Point p_inv(const Point& P) const;
+        Point p_add(const Point &P, const Point& Q) const;
+        Point p_double(const Point& P) const;
+        Point p_scalar(const Point &P, const Integer& k) const;
 
+        bool ecrecover(Point& pubkeyPoint,
+                	   const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
+                	   const bitstream& from_address ) const;
+
+        bool verifyPoint(const Point& P) const;
+        void print() const;
+
+        Element getY2(const Element& X) const;
+        bool sqrtmod(Integer& root, const Integer& n, const bool parity) const;
+
+    protected:
+        const ZP& getField() const { return _FField; };
+        const Element& getA() const { return _A; };
+        const Element& getB()const { return _B; };
+
+        bool isInv(const Point& Q, const Point& P) const;
+        bool isZeroDiscriminant() const;
+
+    private:
+        const ZP _FField;
+        const Integer _p;
+        const Element _A, _B;
+        const Point _G;
+        const Integer _n;
 };
 
 class Secp256k1: public EllipticCurve
@@ -100,17 +80,11 @@ class Secp256k1: public EllipticCurve
     public:
         static Secp256k1& GetInstance();
         Secp256k1(const Secp256k1& obj) = delete;
-        Point Gmul(const Integer& k);
-        const Integer getFieldOrder() const { return p; }
-        const Point getGenerator() const { return G; }
-        const Integer getCurveOrder() const { return n; }
 
     private:
-        Secp256k1(Integer primeField, Integer A, Integer B);
+        //private constructor
+        Secp256k1();
     
     private:
-        const Integer p;
-        const Point G;
-        const Integer n;
         static Secp256k1* instancePtr;
 };

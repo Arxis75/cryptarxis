@@ -12,46 +12,52 @@ bitstream::bitstream()
     : end_boffset(0)
 {}
 
-bitstream::bitstream(const uint32_t reserve_bitsize)
+/*bitstream::bitstream(const uint32_t reserve_bitsize)
     : end_boffset(reserve_bitsize)
 {
     div_t d = div(reserve_bitsize, 8);
     uint32_t bytes = d.quot + (d.rem ? 1 : 0);
     for(uint32_t i=0;i<bytes;i++) vvalue.push_back(0);
-}
+}*/
 
 bitstream::bitstream(const bitstream& b)
     : end_boffset(0)
 {
-    from_bitstream(b);   
+    set(b);   
 }
 
 bitstream::bitstream(const Integer& val, uint32_t bitsize)
     : end_boffset(0)
 {
-    from_integer(val, bitsize);
+    set_from_Integer(val, bitsize);
+}
+
+bitstream::bitstream(const char* p, uint32_t bitsize)
+    : end_boffset(0)
+{
+    set_from_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
 }
 
 bitstream::bitstream(const uint8_t* p, uint32_t bitsize)
     : end_boffset(0)
 {
-    from_ptr(p, bitsize);
+    set_from_ptr(p, bitsize);
 }
 
-void bitstream::from_bitstream(const bitstream& b)
+void bitstream::set(const bitstream& b)
 {
     end_boffset = b.bitsize();
     vvalue = b.vvalue;
 }
 
-void bitstream::from_integer(const Integer& val, uint32_t bitsize)
+void bitstream::set_from_Integer(const Integer& val, uint32_t bitsize)
 {
     if(end_boffset)
         clear();
     push_back(val, bitsize);
 }
 
-void bitstream::from_ptr(const uint8_t* p, uint32_t bitsize)
+void bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
 {
     if(end_boffset)
         clear();
@@ -99,7 +105,7 @@ void bitstream::clear()
 const bitstream bitstream::sha256() const
 {
     assert(!(end_boffset%8));
-    bitstream digest(256);
+    bitstream digest(Integer(0), 256);
     SHA256(*this, end_boffset>>3, digest);
     return digest;
 }

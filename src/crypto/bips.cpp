@@ -17,16 +17,16 @@ using namespace ethash;
 //----------------------------------------------------------- BIP32 -----------------------------------------------------------------
 
 pubkey::pubkey(const Point& p)
-    : key(p)
+    : Point(p)
 { }
 
 const bitstream pubkey::getKey(size_t size) const
 {   
-    Integer publicKey = key.getX();
+    Integer publicKey = getX();
 
     Integer prefix = 0;
     if( size == 33 )
-        prefix = ((key.getY() % 2) ? 0x03 : 0x02);
+        prefix = ((getY() % 2) ? 0x03 : 0x02);
     else if(size == 65)
         prefix = 0x04;
 
@@ -35,7 +35,7 @@ const bitstream pubkey::getKey(size_t size) const
     if( size == 64 | size == 65 )
     {
         publicKey <<= 256;
-        publicKey += key.getY();
+        publicKey += getY();
     }
     return bitstream(publicKey, (size<<3));
 }
@@ -47,7 +47,7 @@ const bitstream pubkey::getAddress() const
 }
 
 extpubkey::extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc)   //from Curve + private key
-    : pubkey(curve.Gmul(k))
+    : pubkey(curve.p_scalar(curve.getGenerator(),k))
     , chaincode(cc)
 { }
 
@@ -61,16 +61,16 @@ extprivkey::extprivkey(const extprivkey& parent, const int32_t index, const bool
     bitstream parent_cc(parent.getChainCode());
     uint32_t suffix = index;
     if(!hardened)
-        parent_data.from_bitstream(parent.getExtPubKey().getKey(33));
+        parent_data.set(parent.getExtPubKey().getKey(33));
     else
     {
-        parent_data.from_integer(0x00, 8);
+        parent_data.set_from_Integer(0x00, 8);
         parent_data.push_back(parent.getSecret(),256);
         suffix += 0x80000000;
     }      
     parent_data.push_back(suffix, 32);
    
-    bitstream digest(512);
+    bitstream digest(Integer(0), 512);
     uint32_t dilen;
     unsigned char *res = ::HMAC(::EVP_sha512(),
                                 parent_cc, 32,
@@ -83,7 +83,7 @@ extprivkey::extprivkey(const extprivkey& parent, const int32_t index, const bool
         Integer s = a2Integer(&digest[0], 256);
         s += parent.getSecret();
         s %= Secp256k1::GetInstance().getCurveOrder();
-        secret.from_integer(s, 256);
+        secret.set_from_Integer(s, 256);
 
         bitstream cc(&digest[32], 256);
         pubkey = new extpubkey(Secp256k1::GetInstance(), secret, cc);
@@ -101,7 +101,7 @@ extprivkey::extprivkey(const bitstream& seed)
     // Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
     // Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
 
-    bitstream digest(512);
+    bitstream digest(Integer(0), 512);
     uint32_t dilen;
 
     unsigned char *res = ::HMAC(::EVP_sha512(),
@@ -255,7 +255,7 @@ void mnemonic::print(bool as_index_list) const
 
 const bitstream mnemonic::get_seed(const string& pwd) const
 {
-    bitstream the_seed(512);
+    bitstream the_seed(Integer(0), 512);
     if (is_valid())
     {
         const string pass = get_word_list();

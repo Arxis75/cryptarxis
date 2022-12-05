@@ -43,9 +43,6 @@ class pubkey: public Point
 
         const bitstream getKey(size_t size) const;
         const bitstream getAddress() const;
-
-    private:
-        Point key;
 };
 
 class extpubkey: public pubkey

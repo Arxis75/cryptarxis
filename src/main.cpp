@@ -13,78 +13,12 @@ using namespace std;
 using namespace BIP39;
 using namespace BIP32;
 
-// Function that checks whether n is prime or not
-bool isPrimeNumber(int n) {
-   bool isPrime = true;
-
-   for(int i = 2; i <= n/2; i++) {
-      if (n%i == 0) {
-         isPrime = false;
-         break;
-      }
-   }  
-   return isPrime;
-}
-
-bool sqrtmod(Integer& root, const Integer& n, const Integer& mod, const bool parity)
-{
-    assert(mod%4 == 3);
-    root = powmod(n, (mod+1)>>2, mod);
-    if( parity == isOdd(root) )
-        root = mod - root;
-    bool ret = (powmod(root, 2, mod) == n);
-    if(!ret)
-        root = 0;
-    return ret;
-}
-
-bool ecrecover( pubkey& key,
-                const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
-                const bitstream& from_address )
-{
-    const EllipticCurve ecc = Secp256k1::GetInstance();
-    Point G = ecc.getGenerator();
-    Integer p = ecc.getFieldOrder();
-    Integer n = ecc.getCurveOrder();
-
-    assert(msg_hash.bitsize() == 256);
-    assert(r < n);
-    assert(s < n);
-    assert(from_address.bitsize() == 160);
-
-    bool ret = false;
-    Integer r_candidate = r;
-    while(!ret && r_candidate < p)
-    {
-        Integer y;
-        if( sqrtmod(y, (r_candidate*r_candidate*r_candidate+7)%p, p, parity) )
-        {
-            Point sR;
-            Point R = Point(r_candidate, y);
-            ecc._scalar(sR,R,s);
-            Point hG;
-            ecc._scalar(hG,G,msg_hash);
-            Point _hG;
-            ecc._inv(_hG,hG);
-            Point sR_hG;
-            ecc._add(sR_hG,sR,_hG);
-            Integer r_1;
-            inv(r_1, r, n);
-            pubkey Q_candidate(G);
-            ecc._scalar(Q_candidate,sR_hG,r_1);
-            ret = (Q_candidate.getAddress() == from_address);
-        }
-        r += n;
-    }
-    return ret;
-}
-
 int main(int argc, char** argv)
 {
-    bool found = false;
-    Integer p = 211;
-    cout << Secp256k1::GetInstance().getFieldOrder() % 4 << endl;
-    cout << 211 % 4 << endl;
+    //bool found = false;
+    //Integer p = 211;
+    //cout << Secp256k1::GetInstance().getFieldOrder() % 4 << endl;
+    //cout << 211 % 4 << endl;
     
     /*while(!found)
     {
@@ -130,10 +64,9 @@ int main(int argc, char** argv)
         found = true;
     }*/
 
-    p = 211;
-    EllipticCurve ecc = EllipticCurve(p, 0, 7);
-    Point G(12,70);
+    Integer p = 211;
     Integer n(199);
+    EllipticCurve ecc = EllipticCurve(p, 0, 7, Point(12,70), n);
 
     Integer k = 22;
     cout << dec << "k = " << k << endl;
@@ -144,12 +77,12 @@ int main(int argc, char** argv)
     cout << dec << "k^(-1) = " << k_1 << endl;
 
     const char* m = "Hello World!";
-    Integer h = Integer(bitstream(m, strlen(m)<<3).keccak256()) % n;
-    //h += n;
-    cout << dec << "h = " << h << endl;
+    Integer h = Integer(bitstream(m, strlen(m)<<3).keccak256());
+    h %= ecc.getCurveOrder();
+    bitstream msg_hash(h, 256);
+    cout << dec << "message hash = " << msg_hash << endl;
 
-    Point R;
-    ecc._scalar(R,G,k);
+    Point R = ecc.p_scalar(ecc.getGenerator(), k);
     bool parity = !isOdd(R.getY());
     cout << dec << "R = (" << R.getX() << "," << R.getY() << ")" << endl;
     Integer r = R.getX() % n;
@@ -158,13 +91,12 @@ int main(int argc, char** argv)
 
     Integer privKey = 69;
     cout << dec << "privKey = " << privKey << endl;
-    pubkey Q(G);
-    ecc._scalar(Q,G,privKey);
+    pubkey Q = ecc.p_scalar(ecc.getGenerator(), privKey);
     cout << dec << "Q = (" << Q.getX() << "," << Q.getY() << ")" << endl;
     cout << dec << "Address(Q) = 0x" << Q.getAddress() << endl;
     
 
-    Integer s = (k_1 * (h + (r*privKey))) % n;
+    Integer s = (k_1 * (Integer(h) + (r*privKey))) % n;
     cout << dec << "s = k^(-1) . (h + r.privKey) = " << s << endl;
     //cout << dec << "s . k = h + r.privKey" << endl;
     //cout << dec << "s . kG = hG + r.privKeyG" << endl;
@@ -174,45 +106,43 @@ int main(int argc, char** argv)
     //cout << dec << "s . k = " << (s*k)%n << endl;
     //cout << dec << "h + r.privKey = " << (h+r*privKey)%n << endl;
 
-    //Point skG;
-    //ecc._scalar(skG,G,(s*k)%n);
-    //cout << dec << "skG = (" << skG.getX() << "," << skG.getY() << ")" << endl;
+    Point skG = ecc.p_scalar(ecc.getGenerator(),(s*k)%n);
+    cout << dec << "skG = (" << skG.getX() << "," << skG.getY() << ")" << endl;
 
-    Integer r_candidate = r+n;
+    Point Q_candidate;
+    if( ecc.ecrecover(Q_candidate, msg_hash, r, s, parity, Q.getAddress()) )
+        pubkey key(Q_candidate);
+
+    Integer r_candidate = r + n;
     Integer y;
-    if( sqrtmod(y, (r_candidate*r_candidate*r_candidate+7)%p, p, parity) )
+    if( ecc.sqrtmod(y, ecc.getY2(r_candidate), parity) )
     {
-        Point sR;
         R = Point(r_candidate, y);
-        //cout << dec << "R_candidate = (" << R.getX() << "," << R.getY() << ")" << endl;
-        ecc._scalar(sR,R,s);
-        //cout << dec << "sR = (" << sR.getX() << "," << sR.getY() << ")" << endl;
+        cout << dec << "R_candidate = (" << R.getX() << "," << R.getY() << ")" << endl;
 
-        Point hG, rprivKeyG;
-        ecc._scalar(hG,G,h);
-        //cout << dec << "hG = (" << hG.getX() << "," << hG.getY() << ")" << endl;
+        Point sR = ecc.p_scalar(R, s);
+        cout << dec << "sR = (" << sR.getX() << "," << sR.getY() << ")" << endl;
 
-        //ecc._scalar(rprivKeyG,G,(r*privKey)%n);
-        //cout << dec << "rprivKeyG = (" << rprivKeyG.getX() << "," << rprivKeyG.getY() << ")" << endl;
+        Point hG = ecc.p_scalar(ecc.getGenerator(), h);
+        cout << dec << "hG = (" << hG.getX() << "," << hG.getY() << ")" << endl;
 
-        Point _hG;
-        ecc._inv(_hG,hG);
-        //cout << dec << "_hG = (" << _hG.getX() << "," << _hG.getY() << ")" << endl;
+        Point rprivKeyG = ecc.p_scalar(ecc.getGenerator(), (r*privKey)%n);
+        cout << dec << "rprivKeyG = (" << rprivKeyG.getX() << "," << rprivKeyG.getY() << ")" << endl;
 
-        //Point skG_hG;
-        //ecc._add(skG_hG,skG,_hG);
-        //cout << dec << "skG_hG = (" << skG_hG.getX() << "," << skG_hG.getY() << ")" << endl;
+        Point _hG = ecc.p_inv(hG);
+        cout << dec << "_hG = (" << _hG.getX() << "," << _hG.getY() << ")" << endl;
 
-        Point sR_hG;
-        ecc._add(sR_hG,sR,_hG);
-        //cout << dec << "sR_hG = (" << sR_hG.getX() << "," << sR_hG.getY() << ")" << endl;
+        Point skG_hG = ecc.p_add(skG,_hG);
+        cout << dec << "skG_hG = (" << skG_hG.getX() << "," << skG_hG.getY() << ")" << endl;
+
+        Point sR_hG = ecc.p_add(sR, _hG);
+        cout << dec << "sR_hG = (" << sR_hG.getX() << "," << sR_hG.getY() << ")" << endl;
 
         Integer r_1;
         inv(r_1, r, n);
-        //cout << dec << "r^(-1) = " << r_1 << endl;
+        cout << dec << "r^(-1) = " << r_1 << endl;
 
-        pubkey Q_candidate(G);
-        ecc._scalar(Q_candidate,sR_hG,r_1);
+        pubkey Q_candidate = ecc.p_scalar(sR_hG, r_1);
         cout << dec << "Q_candidate = (" << Q_candidate.getX() << "," << Q_candidate.getY() << ")" << endl;
         cout << dec << "Address(Q_candidate) = 0x" << Q_candidate.getAddress() << endl;
     }
@@ -259,7 +189,7 @@ int main(int argc, char** argv)
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0b10100000 };
     bitstream a(&toto[2],10);
-    bitstream c(a.at(2,3));
+    bitstream c;
     //cout << hex << Integer(a) << endl;
     cout << hex << c << endl;
 
