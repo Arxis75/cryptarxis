@@ -34,7 +34,12 @@ class bitstream
         operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
         operator const Integer() const { return a2Integer(vvalue.data(), end_boffset); }
 
-        bool const operator==(const bitstream& b) const { return Integer(*this) == Integer(b); }
+        inline bool operator==(const bitstream& b) const { return Integer(*this) == Integer(b); }
+        inline bool operator!=(const bitstream& b) const { return Integer(*this) != Integer(b); }
+        inline bool operator< (const bitstream& b) const { return Integer(*this) <  Integer(b); }
+        inline bool operator> (const bitstream& b) const { return Integer(*this) >  Integer(b); }
+        inline bool operator<=(const bitstream& b) const { return Integer(*this) <= Integer(b); }
+        inline bool operator>=(const bitstream& b) const { return Integer(*this) >= Integer(b); }
 
         //Unaligned operators
         const bitstream at(const uint32_t bitoffset, const uint32_t bitsize) const;
