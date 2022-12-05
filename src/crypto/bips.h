@@ -36,17 +36,26 @@ private:
 
 namespace BIP32 {
 
-class extpubkey: public Point
+class pubkey: public Point
 {
     public:
-        extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc);
+        pubkey(const Point& p);
 
-        const bitstream& getChainCode() const { return chaincode; }
         const bitstream getKey(size_t size) const;
         const bitstream getAddress() const;
 
     private:
         Point key;
+};
+
+class extpubkey: public pubkey
+{
+    public:
+        extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc);
+
+        const bitstream& getChainCode() const { return chaincode; }
+
+    private:
         bitstream chaincode;
 };
 

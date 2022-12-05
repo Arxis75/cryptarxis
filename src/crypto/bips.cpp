@@ -16,12 +16,11 @@ using namespace ethash;
 
 //----------------------------------------------------------- BIP32 -----------------------------------------------------------------
 
-extpubkey::extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc)   //from Curve + private key
-    : key(curve.Gmul(k))
-    , chaincode(cc)
+pubkey::pubkey(const Point& p)
+    : key(p)
 { }
 
-const bitstream extpubkey::getKey(size_t size) const
+const bitstream pubkey::getKey(size_t size) const
 {   
     Integer publicKey = key.getX();
 
@@ -41,11 +40,16 @@ const bitstream extpubkey::getKey(size_t size) const
     return bitstream(publicKey, (size<<3));
 }
 
-const bitstream extpubkey::getAddress() const
+const bitstream pubkey::getAddress() const
 {
     hash256 h = keccak256(getKey(64), 64);
     return bitstream(&h.bytes[32 - 20], 160);
 }
+
+extpubkey::extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc)   //from Curve + private key
+    : pubkey(curve.Gmul(k))
+    , chaincode(cc)
+{ }
 
 extprivkey::extprivkey(const extprivkey& parent, const int32_t index, const bool hardened)
     : secret()

@@ -39,6 +39,7 @@ class bitstream
         uint16_t as_uint16(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+16,end_boffset) - bofs)); }
         uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
         uint64_t as_uint64(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+64,end_boffset) - bofs)); }
+        Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }
 
     private:
         uint32_t end_boffset;

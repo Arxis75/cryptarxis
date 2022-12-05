@@ -5,6 +5,9 @@
 
 #include <ethash/keccak.hpp>
 
+#include <chrono>
+#include <ctime> 
+
 using namespace std;
 
 using namespace BIP39;
@@ -23,33 +26,67 @@ bool isPrimeNumber(int n) {
    return isPrime;
 }
 
-Integer power(Integer x, Integer y, Integer p)
+bool sqrtmod(Integer& root, const Integer& n, const Integer& mod, const bool parity)
 {
-    Integer res = 1;     // Initialize result
- 
-    x = x % p; // Update x if it is more than or
-                // equal to p
-  
-    if (x == 0) return 0; // In case x is divisible by p;
- 
-    while (y > 0)
+    assert(mod%4 == 3);
+    root = powmod(n, (mod+1)>>2, mod);
+    if( parity == isOdd(root) )
+        root = mod - root;
+    bool ret = (powmod(root, 2, mod) == n);
+    if(!ret)
+        root = 0;
+    return ret;
+}
+
+bool ecrecover( pubkey& key,
+                const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
+                const bitstream& from_address )
+{
+    const EllipticCurve ecc = Secp256k1::GetInstance();
+    Point G = ecc.getGenerator();
+    Integer p = ecc.getFieldOrder();
+    Integer n = ecc.getCurveOrder();
+
+    assert(msg_hash.bitsize() == 256);
+    assert(r < n);
+    assert(s < n);
+    assert(from_address.bitsize() == 160);
+
+    bool ret = false;
+    Integer r_candidate = r;
+    while(!ret && r_candidate < p)
     {
-        // If y is odd, multiply x with result
-        if (y & Integer(1))
-            res = (res*x) % p;
- 
-        // y must be even now
-        y = y>>1; // y = y/2
-        x = (x*x) % p;
+        Integer y;
+        if( sqrtmod(y, (r_candidate*r_candidate*r_candidate+7)%p, p, parity) )
+        {
+            Point sR;
+            Point R = Point(r_candidate, y);
+            ecc._scalar(sR,R,s);
+            Point hG;
+            ecc._scalar(hG,G,msg_hash);
+            Point _hG;
+            ecc._inv(_hG,hG);
+            Point sR_hG;
+            ecc._add(sR_hG,sR,_hG);
+            Integer r_1;
+            inv(r_1, r, n);
+            pubkey Q_candidate(G);
+            ecc._scalar(Q_candidate,sR_hG,r_1);
+            ret = (Q_candidate.getAddress() == from_address);
+        }
+        r += n;
     }
-    return res;
+    return ret;
 }
 
 int main(int argc, char** argv)
 {
-    /*bool found = false;
+    bool found = false;
     Integer p = 211;
-    while(!found)
+    cout << Secp256k1::GetInstance().getFieldOrder() % 4 << endl;
+    cout << 211 % 4 << endl;
+    
+    /*while(!found)
     {
         while(!isPrimeNumber(p)) p++;
         EllipticCurve ecc = EllipticCurve(p, 0, 7);
@@ -90,36 +127,121 @@ int main(int argc, char** argv)
                 }
             }
         p++;
+        found = true;
     }*/
 
-    Integer p(211);
-    Integer n(199);
+    p = 211;
     EllipticCurve ecc = EllipticCurve(p, 0, 7);
     Point G(12,70);
+    Integer n(199);
 
     Integer k = 22;
+    cout << dec << "k = " << k << endl;
+    Integer k_1; 
+    //k_1 = powmod(k,n-2,n);
+    //cout << dec << k_1 << endl;
+    inv(k_1, k, n);
+    cout << dec << "k^(-1) = " << k_1 << endl;
 
-    Integer k_1 = power(k, n-2, n) % n;  //Little Fermat theorem
-    cout << dec << k_1 << endl;
-
-    bitstream m("Hello World!", 12<<3);
-    Integer h = Integer(m.keccak256()) % n;
+    const char* m = "Hello World!";
+    Integer h = Integer(bitstream(m, strlen(m)<<3).keccak256()) % n;
     //h += n;
+    cout << dec << "h = " << h << endl;
 
     Point R;
     ecc._scalar(R,G,k);
+    bool parity = !isOdd(R.getY());
+    cout << dec << "R = (" << R.getX() << "," << R.getY() << ")" << endl;
     Integer r = R.getX() % n;
     //r += n;
+    cout << dec << "r = " << r << endl;
 
-    Integer privKey = 44;
+    Integer privKey = 69;
+    cout << dec << "privKey = " << privKey << endl;
+    pubkey Q(G);
+    ecc._scalar(Q,G,privKey);
+    cout << dec << "Q = (" << Q.getX() << "," << Q.getY() << ")" << endl;
+    cout << dec << "Address(Q) = 0x" << Q.getAddress() << endl;
+    
 
-    Integer s = (k_1 * (h + r*privKey)) % n;
-    cout << dec << s << endl;
+    Integer s = (k_1 * (h + (r*privKey))) % n;
+    cout << dec << "s = k^(-1) . (h + r.privKey) = " << s << endl;
+    //cout << dec << "s . k = h + r.privKey" << endl;
+    //cout << dec << "s . kG = hG + r.privKeyG" << endl;
+    //cout << dec << "sR - hG = r.Q " << endl;
+    //cout << dec << "Q = r^(-1) . (sR - hG)" << endl;
 
-    Integer r_1 = power(r, n-2, n) % n;  //Little Fermat theorem
-    cout << dec << r_1 << endl;
+    //cout << dec << "s . k = " << (s*k)%n << endl;
+    //cout << dec << "h + r.privKey = " << (h+r*privKey)%n << endl;
 
-    Integer pubKey = (r_1 * (s + r*privKey)) % n;
+    //Point skG;
+    //ecc._scalar(skG,G,(s*k)%n);
+    //cout << dec << "skG = (" << skG.getX() << "," << skG.getY() << ")" << endl;
+
+    Integer r_candidate = r+n;
+    Integer y;
+    if( sqrtmod(y, (r_candidate*r_candidate*r_candidate+7)%p, p, parity) )
+    {
+        Point sR;
+        R = Point(r_candidate, y);
+        //cout << dec << "R_candidate = (" << R.getX() << "," << R.getY() << ")" << endl;
+        ecc._scalar(sR,R,s);
+        //cout << dec << "sR = (" << sR.getX() << "," << sR.getY() << ")" << endl;
+
+        Point hG, rprivKeyG;
+        ecc._scalar(hG,G,h);
+        //cout << dec << "hG = (" << hG.getX() << "," << hG.getY() << ")" << endl;
+
+        //ecc._scalar(rprivKeyG,G,(r*privKey)%n);
+        //cout << dec << "rprivKeyG = (" << rprivKeyG.getX() << "," << rprivKeyG.getY() << ")" << endl;
+
+        Point _hG;
+        ecc._inv(_hG,hG);
+        //cout << dec << "_hG = (" << _hG.getX() << "," << _hG.getY() << ")" << endl;
+
+        //Point skG_hG;
+        //ecc._add(skG_hG,skG,_hG);
+        //cout << dec << "skG_hG = (" << skG_hG.getX() << "," << skG_hG.getY() << ")" << endl;
+
+        Point sR_hG;
+        ecc._add(sR_hG,sR,_hG);
+        //cout << dec << "sR_hG = (" << sR_hG.getX() << "," << sR_hG.getY() << ")" << endl;
+
+        Integer r_1;
+        inv(r_1, r, n);
+        //cout << dec << "r^(-1) = " << r_1 << endl;
+
+        pubkey Q_candidate(G);
+        ecc._scalar(Q_candidate,sR_hG,r_1);
+        cout << dec << "Q_candidate = (" << Q_candidate.getX() << "," << Q_candidate.getY() << ")" << endl;
+        cout << dec << "Address(Q_candidate) = 0x" << Q_candidate.getAddress() << endl;
+    }
+
+    /*Integer r_1;
+    inv(r_1, r, n);
+    cout << dec << "r^(-1) = " << r_1 << endl;
+    Integer y_candidate;
+    if( sqrtmod(y_candidate, (powmod(r+n,3,p)+7)%p, 211, parity) )
+    {
+        R = Point(r, y_candidate);
+        cout << dec << "Rcandidate = (" << r+n << "," << y_candidate << ")" << endl;
+
+        Point sR;
+        ecc._scalar(sR,R,s);
+        Point hG;
+        ecc._scalar(hG,G,h);
+        Point sR_hG;
+        Point tmp;
+        ecc._add(tmp,sR, hG);
+        ecc._inv(sR_hG, tmp);
+        Point candidate_Q;
+        ecc._scalar(candidate_Q, sR_hG, r_1);
+        cout << dec << "candidate pubKey Q = (" << candidate_Q.getX() << "," << candidate_Q.getY() << ")" << endl;
+    }
+    else
+    {
+        cout << "Signature: r is invalid!";
+    }*/
 
 
     /*Point R = Secp256k1::GetInstance().getGenerator();
@@ -153,7 +275,6 @@ int main(int argc, char** argv)
     mnemonic* mnc = new mnemonic(256);
 
     const char* xx = "bonjour";
-    int y = sizeof(xx);
     // diamond recycle math quantum earn save nut spice hen rice soft wire artefact say twin drum rival live mask lens actress peasant abstract hint
     mnc->add_word("diamond");
     mnc->add_word("recycle");

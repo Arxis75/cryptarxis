@@ -62,12 +62,12 @@ Curve::Curve(Integer primeField, Integer A, Integer B)
 	this->FField->init(this->A,A);
 	this->FField->init(this->B,B); 
 
-    /*if (this->isZeroDiscriminant()){
+    if (this->isZeroDiscriminant()){
         std::cerr << "[!] Curve not defined, disriminant is Zero" << std::endl;
         std::cout << "[+ INFO ] Field : Z/" << primeField << "Z" << std::endl;
         std::cout << "[+ INFO ] A : " << A << " ; B : " << B << std::endl; 
         abort();
-        }*/	
+        }
     }
 void Curve::print() {
     std::cout << " Field : Z/" << this->FField->residu() << "Z" << std::endl;
