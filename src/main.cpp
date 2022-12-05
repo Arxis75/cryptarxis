@@ -111,6 +111,7 @@ int main(int argc, char** argv)
 
     Point Q_candidate;
     if( ecc.ecrecover(Q_candidate, msg_hash, r, s, parity, Q.getAddress()) )
+        cout << endl << "YAY!" << endl << endl;
         pubkey key(Q_candidate);
 
     Integer r_candidate = r + n;
