@@ -8,56 +8,43 @@
 using namespace std;
 using namespace Givaro;
 
-bitstream::bitstream()
+Bitstream::Bitstream()
     : end_boffset(0)
 {}
 
-/*bitstream::bitstream(const uint32_t reserve_bitsize)
-    : end_boffset(reserve_bitsize)
-{
-    div_t d = div(reserve_bitsize, 8);
-    uint32_t bytes = d.quot + (d.rem ? 1 : 0);
-    for(uint32_t i=0;i<bytes;i++) vvalue.push_back(0);
-}*/
-
-bitstream::bitstream(const bitstream& b)
+Bitstream::Bitstream(const Bitstream& b)
     : end_boffset(0)
 {
-    set(b);   
+    end_boffset = b.bitsize();
+    vvalue = b.vvalue;   
 }
 
-bitstream::bitstream(const Integer& val, uint32_t bitsize)
+Bitstream::Bitstream(const Integer& val, uint32_t bitsize)
     : end_boffset(0)
 {
-    set_from_Integer(val, bitsize);
+    set(val, bitsize);
 }
 
-bitstream::bitstream(const char* p, uint32_t bitsize)
+Bitstream::Bitstream(const char* p, uint32_t bitsize)
     : end_boffset(0)
 {
     set_from_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
 }
 
-bitstream::bitstream(const uint8_t* p, uint32_t bitsize)
+Bitstream::Bitstream(const uint8_t* p, uint32_t bitsize)
     : end_boffset(0)
 {
     set_from_ptr(p, bitsize);
 }
 
-void bitstream::set(const bitstream& b)
-{
-    end_boffset = b.bitsize();
-    vvalue = b.vvalue;
-}
-
-void bitstream::set_from_Integer(const Integer& val, uint32_t bitsize)
+void Bitstream::set(const Integer& val, uint32_t bitsize)
 {
     if(end_boffset)
         clear();
     push_back(val, bitsize);
 }
 
-void bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
+void Bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
 {
     if(end_boffset)
         clear();
@@ -70,7 +57,7 @@ void bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
     end_boffset = bitsize;
 }
 
-void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
+void Bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
 {
     Integer max_size_mask = pow(Integer(2),bitsize) - 1;
     Integer bits_to_push(0);
@@ -87,46 +74,46 @@ void bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
     }
 }
 
-const bitstream bitstream::at(uint32_t bitoffset, uint32_t bitsize) const       // not aligned
+const Bitstream Bitstream::at(uint32_t bitoffset, uint32_t bitsize) const       // not aligned
 {
     assert(bitoffset+bitsize <= end_boffset);
     Integer mask = pow(Integer(2), bitsize) - 1;
     uint32_t rshift = end_boffset - bitoffset - bitsize;
     Integer v = mask & (Integer(*this)>>rshift);
-    return bitstream(v, bitsize);
+    return Bitstream(v, bitsize);
 }
 
-void bitstream::clear()
+void Bitstream::clear()
 {
     end_boffset = 0;
     vvalue.clear();
 }
 
-const bitstream bitstream::sha256() const
+const Bitstream Bitstream::sha256() const
 {
     assert(!(end_boffset%8));
-    bitstream digest(Integer(0), 256);
+    Bitstream digest(Integer(0), 256);
     SHA256(*this, end_boffset>>3, digest);
     return digest;
 }
 
-const bitstream bitstream::keccak256() const
+const Bitstream Bitstream::keccak256() const
 {
     assert(!(end_boffset%8));
     ethash::hash256 h = ethash::keccak256(*this, end_boffset>>3);
-    bitstream digest(h.bytes, 256);
+    Bitstream digest(h.bytes, 256);
     return digest;
 }
 
-const bitstream bitstream::address() const
+const Bitstream Bitstream::address() const
 {
     assert(!(end_boffset%8));
     ethash::hash256 h = ethash::keccak256(*this, end_boffset>>3);
-    bitstream digest(&h.bytes[32-20], 160);
+    Bitstream digest(&h.bytes[32-20], 160);
     return digest;
 }
 
-ostream& operator<< (ostream& out, const bitstream& v) {
+ostream& operator<< (ostream& out, const Bitstream& v) {
     out << hex << Integer(v);
     return out;
 }

@@ -8,10 +8,10 @@ using namespace Givaro;
 
 namespace BIP39 {
 
-class mnemonic
+class Mnemonic
 {
     public:
-        mnemonic(const size_t entropy_bitsize, const vector<string>* dictionnary = 0);
+        Mnemonic(const size_t entropy_bitsize, const vector<string>* dictionnary = 0);
 
         void clear();
         bool add_word(const string& word);
@@ -21,54 +21,72 @@ class mnemonic
         bool list_possible_last_word(vector<string>& list) const;
         const string get_word_list() const;
         const string get_last_word() const;
-        const bitstream get_seed(const string& pwd) const;
+        const Bitstream get_seed(const string& pwd) const;
         void print(bool as_index_list = false) const;
 
 private:
-        bitstream entropy;
-        const vector<string>* dic;
-        uint8_t went;
-        uint16_t ent;
-        uint8_t ms;
-        uint8_t cs;
+        Bitstream _entropy;
+        const vector<string>* _dic;
+        uint8_t _went;
+        uint16_t _ent;
+        uint8_t _ms;
+        uint8_t _cs;
 };
 }
 
-namespace BIP32 {
-
-class pubkey: public Point
+class Pubkey
 {
     public:
-        pubkey(const Point& p);
+        enum class Format{PREFIXED_X, XY, PREFIXED_XY};
+        
+        Pubkey(const Pubkey& key); 
+        Pubkey(const Point& p = Point(), const EllipticCurve& curve = Secp256k1::GetInstance());
+        Pubkey(const Point& p, const Bitstream& cc, const EllipticCurve& curve = Secp256k1::GetInstance());
 
-        const bitstream getKey(size_t size) const;
-        const bitstream getAddress() const;
-};
+        const Point& getPoint() const { return _point; }
+        const EllipticCurve& getCurve() const { return _ecc; }
+        const Bitstream getKey(Format f) const;
+        const Bitstream getAddress() const;
 
-class extpubkey: public pubkey
-{
-    public:
-        extpubkey(Secp256k1& curve, const bitstream& k, const bitstream& cc);
+        uint32_t getFormatBitSize(Pubkey::Format f) const;
 
-        const bitstream& getChainCode() const { return chaincode; }
+        const Bitstream& getChainCode() const { return _chaincode; }
 
     private:
-        bitstream chaincode;
+        EllipticCurve _ecc;
+        Point _point;
+        Bitstream _chaincode;   //BIP32
 };
 
-class extprivkey
+class Privkey
 {
     public:
-        extprivkey(const bitstream& s);
-        extprivkey(const extprivkey& parent_secret, const int32_t index, const bool hardened);
-        ~extprivkey() { if(pubkey) delete pubkey; }
+        Privkey(const Integer& k, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Bitstream& seed, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Privkey& parent_extprivkey, const int32_t index, const bool hardened);
 
-        const bitstream& getSecret() const { return secret; }
-        const bitstream& getChainCode() const { return pubkey->getChainCode(); }
-        const extpubkey& getExtPubKey() const { return *pubkey; }
+        const EllipticCurve& getCurve() const { return _pubkey.getCurve(); }
+        const Bitstream& getChainCode() const { return _pubkey.getChainCode(); }
+        const Pubkey& getPubKey() const { return _pubkey; }
+
+        const Bitstream& getSecret() const { return _secret; }
+        operator const Integer() const { return Integer(_secret); }
 
     private:
-        bitstream secret;
-        extpubkey* pubkey;
+        Pubkey _pubkey;
+        Bitstream _secret;
 };
-}
+
+class Signature: public EllipticCurve
+{
+    public:
+        Signature(const Integer& r, const Integer& s, const bool parity, const EllipticCurve& curve);
+        
+        bool isValid(const Bitstream& h, const Bitstream& address) const;
+        bool ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address = Bitstream()) const;
+
+    private:
+        Integer _r;
+        Integer _s;
+        bool _parity;
+};

@@ -11,114 +11,79 @@
 using namespace std;
 
 using namespace BIP39;
-using namespace BIP32;
 
 int main(int argc, char** argv)
 {
-    Integer p;
-
     bool found = false;
-    p = 211;
-    cout << "p % 4 = " << 211 % 4 << endl << endl;
-    
+    Integer p = 11;    
     while(!found)
     {
         while(!isPrimeNumber(p)) p++;
-        if( (p % 4 == 3) && (1323 % p != 0) )  // 4.A³ + 27.B² != 0
+        if( (p % 4 == 3) && (1323 % p != 0) )  // 1323 = 4.A³ + 27.B² != 0
         {
             EllipticCurve ecc = EllipticCurve(p, 0, 7);
-            for(Integer x=0;x<p;x++)
-            {
-                Element y2 = ecc.getY2(x);
-                for(Integer y=0;y<p;y++)
-                {   
-                    Element y2_candidat = y*y % p;
-                    if( y2_candidat == y2)
-                    {
-                        cout << "G(" << dec << x << "," << y << ")" << " solution of y²=x³+7 [" << p << "]" << endl;
-                        Integer k=1;
-                        int count = 0;
-                        for(k=1;k<=p;k++)
-                        {
-                            Point G(x,y);
-                            Point R = ecc.p_scalar(G,k);
-                            if( R.isIdentity() )
-                            {
-                                count++;
-                                cout << "Point at Infinity";
-                                break;
-                            }
-                            cout << "("<< dec << R.getX() << "," << R.getY() << ") ";
-                            count++;
-                        }
-                        cout << endl;
-                        if(isPrimeNumber(count)) cout << "Curve Order is Prime! n = " << dec << count;
-                        cout << endl << endl;
-                    }
-                }
-            }
+            ecc.print_cyclic_subgroups();
         }
         p++;
         found = true;
     }
 
+    EllipticCurve ecc = Secp256k1::GetInstance();
+    p = ecc.getFieldOrder();
+    Integer n = ecc.getCurveOrder();
 
-    //EllipticCurve ecc = Secp256k1::GetInstance();
-    //Integer p = ecc.getFieldOrder();
-    //Integer n = ecc.getCurveOrder();
-
-    p = 211;
-    Integer n(199);
-    EllipticCurve ecc = EllipticCurve(p, 0, 7, Point(12,70), n);
+    //p = 211;
+    //Integer n(199);
+    //EllipticCurve ecc = EllipticCurve(p, 0, 7, Point(12,70), n);
 
     Integer k = 22;
-    //cout << hex << "k = 0x" << k << endl;
+    cout << hex << "k = 0x" << k << endl;
     Integer k_1; 
     inv(k_1, k, n);
-    //cout << hex << "k^(-1) = 0x" << k_1 << endl;
-    const char* m = "Hello World!";
-    bitstream h = bitstream(m, strlen(m)<<3).keccak256();
-    //bitstream h(pow(Integer(2),256) - 1, 256);  // for testing purpose
-    //cout << "message hash = 0x" << h << endl;
+    cout << hex << "k^(-1) = 0x" << k_1 << endl;
+    const char* msg = "Hello World!";
+    Bitstream h = Bitstream(msg, strlen(msg)<<3).keccak256();
+    //Bitstream h(pow(Integer(2),256) - 1, 256);  // for testing purpose
+    cout << "message hash = 0x" << h << endl;
     Point R = ecc.p_scalar(ecc.getGenerator(), k);
     bool parity = !isOdd(R.getY());
-    //cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+    cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
     Integer r = R.getX() % n;
-    //cout << hex << "r = 0x" << r << endl;
-    Integer privKey = 69;
-    //cout << hex << "privKey = 0x" << privKey << endl;
-    pubkey Q = ecc.p_scalar(ecc.getGenerator(), privKey);
-    //cout << hex << "Q = (0x" << Q.getX() << ", 0x" << Q.getY() << ")" << endl;
+    cout << hex << "r = 0x" << r << endl;
+    Privkey secret(69, ecc);
+    cout << hex << "secret = 0x" << secret << endl;
+    Pubkey Q = secret.getPubKey();
+    cout << hex << "Q = (0x" << Q.getPoint().getX() << ", 0x" << Q.getPoint().getY() << ")" << endl;
     cout << hex << "Address(Q) = 0x" << Q.getAddress() << endl;
-    Integer s = (k_1 * (Integer(h) + (r*privKey))) % n;
-    //cout << hex << "s = k^(-1) . (h + r.privKey) = 0x" << s << endl;
+    Integer s = (k_1 * (Integer(h) + (r*secret))) % n;
+    cout << hex << "s = k^(-1) . (h + r.secret) = 0x" << s << endl;
 
-    Point Q_candidate;
-    if( ecc.ecrecover(Q_candidate, h, r, s, parity, Q.getAddress()) )
+    Signature sig(r, s, parity, ecc);
+    Pubkey key;
+    if( sig.ecrecover(key, h, Q.getAddress()) )
     {
-        cout << endl << "YAY!" << endl << endl;
-        pubkey key(Q_candidate);
+        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl;
     }
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0b10100000 };
-    bitstream a(&toto[2],10);
-    bitstream c;
+    Bitstream a(&toto[2],10);
+    Bitstream c;
     //cout << hex << Integer(a) << endl;
     cout << hex << c << endl;
 
-    bitstream d(77,8);
+    Bitstream d(77,8);
     cout << d.sha256() << endl;
     cout << d.keccak256() << endl;
     cout << d.address() << endl;
 
-    bitstream b("toto",sizeof("toto"));
+    Bitstream b("toto",sizeof("toto"));
     //cout << hex << Integer(a) << endl;
     cout << hex << b << endl;
 
-    mnemonic* mnc = new mnemonic(256);
+    Mnemonic* mnc = new Mnemonic(256);
 
     const char* xx = "bonjour";
     // diamond recycle math quantum earn save nut spice hen rice soft wire artefact say twin drum rival live mask lens actress peasant abstract hint
@@ -153,17 +118,19 @@ int main(int argc, char** argv)
     mnc->add_word("hint");
     mnc->print();
 
-    /*extprivkey m(mnc->get_seed("toto"));
-    extprivkey m_h44(m,44,true);
-    extprivkey m_h44_h60(m_h44,60,true);
-    extprivkey m_h44_h60_h0(m_h44_h60,0,true);
-    extprivkey m_h44_h60_h0_0(m_h44_h60_h0,0,false);
+    cout << hex << ecc.getCurveOrder() << endl;
+    cout << dec << ecc.getCurveOrder().size_in_base(2) << endl;
+    Privkey m(mnc->get_seed("toto"), ecc);
+    Privkey m_h44(m,44,true);
+    Privkey m_h44_h60(m_h44,60,true);
+    Privkey m_h44_h60_h0(m_h44_h60,0,true);
+    Privkey m_h44_h60_h0_0(m_h44_h60_h0,0,false);
     int32_t x = 3;
-    extprivkey m_h44_h60_h0_0_x(m_h44_h60_h0_0,x,false);
+    Privkey m_h44_h60_h0_0_x(m_h44_h60_h0_0,x,false);
 
-    cout << "Address: " << hex << m_h44_h60_h0_0_x.getExtPubKey().getAddress() << endl << endl;;
+    cout << "Address: " << hex << m_h44_h60_h0_0_x.getPubKey().getAddress() << endl << endl;;
 
-    delete mnc;*/
+    delete mnc;
 
     return 0;
 }

@@ -4,6 +4,7 @@
 #include <givaro/modular-integer.h>
 #include <Common.h>
 
+using namespace std;
 using namespace Givaro;
 
 typedef Modular<Integer> ZP;
@@ -15,6 +16,7 @@ class Point
 {
     public:
         Point();
+        Point(const Point& p);
         Point(const Element& _x, const Element& _y);
         
         const Element& getX() const { return x; }
@@ -37,42 +39,45 @@ class Point
 class EllipticCurve
 {
     public:
+        EllipticCurve(const EllipticCurve& c);
         EllipticCurve(const Integer& p, const Integer& A, const Integer& B);
         EllipticCurve(const Integer& p, const Integer& A, const Integer& B, const Point& G, const Integer& n);
 
-        bool isZeroDiscriminant() const;
         const Integer& getFieldOrder() const { return _p; }
         const Point& getGenerator() const { return _G; }
         const Integer& getCurveOrder() const { return _n; }
 
+        Point p_scalar(const Point &P, const Integer& k) const;
+
+        void print() const;
+        void print_cyclic_subgroups() const;
+
+    protected:
+        bool isZeroDiscriminant() const;
+        
         Point p_inv(const Point& P) const;
         Point p_add(const Point &P, const Point& Q) const;
         Point p_double(const Point& P) const;
-        Point p_scalar(const Point &P, const Integer& k) const;
-
-        bool ecrecover(Point& pubkeyPoint,
-                	   const bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
-                	   const bitstream& from_address = bitstream()) const;
-
+        
         bool verifyPoint(const Point& P) const;
-        void print() const;
 
-        Element getY2(const Element& X) const;
-        bool sqrtmod(Integer& root, const Integer& n, const bool parity) const;
-
-    protected:
         const ZP& getField() const { return _FField; };
         const Element& getA() const { return _A; };
         const Element& getB()const { return _B; };
 
         bool isInv(const Point& Q, const Point& P) const;
+        Element getY2(const Element& X) const;
+        bool sqrtmod(Integer& root, const Integer& n, const bool parity) const;
 
+        bool recover( Point& pubkeyPoint,
+              	      const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
+                      const bool recover_alternate = false ) const;
     private:
-        const ZP _FField;
-        const Integer _p;
-        const Element _A, _B;
-        const Point _G;
-        const Integer _n;
+        ZP _FField;
+        Integer _p;
+        Element _A, _B;
+        Point _G;
+        Integer _n;
 };
 
 class Secp256k1: public EllipticCurve
