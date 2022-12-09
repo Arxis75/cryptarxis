@@ -1,6 +1,7 @@
 #include "EllipticCurve.h"
 #include "bips.h"
 
+#include <map>
 using namespace std;
 
 // Function that checks whether n is prime or not
@@ -325,30 +326,37 @@ void EllipticCurve::print_cyclic_subgroups() const
 {
 	for(Integer x=0;x<_p;x++)
 	{
-		Element y2 = getY2(x);
-		for(Integer y=0;y<_p;y++)
-		{   
-			Element y2_candidat = y*y % _p;
-			if( y2_candidat == y2)
+		Element y;
+		if( sqrtmod(y, getY2(x), _p) )
+		{  
+			Point G(x,y);
+			Integer k = 0;
+			Point R = G;
+			bool new_point = false;
+			while( !R.isIdentity() )
 			{
-				cout << "G(" << dec << x << "," << y << ")" << " solution of y²=x³+7 [" << _p << "]" << endl;
-				Integer k=1;
-				int count = 0;
-				for(k=1;k<=_p;k++)
+				k++;
+				R = p_scalar(G,k);				
+				if( !R.isIdentity())
 				{
-					Point G(x,y);
-					Point R = p_scalar(G,k);
-					if( R.isIdentity() )
+					if(!new_point)
 					{
-						count++;
-						cout << "Point at Infinity";
-						break;
+						cout << "G(" << dec << x << "," << y << ")" << " solution of y²=x³+7 [" << _p << "]" << endl;
+						new_point = true;
 					}
-					cout << "("<< dec << R.getX() << "," << R.getY() << ") ";
-					count++;
+					cout << "(" << dec << R.getX() << "," << R.getY() << ") ";
 				}
+				else
+				{
+					if( new_point )
+						cout << "Point at Infinity";
+				}
+			}
+			if( new_point )
+			{
 				cout << endl;
-				if(isPrimeNumber(count)) cout << "Curve Order is Prime! n = " << dec << count;
+				if( k > 2 && isPrimeNumber(k) )
+					cout << "Curve Order is Prime! n = " << dec << k;
 				cout << endl << endl;
 			}
 		}

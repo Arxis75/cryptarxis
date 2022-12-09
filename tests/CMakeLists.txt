@@ -11,9 +11,14 @@ execute_process(COMMAND "${CMAKE_COMMAND}" --build .
 # gtest, gtest_main, gmock and gmock_main
 add_subdirectory("${CMAKE_BINARY_DIR}/googletest-src" "${CMAKE_BINARY_DIR}/googletest-build")
 
-add_executable(cryptarxis_tests cryptarxis_tests.cpp)
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
 
-target_link_libraries(cryptarxis_tests PRIVATE GTest::gtest)
+add_executable(cryptarxis_tests main.cpp)
 
-add_test(NAME cryptarxis_gtest
-         COMMAND cryptarxis_tests)
+target_link_libraries(cryptarxis_tests PUBLIC OpenSSL::Crypto ethash::ethash givaro PRIVATE GTest::gtest)
+
+add_subdirectory(unit_tests)
+
+include(GoogleTest)
+gtest_discover_tests(cryptarxis_tests)

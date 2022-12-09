@@ -1,4 +1,5 @@
 #include <Common.h>
+#include <algorithm>
 
 #include "EllipticCurve.h"
 #include "bips.h"
@@ -222,9 +223,10 @@ Mnemonic::Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionna
 bool Mnemonic::add_word(const string &word)
 {
     bool res = false;
-    // TODO: remove case-sensitive
+    std::string data = word;
+    std::transform(data.begin(), data.end(), data.begin(), ::tolower);
     vector<string>::const_iterator dic_it;
-    dic_it = find(_dic->begin(), _dic->end(), word);
+    dic_it = find(_dic->begin(), _dic->end(), data);
     if (dic_it != _dic->end() && _entropy.bitsize() < _ent)
     {
         bool is_last_word = (_entropy.bitsize() + _went > _ent);
@@ -248,6 +250,7 @@ bool Mnemonic::add_word(const string &word)
 bool Mnemonic::set_full_word_list(const string &list)
 {
     bool res = false;
+    clear();
     vector<string> v = split(list, " ");
     if (v.size() == _ms)
         for (int i = 0; i < v.size(); i++)

@@ -15,14 +15,15 @@ using namespace BIP39;
 int main(int argc, char** argv)
 {
     bool found = false;
-    Integer p = 11;    
+    Integer p = 211;    
     while(!found)
     {
         while(!isPrimeNumber(p)) p++;
-        if( (p % 4 == 3) && (1323 % p != 0) )  // 1323 = 4.A³ + 27.B² != 0
+        if( (p % 4 == 3) && (1323 % p != 0) )  // for fast sqrtmod && 1323 = 4.A³ + 27.B² != 0
         {
             EllipticCurve ecc = EllipticCurve(p, 0, 7);
             ecc.print_cyclic_subgroups();
+            cout << endl;
         }
         p++;
         found = true;
