@@ -15,8 +15,10 @@ class Mnemonic
 
         void clear();
         bool add_word(const string& word);
+        bool add_entropy(const string& entropy, const uint32_t bitsize, const uint8_t in_base);
         bool set_full_word_list(const string& list);
-      
+        const uint16_t getEntropySize() const { return _ent; }
+
         bool is_valid() const;
         bool list_possible_last_word(vector<string>& list) const;
         const string get_word_list() const;

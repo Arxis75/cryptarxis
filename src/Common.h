@@ -2,6 +2,7 @@
 
 #include <givaro/modular-integer.h>
 
+#include <map>
 using namespace std;
 using namespace Givaro;
 
@@ -15,9 +16,11 @@ class Bitstream
         Bitstream(const Integer& val, uint32_t bitsize);
         Bitstream(const char* p, uint32_t bitsize);
         Bitstream(const uint8_t* p, uint32_t bitsize);
+        Bitstream(const string& str_value, const uint32_t bitsize, const uint8_t in_base);
         
         void set(const Integer& val, const uint32_t bitsize);
         void push_back(const Integer& bits_value, const uint32_t bitsize);
+        void push_back(const string& str_value, const uint32_t bitsize, const uint8_t in_base);
         void clear();
         
         const uint32_t bitsize() const { return end_boffset; }

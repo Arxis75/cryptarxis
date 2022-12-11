@@ -220,6 +220,17 @@ Mnemonic::Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionna
     _cs = _went - d.rem;
 }
 
+bool Mnemonic::add_entropy(const string& entropy, const uint32_t bitsize, const uint8_t in_base)
+{
+    bool ret = false;
+    if( _entropy.bitsize() + bitsize <= _ent)
+    {
+        _entropy.push_back(entropy, bitsize, in_base);
+        ret = true;
+    }
+    return ret;
+}
+
 bool Mnemonic::add_word(const string &word)
 {
     bool res = false;

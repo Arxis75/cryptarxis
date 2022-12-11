@@ -37,6 +37,12 @@ Bitstream::Bitstream(const uint8_t* p, uint32_t bitsize)
     set_from_ptr(p, bitsize);
 }
 
+Bitstream::Bitstream(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
+    : end_boffset(0)
+{
+    push_back(str_value, bitsize, in_base);
+}
+
 void Bitstream::set(const Integer& val, uint32_t bitsize)
 {
     if(end_boffset)
@@ -55,6 +61,43 @@ void Bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
     if(d.rem)
         vvalue.push_back(p[d.quot] & ~(0xFF >> d.rem));
     end_boffset = bitsize;
+}
+
+struct cmp_str {
+   bool operator()(char const *a, char const *b) const { return strcmp(a, b) < 0; }
+};
+
+void Bitstream::push_back(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
+{
+    assert( in_base == 2 || in_base ==16 );
+
+    const map<const char*, const uint8_t, cmp_str> m = { {"0", 0}, {"1", 1}, {"2", 2}, {"3", 3},
+                                                         {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7},
+                                                         {"8", 8}, {"9", 9}, {"a", 10}, {"A", 10},
+                                                         {"b", 11}, {"B", 11}, {"c", 12}, {"C", 12},
+                                                         {"d", 13}, {"D", 13}, {"e", 14}, {"E", 14},
+                                                         {"f", 15}, {"F", 15} };
+    //Removes the 0x or 0b header
+    string tmp = str_value;
+    if( in_base == 2 && tmp.substr(0,1) == "0b" )
+        tmp = tmp.substr(2, tmp.size() - 2);
+    else if( in_base == 16 && tmp.substr(0,2) == "0x" )
+        tmp = tmp.substr(2, tmp.size() - 2);
+    
+    //size specified must be greater or equal than the number intrinsic size
+    assert(bitsize >= (tmp.size()<<(in_base == 2 ? 0 : 2)));
+
+    Integer value(0);
+    map<const char*, const uint8_t, cmp_str>::const_iterator it;
+    while(tmp.size()>0)
+    {
+        it = m.find(tmp.substr(0, 1).c_str());
+        assert( it != m.end() && ((*it).second == 0 || (*it).second == 1 || in_base == 16) );
+        value <<= (in_base == 2 ? 1 : 4);
+        value += (*it).second;
+        tmp = tmp.substr(1, tmp.size() - 1);
+    }
+    push_back(value, bitsize);
 }
 
 void Bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)

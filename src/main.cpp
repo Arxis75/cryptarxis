@@ -84,44 +84,65 @@ int main(int argc, char** argv)
     //cout << hex << Integer(a) << endl;
     cout << hex << b << endl;
 
-    Mnemonic* mnc = new Mnemonic(256);
+    //Mnemonic* mnc = new Mnemonic(128);
+    Mnemonic* mnc = new Mnemonic(160);
+    //Mnemonic* mnc = new Mnemonic(192);
+    //Mnemonic* mnc = new Mnemonic(224);
+    //Mnemonic* mnc = new Mnemonic(256);
 
-    const char* xx = "bonjour";
-    // diamond recycle math quantum earn save nut spice hen rice soft wire artefact say twin drum rival live mask lens actress peasant abstract hint
-    mnc->add_word("diamond");
-    mnc->add_word("recycle");
-    mnc->add_word("math");
-    mnc->add_word("quantum");
-    mnc->add_word("earn");
-    mnc->add_word("save");
-    mnc->add_word("nut");
-    mnc->add_word("spice");
-    mnc->add_word("hen");
-    mnc->add_word("rice");
-    mnc->add_word("soft");
-    mnc->add_word("wire");
-    mnc->add_word("artefact");
-    mnc->add_word("say");
-    mnc->add_word("twin");
-    mnc->add_word("drum");
-    mnc->add_word("rival");
-    mnc->add_word("live");
-    mnc->add_word("mask");
-    mnc->add_word("lens");
-    mnc->add_word("actress");
-    mnc->add_word("peasant");
-    mnc->add_word("abstract");
-    
+    string single_word = "zoo";
+    //abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon trouble
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    mnc->add_word(single_word);
+    if(mnc->getEntropySize()>128)
+    {
+        mnc->add_word(single_word);
+        mnc->add_word(single_word);
+        mnc->add_word(single_word);
+        if(mnc->getEntropySize()>160)
+        {
+            mnc->add_word(single_word);
+            mnc->add_word(single_word);
+            mnc->add_word(single_word);
+            if(mnc->getEntropySize()>192)
+            {
+                mnc->add_word(single_word);
+                mnc->add_word(single_word);
+                mnc->add_word(single_word);
+                if(mnc->getEntropySize()>224)
+                {
+                    mnc->add_word(single_word);
+                    mnc->add_word(single_word);
+                    mnc->add_word(single_word);
+                }
+            }
+        }
+    }
+
     vector<string> v;
     mnc->list_possible_last_word(v);
+    //11 x abandon: about actual age alpha angle argue artwork attract bachelor bean behind blind bomb brand broken burger cactus carbon cereal cheese city click coach cool coyote cricket cruise cute degree describe diesel disagree donor drama dune edit enemy energy escape exhaust express fashion field fiscal flavor food fringe furnace genius glue goddess grocery hand high holiday huge illness inform insect jacket kangaroo knock lamp lemon length lobster lyrics marble mass member metal moment mouse near noise obey offer once organ own parent phrase pill pole position process project question rail record remind render return ritual rubber sand scout sell share shoot simple slice soap solid speed square stereo street sugar surprise tank tent they toddler tongue trade truly turtle umbrella urge vast vendor void voyage wear wife world wrap
+    //14 x abandon: address amateur angle around bamboo bleak boil butter cat census clip conduct course cry deer device divorce dune enhance estate face fee float gain general gorilla hedgehog horse inherit item jungle lazy length mansion matrix mix mountain oak one over pear plate pride prosper raw require ride save seed share similar soap spend stamp super tank thumb toward true urge veteran warfare wedding word
+    //17 x abandon: agent author biology board camera choose dad desert electric entire fantasy flat grid hundred inherit lemon magic minimum movie one pony push response road school sorry strong task thrive unknown virus wedding
+    //20 x abandon: admit breeze choose depart elegant fury hundred infant link mother plastic radar slab sure truck verify
+    //23 x abandon: art diesel false kite organ ready surface trouble
     for(int i=0;i<v.size();i++) cout <<  v[i] << endl;
     
-    mnc->add_word("hint");
+    mnc->add_word("trouble");
     mnc->print();
 
     cout << hex << ecc.getCurveOrder() << endl;
     cout << dec << ecc.getCurveOrder().size_in_base(2) << endl;
-    Privkey m(mnc->get_seed("toto"), ecc);
+    Privkey m(mnc->get_seed("LEDGER"), ecc);
     Privkey m_h44(m,44,true);
     Privkey m_h44_h60(m_h44,60,true);
     Privkey m_h44_h60_h0(m_h44_h60,0,true);
