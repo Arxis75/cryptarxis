@@ -82,7 +82,7 @@ class Privkey
 class Signature: public EllipticCurve
 {
     public:
-        Signature(const Integer& r, const Integer& s, const bool parity, const EllipticCurve& curve);
+        Signature(const Integer& r, const Integer& s, const bool parity, const EllipticCurve& curve = Secp256k1::GetInstance());
         
         bool isValid(const Bitstream& h, const Bitstream& address) const;
         bool ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address = Bitstream()) const;

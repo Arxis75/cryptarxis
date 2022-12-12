@@ -141,7 +141,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
 			inv(r_1, r_candidate, _n);
 			//cout << hex << "r^(-1) = 0x" << r_1 << endl;
 			Q_candidate = p_scalar(sR_hG, r_1);
-			//cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
+			cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
 			ret = true;
 		}
     }

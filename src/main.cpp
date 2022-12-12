@@ -14,6 +14,25 @@ using namespace BIP39;
 
 int main(int argc, char** argv)
 {
+    //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
+    
+    Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
+    Bitstream t_h(t_raw.keccak256());
+    
+    Bitstream t_from("0x241a383244C822dfDaa3FAb5dBF5127Cd03A773f", 20<<3, 16);
+    
+    Bitstream t_y_parity("0x01", 1<<3, 16);
+    Bitstream t_r("0x70d792a4cb7568ecee34f03b1c271a721aa9b75c78c8f4871c2f256a588148e3", 32<<3, 16);
+    Bitstream t_s("0x503bcb74c5b6eff009436c1b262e8640d509a5b09691482c999ba80733cc18c2", 32<<3, 16);
+    
+    Signature sig(t_r, t_s, !isOdd(t_y_parity));
+    Pubkey key;
+    if( sig.ecrecover(key, t_h, t_from) )
+    {
+        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl << endl;
+        return 0;
+    }
+
     bool found = false;
     Integer p = 211;    
     while(!found)
@@ -59,12 +78,12 @@ int main(int argc, char** argv)
     Integer s = (k_1 * (Integer(h) + (r*secret))) % n;
     cout << hex << "s = k^(-1) . (h + r.secret) = 0x" << s << endl;
 
-    Signature sig(r, s, parity, ecc);
+    /*Signature sig(r, s, parity, ecc);
     Pubkey key;
     if( sig.ecrecover(key, h, Q.getAddress()) )
     {
         cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl;
-    }
+    }*/
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
@@ -84,8 +103,8 @@ int main(int argc, char** argv)
     //cout << hex << Integer(a) << endl;
     cout << hex << b << endl;
 
-    //Mnemonic* mnc = new Mnemonic(128);
-    Mnemonic* mnc = new Mnemonic(160);
+    Mnemonic* mnc = new Mnemonic(128);
+    //Mnemonic* mnc = new Mnemonic(160);
     //Mnemonic* mnc = new Mnemonic(192);
     //Mnemonic* mnc = new Mnemonic(224);
     //Mnemonic* mnc = new Mnemonic(256);

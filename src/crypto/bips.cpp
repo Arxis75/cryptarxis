@@ -107,13 +107,14 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
     {
         ret = true;
         key = Pubkey(Q_candidate, (*this));
+        cout << hex << "Q_candidate adresse = 0x" << key.getAddress() << endl;
         if( from_address.bitsize() == 160 && key.getAddress() != from_address )
         {
             ret = false;
             if( recover(Q_candidate, h, _r, _s, _parity, true) )
             {
                 key = Pubkey(Q_candidate, (*this));
-                ret = key.getAddress() == from_address;
+                ret = (key.getAddress() == from_address);
             }
         }
     }
@@ -123,7 +124,9 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
 Privkey::Privkey(const Integer& k, const EllipticCurve& curve)
     : _pubkey(curve.p_scalar(curve.getGenerator(), k), curve)
     , _secret(k, curve.getCurveOrder().size_in_base(2))
-{ }
+{
+    assert(k>0 && k<curve.getCurveOrder());
+}
 
 Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool hardened)
 {
