@@ -8,15 +8,99 @@
 #include <chrono>
 #include <ctime> 
 
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
+
 using namespace std;
 
 using namespace BIP39;
 
+Integer generate_k(const Integer& x, const Bitstream& data, const EllipticCurve& ecc)
+{
+    unsigned char *res;
+    uint32_t dilen;
+    Bitstream V("0x0101010101010101010101010101010101010101010101010101010101010101", 256, 16);
+    Bitstream K("0x0000000000000000000000000000000000000000000000000000000000000000", 256, 16);
+    Bitstream V_;
+
+    V_ = Bitstream(V);
+    V_.push_back(0x00,8);
+    V_.push_back(x,256);
+    V_.push_back(data, data.bitsize());
+    // K = HMAC(K, V || 0x00 || int2octets(x) || bits2octets(h))
+    res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+    // V = HMAC(K, V)
+    res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+
+    V_ = Bitstream(V);
+    V_.push_back(0x01,8);
+    V_.push_back(x,256);
+    V_.push_back(data, data.bitsize());
+    // K = HMAC(K, V || 0x01 || int2octets(x) || bits2octets(h))
+    res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+    // V = HMAC(K, V)
+    res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+
+    Bitstream k;
+    while(true)
+    {
+        // V = HMAC(K, V)
+        res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+        //k ||= V
+        k = V;
+        if( Integer(k) > 0 && Integer(k) < ecc.getCurveOrder())
+            break;
+        
+        V_ = Bitstream(V);
+        V_.push_back(0x00,8);
+        // K = HMAC(K, V || 0x00)
+        res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+        // V = HMAC(K, V)
+        res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+    }
+
+    return k;
+}
+
 int main(int argc, char** argv)
 {
+    EllipticCurve ecc = Secp256r1::GetInstance();
+    Integer p = ecc.getFieldOrder();
+    Integer n = ecc.getCurveOrder();
+
+    Privkey x(Integer(Bitstream("0xC9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721", 256, 16)), ecc);
+    cout << hex << "x = 0x" << x << endl;
+    Pubkey U = x.getPubKey();
+    cout << hex << "U = (0x" << U.getPoint().getX() << ", 0x" << U.getPoint().getY() << ")" << endl;
+
+    const char* message = "sample";
+    cout << "message = " << message << endl;
+    Bitstream t_raw(message,strlen(message)<<3);
+    Bitstream t_h(t_raw.sha256());
+    cout << "message sha256: h = 0x" << t_h << endl;
+
+    Integer k = generate_k(x, t_h, ecc);
+    cout << hex << "k = 0x" << k << endl;
+    Integer k_1; 
+    inv(k_1, k, n);
+    cout << hex << "k^(-1) = 0x" << k_1 << endl;
+    Point R = ecc.p_scalar(ecc.getGenerator(), k);
+    bool parity = !isOdd(R.getY());
+    //cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+    Integer r = R.getX() % n;
+    cout << hex << "r = 0x" << r << endl;
+    Integer s = (k_1 * (Integer(t_h) + (r*x))) % n;
+    cout << hex << "s = k^(-1) . (h + r.x) = 0x" << s << endl;
+
+    //With SHA-256, message = "sample":
+    // k = A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60
+    // r = EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716
+    // s = F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8
+
     //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
     
-    Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
+    /*Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
     Bitstream t_h(t_raw.keccak256());
     
     Bitstream t_from("0x241a383244C822dfDaa3FAb5dBF5127Cd03A773f", 20<<3, 16);
@@ -46,43 +130,6 @@ int main(int argc, char** argv)
         }
         p++;
         found = true;
-    }
-
-    EllipticCurve ecc = Secp256k1::GetInstance();
-    p = ecc.getFieldOrder();
-    Integer n = ecc.getCurveOrder();
-
-    //p = 211;
-    //Integer n(199);
-    //EllipticCurve ecc = EllipticCurve(p, 0, 7, Point(12,70), n);
-
-    Integer k = 22;
-    cout << hex << "k = 0x" << k << endl;
-    Integer k_1; 
-    inv(k_1, k, n);
-    cout << hex << "k^(-1) = 0x" << k_1 << endl;
-    const char* msg = "Hello World!";
-    Bitstream h = Bitstream(msg, strlen(msg)<<3).keccak256();
-    //Bitstream h(pow(Integer(2),256) - 1, 256);  // for testing purpose
-    cout << "message hash = 0x" << h << endl;
-    Point R = ecc.p_scalar(ecc.getGenerator(), k);
-    bool parity = !isOdd(R.getY());
-    cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
-    Integer r = R.getX() % n;
-    cout << hex << "r = 0x" << r << endl;
-    Privkey secret(69, ecc);
-    cout << hex << "secret = 0x" << secret << endl;
-    Pubkey Q = secret.getPubKey();
-    cout << hex << "Q = (0x" << Q.getPoint().getX() << ", 0x" << Q.getPoint().getY() << ")" << endl;
-    cout << hex << "Address(Q) = 0x" << Q.getAddress() << endl;
-    Integer s = (k_1 * (Integer(h) + (r*secret))) % n;
-    cout << hex << "s = k^(-1) . (h + r.secret) = 0x" << s << endl;
-
-    /*Signature sig(r, s, parity, ecc);
-    Pubkey key;
-    if( sig.ecrecover(key, h, Q.getAddress()) )
-    {
-        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl;
     }*/
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
@@ -166,8 +213,8 @@ int main(int argc, char** argv)
     Privkey m_h44_h60(m_h44,60,true);
     Privkey m_h44_h60_h0(m_h44_h60,0,true);
     Privkey m_h44_h60_h0_0(m_h44_h60_h0,0,false);
-    int32_t x = 3;
-    Privkey m_h44_h60_h0_0_x(m_h44_h60_h0_0,x,false);
+    int32_t _x = 3;
+    Privkey m_h44_h60_h0_0_x(m_h44_h60_h0_0,_x,false);
 
     cout << "Address: " << hex << m_h44_h60_h0_0_x.getPubKey().getAddress() << endl << endl;;
 

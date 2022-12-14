@@ -147,10 +147,10 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
    
     Bitstream digest(Integer(0), 512);
     uint32_t dilen;
-    unsigned char *res = ::HMAC(::EVP_sha512(),
-                                parent_cc, 32,
-                                parent_data, 33 + 4,
-                                digest, &dilen);
+    unsigned char *res = HMAC( EVP_sha512(),
+                               parent_cc, 32,
+                               parent_data, 33 + 4,
+                               digest, &dilen);
     if (res && dilen == 64)
     {
         cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
@@ -179,10 +179,10 @@ Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
     Bitstream digest(Integer(0), 512);
     uint32_t dilen;
 
-    unsigned char *res = ::HMAC(::EVP_sha512(),
-                                "Bitcoin seed", 12,
-                                seed, (seed.bitsize()>>3),
-                                digest, &dilen);
+    unsigned char *res = HMAC( EVP_sha512(),
+                               "Bitcoin seed", 12,
+                               seed, (seed.bitsize()>>3),
+                               digest, &dilen);
     if (res && dilen == 64)
     {
         cout << "BIP32 Root raw (hex): " << digest << dec << endl;

@@ -49,6 +49,8 @@ class EllipticCurve
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
+        //Integer sign()
+
         void print() const;
         void print_cyclic_subgroups() const;
 
@@ -92,4 +94,18 @@ class Secp256k1: public EllipticCurve
     
     private:
         static Secp256k1* instancePtr;
+};
+
+class Secp256r1: public EllipticCurve
+{   
+    public:
+        static Secp256r1& GetInstance();
+        Secp256r1(const Secp256r1& obj) = delete;
+
+    private:
+        //private constructor
+        Secp256r1();
+    
+    private:
+        static Secp256r1* instancePtr;
 };
