@@ -86,11 +86,11 @@ const Bitstream Pubkey::getAddress() const
     return Bitstream(&h.bytes[32 - 20], 160);
 }
 
-Signature::Signature(const Integer& r, const Integer& s, const bool parity, const EllipticCurve& curve)
+Signature::Signature(const Integer& r, const Integer& s, const bool imparity, const EllipticCurve& curve)
     : EllipticCurve(curve)
     , _r(r)
     , _s(s)
-    , _parity(parity)
+    , _imparity(imparity)
 { }
 
 bool Signature::isValid(const Bitstream& h, const Bitstream& from_address) const
@@ -103,15 +103,15 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
 {
     bool ret = false;
     Point Q_candidate;
-    if( recover(Q_candidate, h, _r, _s, _parity, false) )
+    if( recover(Q_candidate, h, _r, _s, _imparity, false) )
     {
         ret = true;
         key = Pubkey(Q_candidate, (*this));
-        cout << hex << "Q_candidate adresse = 0x" << key.getAddress() << endl;
+        //cout << hex << "Q_candidate adresse = 0x" << key.getAddress() << endl;
         if( from_address.bitsize() == 160 && key.getAddress() != from_address )
         {
             ret = false;
-            if( recover(Q_candidate, h, _r, _s, _parity, true) )
+            if( recover(Q_candidate, h, _r, _s, _imparity, true) )
             {
                 key = Pubkey(Q_candidate, (*this));
                 ret = (key.getAddress() == from_address);
@@ -173,6 +173,8 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
 
 Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
 {
+    assert(seed.bitsize() == 512);
+    
     // Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
     // Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
 
@@ -199,6 +201,36 @@ Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
         cout << "BIP32 " << "Root secret (hex): " << hex << _secret << dec << endl;
         cout << "BIP32 " << "Root public key (hex): " << hex << _pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
     }
+}
+
+Signature Privkey::sign(const Bitstream& h) const
+{
+    EllipticCurve ecc = _pubkey.getCurve();
+    Integer n = ecc.getCurveOrder();
+
+    Integer k_1;
+    bool imparity;
+    Integer r;
+    uint8_t nonce_to_skip = 0;
+    while(true)
+    {
+        Integer k = ecc.generate_RFC6979_nonce(_secret, h, nonce_to_skip);
+        cout << hex << "k = 0x" << k << endl;
+        inv(k_1, k, n);
+        //cout << hex << "k^(-1) = 0x" << k_1 << endl;
+        Point R = ecc.p_scalar(ecc.getGenerator(), k);
+        cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+        imparity = isOdd(R.getY());
+        //cout << "R.y imparity = " << (imparity ? "odd (0x01)" : "even (0x00)") << endl;
+        r = R.getX();
+        //cout << hex << "r = 0x" << r << endl;
+        if(r>0 && r<n) break;
+        nonce_to_skip++;
+    }
+    Integer s = (k_1 * (Integer(h) + (r*_secret))) % n;
+    //cout << hex << "s = k^(-1) . (h + r.x) = 0x" << s << endl;
+
+    return Signature(r, s, imparity, ecc);
 }
 
 //----------------------------------------------------------- BIP39 -----------------------------------------------------------------

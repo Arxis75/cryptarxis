@@ -49,10 +49,12 @@ class EllipticCurve
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
-        //Integer sign()
+        Integer generate_RFC6979_nonce(const Bitstream& x, const Bitstream& h, const uint8_t nonce_to_skip = 0) const;
 
         void print() const;
         void print_cyclic_subgroups() const;
+
+        inline bool operator==(const EllipticCurve& c) const { return _p == c.getFieldOrder() && _A == c.getA() && _B == c.getB() && _G == c.getGenerator() && _n == c.getCurveOrder(); }
 
     protected:
         bool isZeroDiscriminant() const;
@@ -69,11 +71,13 @@ class EllipticCurve
 
         bool isInv(const Point& Q, const Point& P) const;
         Element getY2(const Element& X) const;
-        bool sqrtmod(Integer& root, const Integer& n, const bool parity) const;
+
+        bool sqrtmod(Integer& root, const Integer& n, const bool imparity) const;
 
         bool recover( Point& pubkeyPoint,
-              	      const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
+              	      const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
                       const bool recover_alternate = false ) const;
+
     private:
         ZP _FField;
         Integer _p;

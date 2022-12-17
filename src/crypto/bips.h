@@ -54,10 +54,32 @@ class Pubkey
 
         const Bitstream& getChainCode() const { return _chaincode; }
 
+        inline bool operator==(const Pubkey& k) const { return _ecc == k.getCurve() && _point == k.getPoint() && _chaincode == k.getChainCode(); }
+
     private:
         EllipticCurve _ecc;
         Point _point;
         Bitstream _chaincode;   //BIP32
+};
+
+class Signature: public EllipticCurve
+{
+    public:
+        Signature(const Integer& r, const Integer& s, const bool imparity, const EllipticCurve& curve = Secp256k1::GetInstance());
+        
+        bool isValid(const Bitstream& h, const Bitstream& address) const;
+        bool ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address = Bitstream()) const;
+
+        const Integer& get_r() const { return _r; }
+        const Integer& get_s() const { return _s; }
+        const bool get_imparity() const { return _imparity; }
+
+        inline bool operator==(const Signature& s) const { return _r == s.get_r() && _s == s.get_s() && _imparity == s.get_imparity(); }
+
+    private:
+        Integer _r;
+        Integer _s;
+        bool _imparity;
 };
 
 class Privkey
@@ -74,21 +96,11 @@ class Privkey
         const Bitstream& getSecret() const { return _secret; }
         operator const Integer() const { return Integer(_secret); }
 
+        Signature sign(const Bitstream& h) const;
+
+        inline bool operator==(const Privkey& k) const { return _pubkey == k.getPubKey() && _secret == k.getSecret(); }
+
     private:
         Pubkey _pubkey;
         Bitstream _secret;
-};
-
-class Signature: public EllipticCurve
-{
-    public:
-        Signature(const Integer& r, const Integer& s, const bool parity, const EllipticCurve& curve = Secp256k1::GetInstance());
-        
-        bool isValid(const Bitstream& h, const Bitstream& address) const;
-        bool ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address = Bitstream()) const;
-
-    private:
-        Integer _r;
-        Integer _s;
-        bool _parity;
 };

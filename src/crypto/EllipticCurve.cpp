@@ -1,7 +1,13 @@
+
 #include "EllipticCurve.h"
 #include "bips.h"
 
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
+
 #include <map>
+
 using namespace std;
 
 // Function that checks whether n is prime or not
@@ -97,55 +103,6 @@ EllipticCurve::EllipticCurve(const Integer& p, const Integer& A, const Integer& 
 	assert( _p%4 == 3 );			//for fast sqrt
 	assert( verifyPoint(G) );
 	//assert( isPrimeNumber(_n) );	//TODO: calculate pointOrder instead of passing it as a parameter
-}
-
-bool EllipticCurve::sqrtmod(Integer& root, const Integer& n, const bool parity) const
-{
-	Integer r;
-    r = powmod(n, (_p+1)>>2, _p);
-    if( parity == isOdd(r) )
-        r = _p - r;
-    bool ret = (powmod(r, 2, _p) == n);
-    if(ret)
-        root = r;
-    return ret;
-}
-
-bool EllipticCurve::recover( Point& Q_candidate,
-                			 const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool parity,
-							 const bool recover_alternate ) const
-{
-    assert(msg_hash.bitsize() == 256);
-    assert(r < _n);
-    assert(s < _n);
-
-    bool ret = false;
-
-    Integer r_candidate = r + (recover_alternate ? _n : Integer(0));
-    if( r_candidate < _p )
-    {
-		Integer y_candidate;
-		if( sqrtmod(y_candidate, getY2(r_candidate), parity) )
-		{
-			Point R = Point(r_candidate, y_candidate);
-			//cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
-			Point sR = p_scalar(R, s);
-			//cout << hex << "sR = (0x" << sR.getX() << ", 0x" << sR.getY() << ")" << endl;
-			Point hG =  p_scalar(_G, msg_hash);
-			//cout << hex << "hG = (0x" << hG.getX() << ", 0x" << hG.getY() << ")" << endl;
-			Point invhG = p_inv(hG);
-			//cout << hex << "_hG = (0x" << invhG.getX() << ", 0x" << invhG.getY() << ")" << endl;
-			Point sR_hG = p_add(sR, invhG);
-			//cout << hex << "sR_hG = (0x" << sR_hG.getX() << ", 0x" << sR_hG.getY() << ")" << endl;
-			Integer r_1;
-			inv(r_1, r_candidate, _n);
-			//cout << hex << "r^(-1) = 0x" << r_1 << endl;
-			Q_candidate = p_scalar(sR_hG, r_1);
-			cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
-			ret = true;
-		}
-    }
-    return ret;
 }
 
 bool EllipticCurve::isZeroDiscriminant() const
@@ -327,7 +284,7 @@ void EllipticCurve::print_cyclic_subgroups() const
 	for(Integer x=0;x<_p;x++)
 	{
 		Element y;
-		if( sqrtmod(y, getY2(x), _p) )
+		if( sqrtmod(y, getY2(x), true) )
 		{  
 			Point G(x,y);
 			Integer k = 0;
@@ -361,6 +318,114 @@ void EllipticCurve::print_cyclic_subgroups() const
 			}
 		}
 	}
+}
+
+Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstream& h, const uint8_t nonce_to_skip) const
+{
+	assert(Integer(x) > 0 && Integer(x) < getCurveOrder()  && h.bitsize() == 256);
+
+	unsigned char *res;
+	uint32_t dilen;
+	Bitstream V("0x0101010101010101010101010101010101010101010101010101010101010101", 256, 16);
+	Bitstream K("0x0000000000000000000000000000000000000000000000000000000000000000", 256, 16);
+	Bitstream V_;
+
+	V_ = Bitstream(V);
+	V_.push_back(0x00,8);
+	V_.push_back(x,256);
+	V_.push_back(h, h.bitsize());
+	// K = HMAC(K, V || 0x00 || int2octets(x) || bits2octets(h))
+	res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+	// V = HMAC(K, V)
+	res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+
+	V_ = Bitstream(V);
+	V_.push_back(0x01,8);
+	V_.push_back(x,256);
+	V_.push_back(h, h.bitsize());
+	// K = HMAC(K, V || 0x01 || int2octets(x) || bits2octets(h))
+	res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+	// V = HMAC(K, V)
+	res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+
+	Bitstream k;
+	uint8_t counter = 0;
+	while(true)
+	{
+		// V = HMAC(K, V)
+		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+		//k ||= V
+		k = V;
+		if( counter >= nonce_to_skip && Integer(k) > 0 && Integer(k) < getCurveOrder() )
+			break;
+		
+		V_ = Bitstream(V);
+		V_.push_back(0x00,8);
+		// K = HMAC(K, V || 0x00)
+		res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+		// V = HMAC(K, V)
+		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+		counter++;
+	}
+
+	return k;    
+}
+
+bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool imparity) const
+{
+	Integer y;
+    y = powmod(value, (_p+1)>>2, _p);
+    if( isOdd(y) != imparity )
+        y = _p - y;
+    bool ret = (powmod(y, 2, _p) == value);
+    if(ret)
+        root = y;
+    return ret;
+}
+
+bool EllipticCurve::recover( Point& Q_candidate,
+                			 const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
+							 const bool recover_alternate ) const
+{
+    assert(msg_hash.bitsize() == 256);
+    assert(r < _n);
+    assert(s < _n);
+
+    bool ret = false;
+
+    Integer r_candidate = r + (recover_alternate ? _n : Integer(0));
+    if( r_candidate < _p )
+    {
+		Integer y_candidate;
+		if( sqrtmod(y_candidate, getY2(r_candidate), imparity) )
+		{
+			Point R = Point(r_candidate, y_candidate);
+			if( verifyPoint(R) )
+			{
+				cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+				Point sR = p_scalar(R, s);
+				//cout << hex << "sR = (0x" << sR.getX() << ", 0x" << sR.getY() << ")" << endl;
+				Point hG =  p_scalar(_G, msg_hash);
+				//cout << hex << "hG = (0x" << hG.getX() << ", 0x" << hG.getY() << ")" << endl;
+				Point invhG = p_inv(hG);
+				//cout << hex << "_hG = (0x" << invhG.getX() << ", 0x" << invhG.getY() << ")" << endl;
+				Point sR_hG = p_add(sR, invhG);
+				//cout << hex << "sR_hG = (0x" << sR_hG.getX() << ", 0x" << sR_hG.getY() << ")" << endl;
+				Integer r_1;
+				inv(r_1, r_candidate, _n);
+				//cout << hex << "r^(-1) = 0x" << r_1 << endl;
+				Q_candidate = p_scalar(sR_hG, r_1);
+				if( verifyPoint(Q_candidate) )
+				{
+					cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
+					ret = true;
+				}
+			}
+			else
+				cout << "invalid signature!" << endl;
+		}
+    }
+    return ret;
 }
 
 Secp256k1* Secp256k1::instancePtr = NULL;
