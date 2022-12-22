@@ -90,13 +90,25 @@ Signature::Signature(const Integer& r, const Integer& s, const bool imparity, co
     : EllipticCurve(curve)
     , _r(r)
     , _s(s)
+    , _smax(curve.getCurveOrder()>>1)   //Cf EIP-2
     , _imparity(imparity)
 { }
 
-bool Signature::isValid(const Bitstream& h, const Bitstream& from_address) const
+void Signature::fixMalleability()
+{
+    if(!isMalleabilityFixed())
+    {
+        _s = getCurveOrder() - _s;
+        _imparity = !_imparity;
+    }
+}
+
+bool Signature::isValid(const Bitstream& h, const Bitstream& from_address, const bool enforce_eip2) const
 {
     Pubkey key;
-    return ( from_address.bitsize() == 160 && ecrecover(key, h, from_address) && from_address == key.getAddress() );
+    return ( from_address.bitsize() == 160 &&
+             (_s <= _smax || !enforce_eip2) &&
+             ecrecover(key, h, from_address) && from_address == key.getAddress() );
 }
 
 bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address) const
@@ -203,7 +215,7 @@ Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
     }
 }
 
-Signature Privkey::sign(const Bitstream& h) const
+Signature Privkey::sign(const Bitstream& h, const bool enforce_eip2) const
 {
     EllipticCurve ecc = _pubkey.getCurve();
     Integer n = ecc.getCurveOrder();
@@ -215,11 +227,11 @@ Signature Privkey::sign(const Bitstream& h) const
     while(true)
     {
         Integer k = ecc.generate_RFC6979_nonce(_secret, h, nonce_to_skip);
-        cout << hex << "k = 0x" << k << endl;
+        //cout << hex << "k = 0x" << k << endl;
         inv(k_1, k, n);
         //cout << hex << "k^(-1) = 0x" << k_1 << endl;
         Point R = ecc.p_scalar(ecc.getGenerator(), k);
-        cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+        //cout << hex << "R = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
         imparity = isOdd(R.getY());
         //cout << "R.y imparity = " << (imparity ? "odd (0x01)" : "even (0x00)") << endl;
         r = R.getX();
@@ -230,7 +242,11 @@ Signature Privkey::sign(const Bitstream& h) const
     Integer s = (k_1 * (Integer(h) + (r*_secret))) % n;
     //cout << hex << "s = k^(-1) . (h + r.x) = 0x" << s << endl;
 
-    return Signature(r, s, imparity, ecc);
+    Signature sig(r, s, imparity, ecc);
+    if(enforce_eip2)
+        sig.fixMalleability();
+
+    return sig;
 }
 
 //----------------------------------------------------------- BIP39 -----------------------------------------------------------------

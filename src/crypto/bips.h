@@ -66,8 +66,11 @@ class Signature: public EllipticCurve
 {
     public:
         Signature(const Integer& r, const Integer& s, const bool imparity, const EllipticCurve& curve = Secp256k1::GetInstance());
-        
-        bool isValid(const Bitstream& h, const Bitstream& address) const;
+
+        void fixMalleability();
+        bool isMalleabilityFixed() const { return _s <= _smax; }
+
+        bool isValid(const Bitstream& h, const Bitstream& address, const bool enforce_eip2 = true) const;
         bool ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address = Bitstream()) const;
 
         const Integer& get_r() const { return _r; }
@@ -79,6 +82,7 @@ class Signature: public EllipticCurve
     private:
         Integer _r;
         Integer _s;
+        Integer _smax; //EIP-2: fixes signature malleability
         bool _imparity;
 };
 
@@ -96,7 +100,7 @@ class Privkey
         const Bitstream& getSecret() const { return _secret; }
         operator const Integer() const { return Integer(_secret); }
 
-        Signature sign(const Bitstream& h) const;
+        Signature sign(const Bitstream& h, const bool enforce_eip2 = true) const;
 
         inline bool operator==(const Privkey& k) const { return _pubkey == k.getPubKey() && _secret == k.getSecret(); }
 

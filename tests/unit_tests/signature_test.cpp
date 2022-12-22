@@ -27,7 +27,7 @@ TEST(SignatureTests, RFC6979_NIST_P256)
     Signature expected_signature( Bitstream("EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716", 256, 16),
                                   Bitstream("F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8", 256, 16),
                                   false );
-    Signature actual_signature = x.sign(t_h);
+    Signature actual_signature = x.sign(t_h, false);    //malleability not enforced by default in the RFC
     expected = expected_signature.get_imparity();
     actual = actual_signature.get_imparity();
     ASSERT_EQ(actual, expected);
