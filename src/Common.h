@@ -44,11 +44,11 @@ class Bitstream
 
         //Unaligned operators
         const Bitstream at(const uint32_t bitoffset, const uint32_t bitsize) const;
-        uint8_t as_uint8(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+8,end_boffset) - bofs)); }
-        uint16_t as_uint16(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+16,end_boffset) - bofs)); }
-        uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
+        uint8_t as_uint8(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+8, end_boffset) - bofs)); }
+        uint16_t as_uint16(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+16, end_boffset) - bofs)); }
+        /*uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
         uint64_t as_uint64(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+64,end_boffset) - bofs)); }
-        Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }
+        Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }*/
 
     protected:
         void set_from_ptr(const uint8_t* p, const uint32_t bitsize);

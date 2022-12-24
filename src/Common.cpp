@@ -102,7 +102,7 @@ void Bitstream::push_back(const string& str_value, const uint32_t bitsize, const
 
 void Bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
 {
-    Integer max_size_mask = pow(Integer(2),bitsize) - 1;
+    Integer max_size_mask = Givaro::pow(2, bitsize) - 1;
     Integer bits_to_push(0);
     uint32_t nbitsleft = bitsize;
     while(nbitsleft)
@@ -120,7 +120,7 @@ void Bitstream::push_back(const Integer& bits_value, const uint32_t bitsize)
 const Bitstream Bitstream::at(uint32_t bitoffset, uint32_t bitsize) const       // not aligned
 {
     assert(bitoffset+bitsize <= end_boffset);
-    Integer mask = pow(Integer(2), bitsize) - 1;
+    Integer mask = pow(2, bitsize) - 1;
     uint32_t rshift = end_boffset - bitoffset - bitsize;
     Integer v = mask & (Integer(*this)>>rshift);
     return Bitstream(v, bitsize);

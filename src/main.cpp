@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     Bitstream t_h(t_raw.keccak256());
     cout << hex << "h = " << t_h << endl;
 
-    Privkey x(Integer(Bitstream("0x67719fc5f6586d6b5975b77af4e3d5b4d1824937d81c6cd142ae1db5e97a010f", 256, 16)));
+    Privkey x(Bitstream("0x67719fc5f6586d6b5975b77af4e3d5b4d1824937d81c6cd142ae1db5e97a010f", 256, 16));
     Bitstream t_from("0x241a383244C822dfDaa3FAb5dBF5127Cd03A773f", 20<<3, 16);
 
     Signature actual_sig = x.sign(t_h);
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 
     cout << hex << ecc.getGeneratorOrder() << endl;
     cout << dec << ecc.getGeneratorOrder().size_in_base(2) << endl;
-    Privkey m(mnc->get_seed("LEDGER"), ecc);
+    Privkey m(mnc->get_seed("LEDGER"), Privkey::Format::SEED, ecc);
     Privkey m_h44(m,44,true);
     Privkey m_h44_h60(m_h44,60,true);
     Privkey m_h44_h60_h0(m_h44_h60,0,true);

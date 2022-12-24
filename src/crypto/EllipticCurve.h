@@ -17,23 +17,23 @@ class Point
     public:
         Point();
         Point(const Point& p);
-        Point(const Element& _x, const Element& _y);
+        Point(const Element& x, const Element& y);
         
-        const Element& getX() const { return x; }
-        const Element& getY() const { return y; }
-        bool isIdentity() const { return identity; }
+        const Element& getX() const { return m_x; }
+        const Element& getY() const { return m_y; }
+        bool isIdentity() const { return m_isIdentity; }
 
-        void setX(Element _x) { x = _x; }
-        void setY(Element _y) { y = _y; }
-        void setIdentity(bool _identity) { identity = _identity; }
+        void setX(Element x) { m_x = x; }
+        void setY(Element y) { m_y = y; }
+        void setIdentity(bool isIdentity) { m_isIdentity = isIdentity; }
 
         Point operator=(const Point& P);
         bool operator==(const Point& P) const;
         void print() const;
         
     private:    
-        bool identity;
-        Element x,y;
+        bool m_isIdentity;
+        Element m_x, m_y;
 };
 
 class EllipticCurve
@@ -43,9 +43,9 @@ class EllipticCurve
         EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B);
         EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B, const Point& G, const Integer& generatorOrder);
 
-        const Integer getFieldOrder() const { return _FField.size(); }
-        const Point& getGenerator() const { return _G; }
-        const Integer& getGeneratorOrder() const { return _genOrder; }
+        const Integer getFieldOrder() const { return m_FField.size(); }
+        const Point& getGenerator() const { return m_G; }
+        const Integer& getGeneratorOrder() const { return m_GOrder; }
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
@@ -54,7 +54,7 @@ class EllipticCurve
         void print() const;
         void print_cyclic_subgroups() const;
 
-        inline bool operator==(const EllipticCurve& c) const { return getFieldOrder() == c.getFieldOrder() && _A == c.getA() && _B == c.getB() && _G == c.getGenerator() && _genOrder == c.getGeneratorOrder(); }
+        inline bool operator==(const EllipticCurve& c) const { return getFieldOrder() == c.getFieldOrder() && m_A == c.getA() && m_B == c.getB() && m_G == c.getGenerator() && m_GOrder == c.getGeneratorOrder(); }
 
     protected:
         Point p_inv(const Point& P) const;
@@ -67,9 +67,9 @@ class EllipticCurve
         
         Point p_double(const Point& P) const;    
 
-        const ZP& getField() const { return _FField; };
-        const Element& getA() const { return _A; };
-        const Element& getB()const { return _B; };
+        const ZP& getField() const { return m_FField; };
+        const Element& getA() const { return m_A; };
+        const Element& getB()const { return m_B; };
 
         bool isInv(const Point& Q, const Point& P) const;
         Element getY2(const Element& X) const;
@@ -81,10 +81,10 @@ class EllipticCurve
                       const bool recover_alternate = false ) const;
 
     private:
-        ZP _FField;
-        Element _A, _B;
-        Point _G;
-        Integer _genOrder;
+        ZP m_FField;
+        Element m_A, m_B;
+        Point m_G;
+        Integer m_GOrder;
 };
 
 class Secp256k1: public EllipticCurve
@@ -98,7 +98,7 @@ class Secp256k1: public EllipticCurve
         Secp256k1();
     
     private:
-        static Secp256k1* instancePtr;
+        static Secp256k1* m_sInstancePtr;
 };
 
 class Secp256r1: public EllipticCurve
@@ -112,5 +112,5 @@ class Secp256r1: public EllipticCurve
         Secp256r1();
     
     private:
-        static Secp256r1* instancePtr;
+        static Secp256r1* m_sInstancePtr;
 };
