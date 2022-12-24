@@ -9,7 +9,43 @@ using namespace BIP39;
 
 int main(int argc, char** argv)
 {
-    Pubkey k;
+    EllipticCurve ecc = Secp256k1::GetInstance();
+    Integer n = ecc.getGeneratorOrder();
+
+    // R(0x1, 0x4218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee)
+    /*Point R(Integer("1"), Integer("29896722852569046015560700294576055776214335159245303116488692907525646231534"));
+
+    if(ecc.verifyPoint(R))
+    {
+        Point O = ecc.p_scalar(R, ecc.getGeneratorOrder());
+        if(O.isIdentity())
+        {
+            const char* message = "hello";
+            Bitstream t_raw(message,strlen(message)<<3);
+            Bitstream t_h(t_raw.keccak256());
+            cout << hex << t_h << endl;
+
+            //Point Q = ecc.p_add(R, ecc.p_inv(ecc.p_scalar(ecc.getGenerator(), t_h)));
+            //cout << hex << Q.getX() << ", " << Q.getY() << endl;
+
+            Pubkey Qrec;
+            Signature sig(1, 1, false);
+            sig.ecrecover(Qrec, t_h);
+            cout << hex << Qrec.getPoint().getX() << ", " << Qrec.getPoint().getY() << endl;
+
+            if(ecc.verifyPoint(Qrec.getPoint()))
+            {
+                O = ecc.p_scalar(Qrec.getPoint(), ecc.getGeneratorOrder());
+                if(O.isIdentity())
+                {
+                    cout << hex << Qrec.getAddress() << endl;
+                    return 0;
+                }
+            }
+        }
+    }*/
+
+    /*Pubkey k;
     const char* message = "hello";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.keccak256());
@@ -19,14 +55,13 @@ int main(int argc, char** argv)
                    false );
     bool bexpected = false;
     bool bactual = sig.ecrecover(k, t_h);
-     return 0;
+     return 0;*/
 
     Pubkey key;
-    EllipticCurve ecc = Secp256k1::GetInstance();
-    Integer n = ecc.getCurveOrder();
+
     //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
 
-    /*Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
+    Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
     Bitstream t_h(t_raw.keccak256());
     cout << hex << "h = " << t_h << endl;
 
@@ -76,7 +111,7 @@ int main(int argc, char** argv)
         }
         p++;
         found = true;
-    }*/
+    }
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
@@ -152,8 +187,8 @@ int main(int argc, char** argv)
     mnc->add_word("trouble");
     mnc->print();
 
-    cout << hex << ecc.getCurveOrder() << endl;
-    cout << dec << ecc.getCurveOrder().size_in_base(2) << endl;
+    cout << hex << ecc.getGeneratorOrder() << endl;
+    cout << dec << ecc.getGeneratorOrder().size_in_base(2) << endl;
     Privkey m(mnc->get_seed("LEDGER"), ecc);
     Privkey m_h44(m,44,true);
     Privkey m_h44_h60(m_h44,60,true);

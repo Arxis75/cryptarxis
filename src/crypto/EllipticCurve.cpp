@@ -70,39 +70,36 @@ void Point::print() const
 
 EllipticCurve::EllipticCurve(const EllipticCurve& curve)
 	: _FField(ZP(curve._FField))
-    , _p(curve._p)
 	, _A(curve._A)
 	, _B(curve._B)
     , _G(curve._G)
-    , _n(curve._n)
+    , _genOrder(curve._genOrder)
 { }
 
-EllipticCurve::EllipticCurve(const Integer& p, const Integer& A, const Integer& B)
-	: _FField(ZP(p))
-    , _p(p)
+EllipticCurve::EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B)
+	: _FField(ZP(fieldOrder))
 	, _A(A)
 	, _B(B)
     , _G(Point())
-    , _n(0)
+    , _genOrder(0)
 {
 	assert( !isZeroDiscriminant() );
-	//assert( isPrimeNumber(_p) );
-	assert( _p%4 == 3 );			//for fast sqrt
+	//assert( isPrimeNumber(_FField.size()) );
+	assert( _FField.size()%4 == 3 );			//for fast sqrt
 }
 
-EllipticCurve::EllipticCurve(const Integer& p, const Integer& A, const Integer& B, const Point& G, const Integer& n)
-	: _FField(ZP(p))
-    , _p(p)
+EllipticCurve::EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B, const Point& G, const Integer& generatorOrder)
+	: _FField(ZP(fieldOrder))
 	, _A(A)
 	, _B(B)
     , _G(G)
-    , _n(n)
+    , _genOrder(generatorOrder)
 {
 	assert( !isZeroDiscriminant() );
-	//assert( isPrimeNumber(_p) );
-	assert( _p%4 == 3 );			//for fast sqrt
+	//assert( isPrimeNumber(_FField.size()) );
+	assert( _FField.size()%4 == 3 );			//for fast sqrt
 	assert( verifyPoint(G) );
-	//assert( isPrimeNumber(_n) );	//TODO: calculate pointOrder instead of passing it as a parameter
+	//assert( isPrimeNumber(_genOrder) );	//TODO: calculate pointOrder instead of passing it as a parameter
 }
 
 bool EllipticCurve::isZeroDiscriminant() const
@@ -268,6 +265,12 @@ bool EllipticCurve::verifyPoint(const Point& P) const
     return ret;
 }
 
+bool EllipticCurve::verifyPointOrder(const Point& P, const Integer& order) const
+{
+	Point O = p_scalar(P, (order ? order : getGeneratorOrder()));
+    return O.isIdentity();
+}
+
 void EllipticCurve::print() const
 {
 	cout<<"Elliptic Curve Defined by ";
@@ -281,7 +284,7 @@ void EllipticCurve::print() const
 
 void EllipticCurve::print_cyclic_subgroups() const
 {
-	for(Integer x=0;x<_p;x++)
+	for(Integer x=0;x<_FField.size();x++)
 	{
 		Element y;
 		if( sqrtmod(y, getY2(x), true) )
@@ -298,7 +301,7 @@ void EllipticCurve::print_cyclic_subgroups() const
 				{
 					if(!new_point)
 					{
-						cout << "G(" << dec << x << "," << y << ")" << " solution of y²=x³+7 [" << _p << "]" << endl;
+						cout << "G(" << dec << x << "," << y << ")" << " solution of y²=x³+7 [" << _FField.size() << "]" << endl;
 						new_point = true;
 					}
 					cout << "(" << dec << R.getX() << "," << R.getY() << ") ";
@@ -322,7 +325,8 @@ void EllipticCurve::print_cyclic_subgroups() const
 
 Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstream& h, const uint8_t nonce_to_skip) const
 {
-	assert(Integer(x) > 0 && Integer(x) < getCurveOrder()  && h.bitsize() == 256);
+	assert(_genOrder > 0);
+	assert(Integer(x) > 0 && Integer(x) < getGeneratorOrder()  && h.bitsize() == 256);
 
 	unsigned char *res;
 	uint32_t dilen;
@@ -356,7 +360,7 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstrea
 		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
 		//k ||= V
 		k = V;
-		if( counter >= nonce_to_skip && Integer(k) > 0 && Integer(k) < getCurveOrder() )
+		if( counter >= nonce_to_skip && Integer(k) > 0 && Integer(k) < getGeneratorOrder() )
 			break;
 		
 		V_ = Bitstream(V);
@@ -374,10 +378,10 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstrea
 bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool imparity) const
 {
 	Integer y;
-    y = powmod(value, (_p+1)>>2, _p);
+    y = powmod(value, (_FField.size()+1)>>2, _FField.size());
     if( isOdd(y) != imparity )
-        y = _p - y;
-    bool ret = (powmod(y, 2, _p) == value);
+        y = _FField.size() - y;
+    bool ret = (powmod(y, 2, _FField.size()) == value);
     if(ret)
         root = y;
     return ret;
@@ -387,20 +391,21 @@ bool EllipticCurve::recover( Point& Q_candidate,
                 			 const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
 							 const bool recover_alternate ) const
 {
+	assert(_genOrder > 0);
     assert(msg_hash.bitsize() == 256);
-    assert(r < _n);
-    assert(s < _n);
+    assert(r < _genOrder);
+    assert(s < _genOrder);
 
     bool ret = false;
 
-    Integer r_candidate = r + (recover_alternate ? _n : Integer(0));
-    if( r_candidate < _p )
+    Integer r_candidate = r + (recover_alternate ? _genOrder : Integer(0));
+    if( r_candidate < _FField.size() )
     {
 		Integer y_candidate;
 		if( sqrtmod(y_candidate, getY2(r_candidate), imparity) )
 		{
 			Point R = Point(r_candidate, y_candidate);
-			if( verifyPoint(R) )
+			if( verifyPoint(R) && verifyPointOrder(R) )
 			{
 				cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
 				Point sR = p_scalar(R, s);
@@ -412,10 +417,10 @@ bool EllipticCurve::recover( Point& Q_candidate,
 				Point sR_hG = p_add(sR, invhG);
 				//cout << hex << "sR_hG = (0x" << sR_hG.getX() << ", 0x" << sR_hG.getY() << ")" << endl;
 				Integer r_1;
-				inv(r_1, r_candidate, _n);
+				inv(r_1, r_candidate, _genOrder);
 				//cout << hex << "r^(-1) = 0x" << r_1 << endl;
 				Q_candidate = p_scalar(sR_hG, r_1);
-				if( verifyPoint(Q_candidate) )
+				if( verifyPoint(Q_candidate) && verifyPointOrder(Q_candidate) )
 				{
 					cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
 					ret = true;

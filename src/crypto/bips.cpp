@@ -35,7 +35,7 @@ Pubkey::Pubkey(const Pubkey& key)
 
 const Bitstream Pubkey::getKey(Format f) const
 {   
-    uint32_t ecc_order_bsize = _ecc.getCurveOrder().size_in_base(2);
+    uint32_t ecc_order_bsize = _ecc.getGeneratorOrder().size_in_base(2);
     uint32_t bsize;
     Integer prefix = 0;
     if( f == Format::PREFIXED_X )
@@ -72,11 +72,11 @@ uint32_t Pubkey::getFormatBitSize(Format f) const
     switch(f)
     {
         case Format::PREFIXED_X:
-            return _ecc.getCurveOrder().size_in_base(2) + 8;
+            return _ecc.getGeneratorOrder().size_in_base(2) + 8;
         case Format::PREFIXED_XY:
-            return (_ecc.getCurveOrder().size_in_base(2)<<1) + 8;
+            return (_ecc.getGeneratorOrder().size_in_base(2)<<1) + 8;
         default:
-            return (_ecc.getCurveOrder().size_in_base(2)<<1);
+            return (_ecc.getGeneratorOrder().size_in_base(2)<<1);
     }
 }
 
@@ -90,7 +90,7 @@ Signature::Signature(const Integer& r, const Integer& s, const bool imparity, co
     : EllipticCurve(curve)
     , _r(r)
     , _s(s)
-    , _smax(curve.getCurveOrder()>>1)   //Cf EIP-2
+    , _smax(curve.getGeneratorOrder()>>1)   //Cf EIP-2
     , _imparity(imparity)
 { }
 
@@ -98,7 +98,7 @@ void Signature::fixMalleability()
 {
     if(!isMalleabilityFixed())
     {
-        _s = getCurveOrder() - _s;
+        _s = getGeneratorOrder() - _s;
         _imparity = !_imparity;
     }
 }
@@ -135,9 +135,9 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
 
 Privkey::Privkey(const Integer& k, const EllipticCurve& curve)
     : _pubkey(curve.p_scalar(curve.getGenerator(), k), curve)
-    , _secret(k, curve.getCurveOrder().size_in_base(2))
+    , _secret(k, curve.getGeneratorOrder().size_in_base(2))
 {
-    assert(k>0 && k<curve.getCurveOrder());
+    assert(k>0 && k<curve.getGeneratorOrder());
 }
 
 Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool hardened)
@@ -168,7 +168,7 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
     
         EllipticCurve curve = parent_privkey.getCurve();
-        Integer n = curve.getCurveOrder();
+        Integer n = curve.getGeneratorOrder();
         Integer s = a2Integer(&digest[0], 256); // first 256bits/512 = secret
         s += parent_privkey.getSecret();
         s %= n;
@@ -201,9 +201,9 @@ Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
     {
         cout << "BIP32 Root raw (hex): " << digest << dec << endl;
 
-        Integer n = curve.getCurveOrder();
+        Integer n = curve.getGeneratorOrder();
         Integer s = a2Integer(&digest[0], 256); // first 256bits/512 = secret
-        s %= curve.getCurveOrder();
+        s %= curve.getGeneratorOrder();
         const_cast<Bitstream&>(_secret).set(s, n.size_in_base(2));
 
         Bitstream cc(&digest[32], 256);
@@ -218,7 +218,7 @@ Privkey::Privkey(const Bitstream& seed, const EllipticCurve& curve)
 Signature Privkey::sign(const Bitstream& h, const bool enforce_eip2) const
 {
     EllipticCurve ecc = _pubkey.getCurve();
-    Integer n = ecc.getCurveOrder();
+    Integer n = ecc.getGeneratorOrder();
 
     Integer k_1;
     bool imparity;

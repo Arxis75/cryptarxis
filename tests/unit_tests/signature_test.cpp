@@ -27,7 +27,7 @@ TEST(SignatureTests, RFC6979_NIST_P256)
     Signature expected_signature( Bitstream("EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716", 256, 16),
                                   Bitstream("F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8", 256, 16),
                                   false );
-    Signature actual_signature = x.sign(t_h, false);    //malleability not enforced by default in the RFC
+    Signature actual_signature = x.sign(t_h, false);    //false = malleability fix not enforced by default in the RFC
     expected = expected_signature.get_imparity();
     actual = actual_signature.get_imparity();
     ASSERT_EQ(actual, expected);
@@ -136,12 +136,4 @@ TEST(SignatureTests, Micah_recover_vectors)
     expected = x.getPubKey().getPoint();
     actual = k.getPoint();
     ASSERT_EQ(actual, expected);
-
-    x = Privkey(Integer(Bitstream("1", 256, 16)));
-    sig = Signature( Bitstream("1", 256, 16),
-                     Bitstream("1", 256, 16),
-                     false );
-    bool bexpected = false;
-    bool bactual = sig.ecrecover(k, t_h);
-    ASSERT_EQ(bactual, bexpected);
 }

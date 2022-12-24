@@ -40,12 +40,12 @@ class EllipticCurve
 {
     public:
         EllipticCurve(const EllipticCurve& c);
-        EllipticCurve(const Integer& p, const Integer& A, const Integer& B);
-        EllipticCurve(const Integer& p, const Integer& A, const Integer& B, const Point& G, const Integer& n);
+        EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B);
+        EllipticCurve(const Integer& fieldOrder, const Integer& A, const Integer& B, const Point& G, const Integer& generatorOrder);
 
-        const Integer& getFieldOrder() const { return _p; }
+        const Integer getFieldOrder() const { return _FField.size(); }
         const Point& getGenerator() const { return _G; }
-        const Integer& getCurveOrder() const { return _n; }
+        const Integer& getGeneratorOrder() const { return _genOrder; }
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
@@ -54,16 +54,18 @@ class EllipticCurve
         void print() const;
         void print_cyclic_subgroups() const;
 
-        inline bool operator==(const EllipticCurve& c) const { return _p == c.getFieldOrder() && _A == c.getA() && _B == c.getB() && _G == c.getGenerator() && _n == c.getCurveOrder(); }
+        inline bool operator==(const EllipticCurve& c) const { return getFieldOrder() == c.getFieldOrder() && _A == c.getA() && _B == c.getB() && _G == c.getGenerator() && _genOrder == c.getGeneratorOrder(); }
+
+    protected:
+        Point p_inv(const Point& P) const;
+        Point p_add(const Point &P, const Point& Q) const;
+        bool verifyPoint(const Point& P) const;
+        bool verifyPointOrder(const Point& P, const Integer& order = 0) const;
 
     protected:
         bool isZeroDiscriminant() const;
         
-        Point p_inv(const Point& P) const;
-        Point p_add(const Point &P, const Point& Q) const;
-        Point p_double(const Point& P) const;
-        
-        bool verifyPoint(const Point& P) const;
+        Point p_double(const Point& P) const;    
 
         const ZP& getField() const { return _FField; };
         const Element& getA() const { return _A; };
@@ -80,10 +82,9 @@ class EllipticCurve
 
     private:
         ZP _FField;
-        Integer _p;
         Element _A, _B;
         Point _G;
-        Integer _n;
+        Integer _genOrder;
 };
 
 class Secp256k1: public EllipticCurve
