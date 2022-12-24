@@ -92,7 +92,7 @@ class Privkey
         enum class Format{SCALAR, SEED};
 
         //Privkey(const Integer& k, const EllipticCurve& curve = Secp256k1::GetInstance());
-        Privkey(const Bitstream& seed, const Format f = Format::SCALAR, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Bitstream& value, const Format f = Format::SCALAR, const EllipticCurve& curve = Secp256k1::GetInstance());
         Privkey(const Privkey& parent_extprivkey, const int32_t index, const bool hardened);
 
         const EllipticCurve& getCurve() const { return m_pubkey.getCurve(); }

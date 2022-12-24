@@ -350,7 +350,7 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstrea
 	// V = HMAC(K, V)
 	res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
 
-	Bitstream k;
+	Integer k;
 	uint8_t counter = 0;
 	while(true)
 	{
@@ -358,7 +358,9 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstrea
 		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
 		//k ||= V
 		k = V;
-		if( counter >= nonce_to_skip && Integer(k) > 0 && Integer(k) < getGeneratorOrder() )
+		k &= Givaro::pow(2, getGeneratorOrder().size_in_base(2)) - 1;		//truncate for testing purposes only (small fields)
+		//cout << dec << "k_candidate: " << k << endl;
+		if( counter >= nonce_to_skip && k > 0 && k < getGeneratorOrder() )
 			break;
 		
 		V_ = Bitstream(V);
@@ -405,7 +407,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
 			Point R = Point(r_candidate, y_candidate);
 			if( verifyPoint(R) && verifyPointOrder(R) )
 			{
-				cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
+				//cout << hex << "R_candidate = (0x" << R.getX() << ", 0x" << R.getY() << ")" << endl;
 				Point sR = p_scalar(R, s);
 				//cout << hex << "sR = (0x" << sR.getX() << ", 0x" << sR.getY() << ")" << endl;
 				Point hG =  p_scalar(m_G, msg_hash);
@@ -420,7 +422,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
 				Q_candidate = p_scalar(sR_hG, r_1);
 				if( verifyPoint(Q_candidate) && verifyPointOrder(Q_candidate) )
 				{
-					cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
+					//cout << hex << "Q_candidate = (0x" << Q_candidate.getX() << ", 0x" << Q_candidate.getY() << ")" << endl;
 					ret = true;
 				}
 			}

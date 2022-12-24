@@ -9,8 +9,33 @@ using namespace BIP39;
 
 int main(int argc, char** argv)
 {
-    EllipticCurve ecc = Secp256k1::GetInstance();
-    Integer n = ecc.getGeneratorOrder();
+    //EllipticCurve ecc = Secp256k1::GetInstance();
+    Integer p = 211;
+    Point G(12,70);
+    Integer n = 199;
+    EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
+
+    Integer x_candidate = 24; 
+    Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
+
+    const char* msg = "hello";
+    Bitstream msg_raw(msg,strlen(msg)<<3);
+    Bitstream msg_h(msg_raw.keccak256());
+    
+    Signature sig = x.sign(msg_h, true);
+
+    Pubkey Q;
+    sig = Signature(3, 102, true, ecc);
+    if( sig.isValid(msg_h, x.getPubKey().getAddress(), false) )
+        if( sig.ecrecover(Q,msg_h,x.getPubKey().getAddress()) )
+            cout << "Pre EIP-2 Sig recovered!" << endl;
+
+    sig = Signature(3, 97, false, ecc);
+    if( sig.isValid(msg_h, x.getPubKey().getAddress(), true) )
+        if( sig.ecrecover(Q, msg_h,x.getPubKey().getAddress()) )
+            cout << "Post EIP-2 Sig recovered!" << endl;
+        
+    int tototo = 1;
 
     // R(0x1, 0x4218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee)
     /*Point R(Integer("1"), Integer("29896722852569046015560700294576055776214335159245303116488692907525646231534"));
@@ -57,7 +82,7 @@ int main(int argc, char** argv)
     bool bactual = sig.ecrecover(k, t_h);
      return 0;*/
 
-    Pubkey key;
+    /*Pubkey key;
 
     //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
 
@@ -96,9 +121,9 @@ int main(int argc, char** argv)
     cout << my_sk << endl;
     Integer their_sk = (Integer(t_s) * Bitstream("0xd961afcbb57eba843b8e7fbc5b5840d5158f503530184df09665c1665f031e9e", 256, 16));
     their_sk %= n;
-    cout << their_sk << endl;
+    cout << their_sk << endl;*/
 
-    bool found = false;
+    /*bool found = false;
     Integer p = 211;    
     while(!found)
     {
@@ -111,7 +136,7 @@ int main(int argc, char** argv)
         }
         p++;
         found = true;
-    }
+    }*/
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,

@@ -157,7 +157,7 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
                                digest, &dilen);
     if (res && dilen == 64)
     {
-        cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
+        //cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
     
         EllipticCurve curve = parent_privkey.getCurve();
         Integer n = curve.getGeneratorOrder();
@@ -169,9 +169,9 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         Bitstream cc(&digest[32], 256);
         m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
 
-        cout << "BIP32 " << index << (hardened ? "'" : "") << " chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
-        cout << "BIP32 " << index << (hardened ? "'" : "") << " secret (hex): " << hex << m_secret << dec << endl;
-        cout << "BIP32 " << index << (hardened ? "'" : "") << " public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
+        //cout << "BIP32 " << index << (hardened ? "'" : "") << " chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
+        //cout << "BIP32 " << index << (hardened ? "'" : "") << " secret (hex): " << hex << m_secret << dec << endl;
+        //cout << "BIP32 " << index << (hardened ? "'" : "") << " public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
     }
 }
 
@@ -200,7 +200,7 @@ Privkey::Privkey(const Bitstream& value, const Format f, const EllipticCurve& cu
                                 digest, &dilen);
         if (res && dilen == 64)
         {
-            cout << "BIP32 Root raw (hex): " << digest << dec << endl;
+            //cout << "BIP32 Root raw (hex): " << digest << dec << endl;
 
             Integer n = curve.getGeneratorOrder();
             Integer s = a2Integer(&digest[0], 256); // first 256bits/512 = secret
@@ -210,9 +210,9 @@ Privkey::Privkey(const Bitstream& value, const Format f, const EllipticCurve& cu
             Bitstream cc(&digest[32], 256);
             m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
 
-            cout << "BIP32 " << "Root chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
-            cout << "BIP32 " << "Root secret (hex): " << hex << m_secret << dec << endl;
-            cout << "BIP32 " << "Root public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
+            //cout << "BIP32 " << "Root chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
+            //cout << "BIP32 " << "Root secret (hex): " << hex << m_secret << dec << endl;
+            //cout << "BIP32 " << "Root public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
         }
     }
 }
@@ -410,8 +410,8 @@ const Bitstream Mnemonic::get_seed(const string& pwd) const
                            64,
                            the_seed );
 
-        cout << "BIP32 password : " << pwd.c_str() << endl;
-        cout << "BIP32 seed (hex): " << the_seed << dec << endl;
+        //cout << "BIP32 password : " << pwd.c_str() << endl;
+        //cout << "BIP32 seed (hex): " << the_seed << dec << endl;
     }
     return the_seed;
 }

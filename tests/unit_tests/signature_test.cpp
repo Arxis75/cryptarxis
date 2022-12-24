@@ -62,3 +62,52 @@ TEST(SignatureTests, Micah_recover_vectors)
     actual = k.getPoint();
     ASSERT_EQ(actual, expected);
 }
+
+TEST(SignatureTests, test_boundaries)
+{
+    //Small field curve for edge-case testing purposes
+    Integer p = 211;
+    Point G(12,70);
+    Integer n = 199;
+    EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
+
+    Integer x_candidate = 24;
+    Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
+    Pubkey Q;
+
+    const char* msg = "hello";
+    Bitstream msg_raw(msg,strlen(msg)<<3);
+    Bitstream msg_h(msg_raw.keccak256());
+    
+    //pre EIP-2 signature:
+    // k = 69
+    // R = (202, 79)
+    // r = R.x mod 199 = 3
+    // s = 102                  => EIP-2 incompatible
+    // R.y % 2 = true
+    Signature sig = Signature(3, 102, true, ecc);
+    //pre EIP-2
+    auto expected = true;
+    auto actual = sig.isValid(msg_h, x.getPubKey().getAddress(), false);
+    ASSERT_EQ(actual, expected);
+    //post EIP-2
+    expected = false;
+    actual = sig.isValid(msg_h, x.getPubKey().getAddress(), true);
+    ASSERT_EQ(actual, expected);
+
+    //post EIP-2 signature:
+    // k = 69
+    // R' = -R = (202, 132)
+    // r = R'.x mod 199 = 3
+    // s' = -s = 97             => EIP-2 compatible
+    // R'.y % 2 = false
+    sig = Signature(3, 97, false, ecc);
+    //pre EIP-2
+    expected = true;
+    actual = sig.isValid(msg_h, x.getPubKey().getAddress(), false);
+    ASSERT_EQ(actual, expected);
+    //post EIP-2
+    expected = true;
+    actual = sig.isValid(msg_h, x.getPubKey().getAddress(), true);
+    ASSERT_EQ(actual, expected);
+}

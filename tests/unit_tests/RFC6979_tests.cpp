@@ -61,6 +61,48 @@ TEST(RFC6979Tests, RFC6979_NIST_P256)
     ASSERT_EQ(actual, expected);
 }
 
+TEST(RFC6979Tests, test_boundaries)
+{
+    //Small field curve for edge-case testing purposes
+    Integer p = 211;
+    Point G(12,70);
+    Integer n = 199;
+    EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
+
+    Integer x_candidate = 24;
+    Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
+    Pubkey Q = x.getPubKey();
+
+    const char* msg = "hello";
+    Bitstream msg_raw(msg,strlen(msg)<<3);
+    Bitstream msg_h(msg_raw.keccak256());
+    
+    Signature expected_sig(188, 44, true, ecc);
+    Signature actual_sig = x.sign(msg_h, true);
+    // "sign" initiale iteration:
+    // k0 = 69
+    // R0 = (202, 79)
+    // r0 = 202 > 199 = 3
+    // s0 = 102
+    // R0.y % 2 = true
+    // => Out-of-bound r(=202) forces RFC6979 to iterate
+    // k1 = 229
+    // => Out-of-bound k(=229) forces RFC6979 to re-iterate
+    // "sign" final iteration:
+    // k2 = 89
+    // R2 = (188, 17)
+    // r2 = 188
+    // s2 = 44
+    // R2.y % 2 = true
+    ASSERT_EQ(actual_sig, expected_sig);
+
+    Pubkey Q_candidate;
+    actual_sig.ecrecover(Q_candidate, msg_h, x.getPubKey().getAddress());
+    auto expected = true;
+    auto actual = (Q_candidate == Q);
+    ASSERT_EQ(actual, expected);
+}
+
 TEST(RFC6979Tests, Micah_sign_vectors)
 {
     const char* message = "hello";
