@@ -3,7 +3,7 @@
 
 TEST(SignatureTests, Micah_verify_vectors)
 {
-    const char* message = "hello";
+    const char *message = "hello";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.keccak256());
 
@@ -44,7 +44,7 @@ TEST(SignatureTests, Micah_verify_vectors)
 TEST(SignatureTests, Micah_recover_vectors)
 {
     Pubkey k;
-    const char* message = "hello";
+    const char *message = "hello";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.keccak256());
 
@@ -72,10 +72,10 @@ TEST(SignatureTests, test_boundaries)
     EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
 
     Integer x_candidate = 24;
-    Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
+    Privkey x(Bitstream(x_candidate, 8), ecc);
     Pubkey Q;
 
-    const char* msg = "hello";
+    const char *msg = "hello";
     Bitstream msg_raw(msg,strlen(msg)<<3);
     Bitstream msg_h(msg_raw.keccak256());
     

@@ -25,13 +25,13 @@ Bitstream::Bitstream(const Integer& val, uint32_t bitsize)
     set(val, bitsize);
 }
 
-Bitstream::Bitstream(const char* p, uint32_t bitsize)
+Bitstream::Bitstream(const char *p, uint32_t bitsize)
     : end_boffset(0)
 {
     set_from_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
 }
 
-Bitstream::Bitstream(const uint8_t* p, uint32_t bitsize)
+Bitstream::Bitstream(const uint8_t *p, uint32_t bitsize)
     : end_boffset(0)
 {
     set_from_ptr(p, bitsize);
@@ -50,7 +50,7 @@ void Bitstream::set(const Integer& val, uint32_t bitsize)
     push_back(val, bitsize);
 }
 
-void Bitstream::set_from_ptr(const uint8_t* p, uint32_t bitsize)
+void Bitstream::set_from_ptr(const uint8_t *p, uint32_t bitsize)
 {
     if(end_boffset)
         clear();
@@ -135,7 +135,7 @@ void Bitstream::clear()
 const Bitstream Bitstream::sha256() const
 {
     assert(!(end_boffset%8));
-    Bitstream digest(Integer(0), 256);
+    Bitstream digest(Integer::zero, 256);
     SHA256(*this, end_boffset>>3, digest);
     return digest;
 }
@@ -161,7 +161,7 @@ ostream& operator<< (ostream& out, const Bitstream& v) {
     return out;
 }
 
-Integer a2Integer(const uint8_t* input, const int32_t bitsize)
+Integer a2Integer(const uint8_t *input, const int32_t bitsize)
 {
     Integer output = 0;
     if(bitsize>0)

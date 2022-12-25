@@ -6,7 +6,7 @@ TEST(BIP32Tests, TestBIP32_vector1)
     // seed: 0x000102030405060708090a0b0c0d0e0f
     // path: m
     Bitstream seed = Bitstream("0x000102030405060708090a0b0c0d0e0f", 128, 16);
-    Privkey x(seed, Privkey::Format::SEED);
+    Privkey x(seed, "m");
     auto expected = Bitstream("0xe8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35", 256 ,16);
     auto actual = x.getSecret();
     ASSERT_EQ(actual, expected);
@@ -70,7 +70,7 @@ TEST(BIP32Tests, TestBIP32_vector2)
     // seed: 0xfffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542
     // path: m
     Bitstream seed = Bitstream("0xfffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542", 512, 16);
-    Privkey x(seed, Privkey::Format::SEED);
+    Privkey x(seed, "m");
     auto expected = Bitstream("0x4b03d6fc340455b363f51020ad3ecca4f0850280cf436c70c727923f6db46c3e", 256 ,16);
     auto actual = x.getSecret();
     ASSERT_EQ(actual, expected);
@@ -134,7 +134,7 @@ TEST(BIP32Tests, TestBIP32_vector3)
     // seed: 0x4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be
     // path: m
     Bitstream seed = Bitstream("0x4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be", 512, 16);
-    Privkey x(seed, Privkey::Format::SEED);
+    Privkey x(seed, "m");
     auto expected = Bitstream("0x00ddb80b067e0d4993197fe10f2657a844a384589847602d56f0c629c81aae32", 256 ,16);
     auto actual = x.getSecret();
     ASSERT_EQ(actual, expected);
@@ -158,7 +158,7 @@ TEST(BIP32Tests, TestBIP32_vector4)
     // seed: 0x3ddd5602285899a946114506157c7997e5444528f3003f6134712147db19b678
     // path: m
     Bitstream seed = Bitstream("0x3ddd5602285899a946114506157c7997e5444528f3003f6134712147db19b678", 256, 16);
-    Privkey x(seed, Privkey::Format::SEED);
+    Privkey x(seed, "m");
     auto expected = Bitstream("0x12c0d59c7aa3a10973dbd3f478b65f2516627e3fe61e00c345be9a477ad2e215", 256 ,16);
     auto actual = x.getSecret();
     ASSERT_EQ(actual, expected);

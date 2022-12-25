@@ -30,6 +30,7 @@ Pubkey::Pubkey(const Point& p, const Bitstream& cc, const EllipticCurve& curve)
 Pubkey::Pubkey(const Pubkey& key) 
     : m_ecc(key.m_ecc)
     , m_point(key.m_point)
+    , m_chaincode(key.m_chaincode)
 { }
 
 const Bitstream Pubkey::getKey(Format f) const
@@ -132,6 +133,19 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
     return ret;
 }
 
+void Signature::print() const
+{
+    cout << "Signature: " << endl;
+    cout << "   r = " << hex << "0x" << get_r() << endl;
+    cout << "   s = " << hex << "0x" << get_s() << endl;
+    cout << "   imparity = " << get_imparity() << endl;
+}
+
+Privkey::Privkey(const Privkey& privkey)
+    : m_pubkey(privkey.m_pubkey)
+    , m_secret(privkey.m_secret)
+{ }
+
 Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool hardened)
 {
     assert(index >= 0);
@@ -149,7 +163,7 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
     }      
     parent_data.push_back(suffix, 32);
    
-    Bitstream digest(Integer(0), 512);
+    Bitstream digest(Integer::zero, 512);
     uint32_t dilen;
     unsigned char *res = HMAC( EVP_sha512(),
                                parent_cc, 32,
@@ -160,11 +174,9 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         //cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
     
         EllipticCurve curve = parent_privkey.getCurve();
-        Integer n = curve.getGeneratorOrder();
-        Integer s = a2Integer(&digest[0], 256); // first 256bits/512 = secret
-        s += parent_privkey.getSecret();
-        s %= n;
-        const_cast<Bitstream&>(m_secret).set(s, n.size_in_base(2));
+        m_secret = a2Integer(&digest[0], 256); // first 256bits/512 = secret
+        m_secret += parent_privkey.getSecret();
+        m_secret %= curve.getGeneratorOrder();
 
         Bitstream cc(&digest[32], 256);
         m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
@@ -175,45 +187,47 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
     }
 }
 
-Privkey::Privkey(const Bitstream& value, const Format f, const EllipticCurve& curve)
+Privkey::Privkey(const Bitstream& k, const EllipticCurve& curve)
+    : m_secret(k)
+    , m_pubkey(Pubkey(curve.p_scalar(curve.getGenerator(), k), curve))
 {
-    if(f == Format::SCALAR)
+        assert(Integer(k) > 0 && Integer(k) < curve.getGeneratorOrder());
+}
+
+Privkey::Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t account_i, const EllipticCurve& curve)
+    : Privkey(mnc.get_seed(), path, account_i, curve)
+{ }
+
+Privkey::Privkey(const Bitstream& seed, const char *path, const int32_t account_i, const EllipticCurve& curve)
+{
+    assert(seed.bitsize() >= 128 && seed.bitsize() <= 512);
+
+    // Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
+    // Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
+
+    Bitstream digest(Integer::zero, 512);
+    uint32_t dilen;
+
+    unsigned char *res = HMAC( EVP_sha512(),
+                            "Bitcoin seed", 12,
+                            seed, (seed.bitsize()>>3),
+                            digest, &dilen);
+    if (res && dilen == 64)
     {
-        assert(Integer(value) > 0 && Integer(value) < curve.getGeneratorOrder());
-        
-        m_secret = value;
-        m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), curve);
-    }
-    else
-    {   
-        assert(value.bitsize() >= 128 && value.bitsize() <= 512);
+        //cout << "BIP32 Root raw (hex): " << digest << dec << endl;
 
-        // Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
-        // Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
+        m_secret = a2Integer(&digest[0], 256); // first 256bits/512 = secret
+        m_secret %= curve.getGeneratorOrder();
 
-        Bitstream digest(Integer(0), 512);
-        uint32_t dilen;
+        Bitstream cc(&digest[32], 256);
+        m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
 
-        unsigned char *res = HMAC( EVP_sha512(),
-                                "Bitcoin seed", 12,
-                                value, (value.bitsize()>>3),
-                                digest, &dilen);
-        if (res && dilen == 64)
-        {
-            //cout << "BIP32 Root raw (hex): " << digest << dec << endl;
+        DerivationPath dp(path);
+        (*this) = dp.deriveRootKey(*this, account_i);
 
-            Integer n = curve.getGeneratorOrder();
-            Integer s = a2Integer(&digest[0], 256); // first 256bits/512 = secret
-            s %= curve.getGeneratorOrder();
-            const_cast<Bitstream&>(m_secret).set(s, n.size_in_base(2));
-
-            Bitstream cc(&digest[32], 256);
-            m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
-
-            //cout << "BIP32 " << "Root chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
-            //cout << "BIP32 " << "Root secret (hex): " << hex << m_secret << dec << endl;
-            //cout << "BIP32 " << "Root public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
-        }
+        //cout << "BIP32 " << "Root chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
+        //cout << "BIP32 " << "Root secret (hex): " << hex << m_secret << dec << endl;
+        //cout << "BIP32 " << "Root public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
     }
 }
 
@@ -251,9 +265,15 @@ Signature Privkey::sign(const Bitstream& h, const bool enforce_eip2) const
     return sig;
 }
 
+void Privkey::print() const
+{
+    cout << hex << "0x" << m_secret << endl;
+}
+
 //----------------------------------------------------------- BIP39 -----------------------------------------------------------------
 
 Mnemonic::Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionnary)
+    : m_pwd("")
 {
     div_t d;
     m_dic = (dictionnary ? dictionnary : &BIP39::Dictionary::WordList_english);
@@ -329,6 +349,11 @@ bool Mnemonic::set_full_word_list(const string &list)
     return res;
 }
 
+void Mnemonic::setPassword(const string& pwd)
+{
+    m_pwd = pwd;
+}
+
 bool Mnemonic::is_valid() const
 {
     return (m_entropy.bitsize() == m_ent);
@@ -391,15 +416,21 @@ void Mnemonic::print(bool as_index_list) const
         cout << get_word_list() << endl;
 }
 
-const Bitstream Mnemonic::get_seed(const string& pwd) const
+const Bitstream Mnemonic::get_seed(const string& pwd)
 {
-    Bitstream the_seed(Integer(0), 512);
+    m_pwd = pwd;
+    return get_seed();
+}
+
+const Bitstream Mnemonic::get_seed() const
+{
+    Bitstream the_seed(Integer::zero, 512);
     if (is_valid())
     {
         const string pass = get_word_list();
-        char salt[8 + pwd.size()];
+        char salt[8 + m_pwd.size()];
         strcpy(salt, "mnemonic");
-        strcat(salt, pwd.c_str()); // salt = "mnemonic" + password
+        strcat(salt, m_pwd.c_str()); // salt = "mnemonic" + password
 
         // Cf https://www.openssl.org/docs/manmaster/man3/PKCS5_PBKDF2_HMAC.html
 
@@ -414,4 +445,51 @@ const Bitstream Mnemonic::get_seed(const string& pwd) const
         //cout << "BIP32 seed (hex): " << the_seed << dec << endl;
     }
     return the_seed;
+}
+
+DerivationPath::DerivationPath(string path)
+    : m_account_depth(0)
+{
+    vector<string> p = split(path, "/");
+    assert(p.size()>0);
+    if(p.size()>1)
+    {
+        assert(p[0] == "m");
+        m_path.push_back(0);            // convention as root key value
+        for(int i=1; i<p.size(); i++)
+        {
+            bool hardened = false;
+            string index = p[i];
+            uint32_t value = 0;
+            if(index.size()>1 && !strcmp(&index.back(),"'"))
+            {
+                value = 0x80000000;
+                index = index.substr(0, index.size()-1);
+            }
+            if(!strcmp(index.c_str(), "x")) // value = 0 for x (convention)
+            {
+                assert(m_account_depth == 0);
+                m_account_depth = i;
+            }
+            else
+            {
+                uint32_t v = stoi(index.c_str());
+                assert(v < 0x80000000);
+                value += v;
+            }
+            m_path.push_back(value);
+        }
+    }
+}
+
+Privkey DerivationPath::deriveRootKey(const Privkey& root_key, const int32_t account_i) const
+{
+    Privkey x(root_key);
+    for(uint8_t i=1;i<m_path.size();i++)
+    {
+        uint32_t index = (m_path[i] < 0x80000000 ? m_path[i] : m_path[i]-0x80000000) + (i == m_account_depth ? account_i : 0);
+        bool hardened = (m_path[i] >= 0x80000000);
+        x = Privkey(x, index, hardened);
+    }
+    return x;
 }

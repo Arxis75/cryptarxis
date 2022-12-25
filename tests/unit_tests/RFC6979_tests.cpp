@@ -4,7 +4,7 @@
 TEST(RFC6979Tests, RFC6979_NIST_P256)
 {
     EllipticCurve ecc = Secp256r1::GetInstance();
-    Privkey x(Bitstream("0xC9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721", 256, 16), Privkey::Format::SCALAR, ecc);
+    Privkey x(Bitstream("0xC9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721", 256, 16), ecc);
     Pubkey U = x.getPubKey();
     
     Integer expected = Bitstream("60FED4BA255A9D31C961EB74C6356D68C049B8923B61FA6CE669622E60F29FB6", 256, 16);
@@ -14,7 +14,7 @@ TEST(RFC6979Tests, RFC6979_NIST_P256)
     actual = U.getPoint().getY();
     ASSERT_EQ(actual, expected);
 
-    const char* message = "sample";
+    const char *message = "sample";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.sha256());
 
@@ -70,10 +70,10 @@ TEST(RFC6979Tests, test_boundaries)
     EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
 
     Integer x_candidate = 24;
-    Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
+    Privkey x(Bitstream(x_candidate, 8), ecc);
     Pubkey Q = x.getPubKey();
 
-    const char* msg = "hello";
+    const char *msg = "hello";
     Bitstream msg_raw(msg,strlen(msg)<<3);
     Bitstream msg_h(msg_raw.keccak256());
     
@@ -82,7 +82,7 @@ TEST(RFC6979Tests, test_boundaries)
     // "sign" initiale iteration:
     // k0 = 69
     // R0 = (202, 79)
-    // r0 = 202 > 199 = 3
+    // r0 = 202
     // s0 = 102
     // R0.y % 2 = true
     // => Out-of-bound r(=202) forces RFC6979 to iterate
@@ -105,7 +105,7 @@ TEST(RFC6979Tests, test_boundaries)
 
 TEST(RFC6979Tests, Micah_sign_vectors)
 {
-    const char* message = "hello";
+    const char *message = "hello";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.keccak256());
 

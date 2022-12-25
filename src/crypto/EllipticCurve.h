@@ -49,7 +49,7 @@ class EllipticCurve
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
-        Integer generate_RFC6979_nonce(const Bitstream& x, const Bitstream& h, const uint8_t nonce_to_skip = 0) const;
+        Integer generate_RFC6979_nonce(const Integer& x, const Bitstream& h, const uint8_t nonce_to_skip = 0) const;
 
         void print() const;
         void print_cyclic_subgroups() const;
@@ -98,7 +98,7 @@ class Secp256k1: public EllipticCurve
         Secp256k1();
     
     private:
-        static Secp256k1* m_sInstancePtr;
+        static Secp256k1 *m_sInstancePtr;
 };
 
 class Secp256r1: public EllipticCurve
@@ -112,5 +112,5 @@ class Secp256r1: public EllipticCurve
         Secp256r1();
     
     private:
-        static Secp256r1* m_sInstancePtr;
+        static Secp256r1 *m_sInstancePtr;
 };

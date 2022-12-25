@@ -7,9 +7,67 @@ using namespace std;
 
 using namespace BIP39;
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    //EllipticCurve ecc = Secp256k1::GetInstance();
+    Mnemonic mnc(128);
+    if(mnc.set_full_word_list("physical eagle dry banana embrace aisle virtual spell modify series doctor tonight"))
+    {
+        Privkey x(mnc, "m/44'/60'/0'/0/0");
+        x.print();
+        
+        //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
+
+        // SIGNING PAYLOAD:
+        // transaction_type:                       0x02    (EIP1559)
+        // RLP list/size:              0xc0+0x2F       = 7 Bytes RLP headers + 40(0x28) Bytes RLP payload      <= 55 Bytes
+        // chain_id:                               0x05            (GOERLI)
+        // // nonce:                                  0x07
+        // max_priority_fee_per_gas:   0x80+0x04/  0x77359400      ( 2E+09 =  2 GWEI)
+        // max_fee_per_gas:            0x80+0x05/  0x02540be400    (10E+09 = 10 GWEI)
+        // gas_limit:                  0x80+0x02/  0x5208              ( = 21000 WEI)
+        // to:                         0x80+0x14/  0x1dcf117c651e34c9e0e397b271bc59477b0fd0fa
+        // eth:                        0x80+0x07/  0x038d7ea4c68000    (0.001E+18 = 0.001 ETH)
+        // data:                       0x80
+        // access_list:                0xc0
+
+        Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
+        Bitstream t_h(t_raw.keccak256());
+
+        Signature sig = x.sign(t_h, true);
+        sig.print();
+    }
+
+    /*Signature actual_sig = x.sign(t_h);
+    cout << hex << "my signature_y_parity = " << (actual_sig.get_imparity() ? "impair" : "pair") << endl;
+    cout << hex << "my r = " << actual_sig.get_r() << endl;
+    cout << hex << "my s = " << actual_sig.get_s() << endl;
+
+    if( actual_sig.ecrecover(key, t_h, t_from) )
+    {
+        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl << endl;
+    }
+  
+    bool t_y_imparity = 0x01;
+    Bitstream t_r("0x70d792a4cb7568ecee34f03b1c271a721aa9b75c78c8f4871c2f256a588148e3", 32<<3, 16);
+    Bitstream t_s("0x503bcb74c5b6eff009436c1b262e8640d509a5b09691482c999ba80733cc18c2", 32<<3, 16);
+
+    Signature sig(t_r, t_s, t_y_imparity);
+    if( sig.ecrecover(key, t_h, t_from) )
+    {
+        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl << endl;
+    }*/
+
+    /*Integer sk = Integer(t_h) + Integer(Bitstream("0x70d792a4cb7568ecee34f03b1c271a721aa9b75c78c8f4871c2f256a588148e3", 256, 16)) * x.getSecret();
+    sk %= n;
+    cout << sk << endl;
+    Integer my_sk = (actual_sig.get_s() * Bitstream("0xd961afcbb57eba843b8e7fbc5b5840d5158f503530184df09665c1665f031e9e", 256, 16));
+    my_sk %= n;
+    cout << my_sk << endl;
+    Integer their_sk = (Integer(t_s) * Bitstream("0xd961afcbb57eba843b8e7fbc5b5840d5158f503530184df09665c1665f031e9e", 256, 16));
+    their_sk %= n;
+    cout << their_sk << endl;*/
+
+    /*//EllipticCurve ecc = Secp256k1::GetInstance();
     Integer p = 211;
     Point G(12,70);
     Integer n = 199;
@@ -18,7 +76,7 @@ int main(int argc, char** argv)
     Integer x_candidate = 24; 
     Privkey x(Bitstream(x_candidate, 8), Privkey::Format::SCALAR, ecc);
 
-    const char* msg = "hello";
+    const char *msg = "hello";
     Bitstream msg_raw(msg,strlen(msg)<<3);
     Bitstream msg_h(msg_raw.keccak256());
     
@@ -35,7 +93,7 @@ int main(int argc, char** argv)
         if( sig.ecrecover(Q, msg_h,x.getPubKey().getAddress()) )
             cout << "Post EIP-2 Sig recovered!" << endl;
         
-    int tototo = 1;
+    int tototo = 1;*/
 
     // R(0x1, 0x4218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee)
     /*Point R(Integer("1"), Integer("29896722852569046015560700294576055776214335159245303116488692907525646231534"));
@@ -45,7 +103,7 @@ int main(int argc, char** argv)
         Point O = ecc.p_scalar(R, ecc.getGeneratorOrder());
         if(O.isIdentity())
         {
-            const char* message = "hello";
+            const char *message = "hello";
             Bitstream t_raw(message,strlen(message)<<3);
             Bitstream t_h(t_raw.keccak256());
             cout << hex << t_h << endl;
@@ -71,7 +129,7 @@ int main(int argc, char** argv)
     }*/
 
     /*Pubkey k;
-    const char* message = "hello";
+    const char *message = "hello";
     Bitstream t_raw(message,strlen(message)<<3);
     Bitstream t_h(t_raw.keccak256());
     Privkey x(Integer(Bitstream("1", 256, 16)));
@@ -82,48 +140,7 @@ int main(int argc, char** argv)
     bool bactual = sig.ecrecover(k, t_h);
      return 0;*/
 
-    /*Pubkey key;
-
-    //keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
-
-    Bitstream t_raw("0x02ef050784773594008502540be400825208941dcf117c651e34c9e0e397b271bc59477b0fd0fa87038d7ea4c6800080c0", 49<<3, 16);
-    Bitstream t_h(t_raw.keccak256());
-    cout << hex << "h = " << t_h << endl;
-
-    Privkey x(Bitstream("0x67719fc5f6586d6b5975b77af4e3d5b4d1824937d81c6cd142ae1db5e97a010f", 256, 16));
-    Bitstream t_from("0x241a383244C822dfDaa3FAb5dBF5127Cd03A773f", 20<<3, 16);
-
-    Signature actual_sig = x.sign(t_h);
-    cout << hex << "my signature_y_parity = " << (actual_sig.get_imparity() ? "impair" : "pair") << endl;
-    cout << hex << "my r = " << actual_sig.get_r() << endl;
-    cout << hex << "my s = " << actual_sig.get_s() << endl;
-
-    if( actual_sig.ecrecover(key, t_h, t_from) )
-    {
-        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl << endl;
-    }
-  
-    bool t_y_imparity = 0x01;
-    Bitstream t_r("0x70d792a4cb7568ecee34f03b1c271a721aa9b75c78c8f4871c2f256a588148e3", 32<<3, 16);
-    Bitstream t_s("0x503bcb74c5b6eff009436c1b262e8640d509a5b09691482c999ba80733cc18c2", 32<<3, 16);
-
-    Signature sig(t_r, t_s, t_y_imparity);
-    if( sig.ecrecover(key, t_h, t_from) )
-    {
-        cout << endl << "YAY! address 0x" << key.getAddress() << " verified!" << endl << endl;
-    }
-
-    Integer sk = Integer(t_h) + Integer(Bitstream("0x70d792a4cb7568ecee34f03b1c271a721aa9b75c78c8f4871c2f256a588148e3", 256, 16)) * x.getSecret();
-    sk %= n;
-    cout << sk << endl;
-    Integer my_sk = (actual_sig.get_s() * Bitstream("0xd961afcbb57eba843b8e7fbc5b5840d5158f503530184df09665c1665f031e9e", 256, 16));
-    my_sk %= n;
-    cout << my_sk << endl;
-    Integer their_sk = (Integer(t_s) * Bitstream("0xd961afcbb57eba843b8e7fbc5b5840d5158f503530184df09665c1665f031e9e", 256, 16));
-    their_sk %= n;
-    cout << their_sk << endl;*/
-
-    /*bool found = false;
+     /*bool found = false;
     Integer p = 211;    
     while(!found)
     {
@@ -136,7 +153,7 @@ int main(int argc, char** argv)
         }
         p++;
         found = true;
-    }*/
+    }
 
     uint8_t toto[97] = { 0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
                          0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,0xFF,0,0,0xFF,
@@ -156,11 +173,11 @@ int main(int argc, char** argv)
     //cout << hex << Integer(a) << endl;
     cout << hex << b << endl;
 
-    Mnemonic* mnc = new Mnemonic(128);
-    //Mnemonic* mnc = new Mnemonic(160);
-    //Mnemonic* mnc = new Mnemonic(192);
-    //Mnemonic* mnc = new Mnemonic(224);
-    //Mnemonic* mnc = new Mnemonic(256);
+    Mnemonic *mnc = new Mnemonic(128);
+    //Mnemonic *mnc = new Mnemonic(160);
+    //Mnemonic *mnc = new Mnemonic(192);
+    //Mnemonic *mnc = new Mnemonic(224);
+    //Mnemonic *mnc = new Mnemonic(256);
 
     string single_word = "zoo";
     //abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon trouble
@@ -224,7 +241,7 @@ int main(int argc, char** argv)
 
     cout << "Address: " << hex << m_h44_h60_h0_0_x.getPubKey().getAddress() << endl << endl;;
 
-    delete mnc;
+    delete mnc;*/
 
     return 0;
 }

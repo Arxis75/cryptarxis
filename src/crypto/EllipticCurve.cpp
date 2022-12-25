@@ -321,10 +321,10 @@ void EllipticCurve::print_cyclic_subgroups() const
 	}
 }
 
-Integer EllipticCurve::generate_RFC6979_nonce(const Bitstream& x, const Bitstream& h, const uint8_t nonce_to_skip) const
+Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const Bitstream& h, const uint8_t nonce_to_skip) const
 {
 	assert(m_GOrder > 0);
-	assert(Integer(x) > 0 && Integer(x) < getGeneratorOrder()  && h.bitsize() == 256);
+	assert(x > 0 && x < getGeneratorOrder()  && h.bitsize() == 256);
 
 	unsigned char *res;
 	uint32_t dilen;
@@ -398,7 +398,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
 
     bool ret = false;
 
-    Integer r_candidate = r + (recover_alternate ? m_GOrder : Integer(0));
+    Integer r_candidate = r + (recover_alternate ? m_GOrder : Integer::zero);
     if( r_candidate < m_FField.size() )
     {
 		Integer y_candidate;
@@ -433,7 +433,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
     return ret;
 }
 
-Secp256k1* Secp256k1::m_sInstancePtr = NULL;
+Secp256k1 *Secp256k1::m_sInstancePtr = NULL;
 
 Secp256k1::Secp256k1()
     : EllipticCurve( Integer("115792089237316195423570985008687907853269984665640564039457584007908834671663"),
@@ -451,7 +451,7 @@ Secp256k1& Secp256k1::GetInstance()
     return *m_sInstancePtr;
 }
 
-Secp256r1* Secp256r1::m_sInstancePtr = NULL;
+Secp256r1 *Secp256r1::m_sInstancePtr = NULL;
 
 Secp256r1::Secp256r1()
     : EllipticCurve( Integer("115792089210356248762697446949407573530086143415290314195533631308867097853951"),

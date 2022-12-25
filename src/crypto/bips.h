@@ -11,28 +11,31 @@ namespace BIP39 {
 class Mnemonic
 {
     public:
-        Mnemonic(const size_t entropy_bitsize, const vector<string>* dictionnary = 0);
+        Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionnary = 0);
 
         void clear();
         bool add_word(const string& word);
         bool add_entropy(const string& entropy, const uint32_t bitsize, const uint8_t in_base);
         bool set_full_word_list(const string& list);
         const uint16_t getEntropySize() const { return m_ent; }
+        void setPassword(const string& pwd);
 
         bool is_valid() const;
         bool list_possible_last_word(vector<string>& list) const;
         const string get_word_list() const;
         const string get_last_word() const;
-        const Bitstream get_seed(const string& pwd) const;
+        const Bitstream get_seed(const string& pwd);
+        const Bitstream get_seed() const;
         void print(bool as_index_list = false) const;
 
 private:
         Bitstream m_entropy;
-        const vector<string>* m_dic;
+        const vector<string> *m_dic;
         uint8_t m_went;
         uint16_t m_ent;
         uint8_t m_ms;
         uint8_t m_cs;
+        string m_pwd;
 };
 }
 
@@ -77,6 +80,8 @@ class Signature: public EllipticCurve
         const Integer& get_s() const { return m_s; }
         const bool get_imparity() const { return m_imparity; }
 
+        void print() const;
+
         inline bool operator==(const Signature& s) const { return m_r == s.get_r() && m_s == s.get_s() && m_imparity == s.get_imparity(); }
 
     private:
@@ -89,18 +94,18 @@ class Signature: public EllipticCurve
 class Privkey
 {
     public:
-        enum class Format{SCALAR, SEED};
-
-        //Privkey(const Integer& k, const EllipticCurve& curve = Secp256k1::GetInstance());
-        Privkey(const Bitstream& value, const Format f = Format::SCALAR, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Privkey& privkey);
+        Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Bitstream& seed, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
         Privkey(const Privkey& parent_extprivkey, const int32_t index, const bool hardened);
+        Privkey(const Bitstream& k, const EllipticCurve& curve = Secp256k1::GetInstance());
 
         const EllipticCurve& getCurve() const { return m_pubkey.getCurve(); }
         const Bitstream& getChainCode() const { return m_pubkey.getChainCode(); }
         const Pubkey& getPubKey() const { return m_pubkey; }
-
-        const Bitstream& getSecret() const { return m_secret; }
-        operator const Integer() const { return Integer(m_secret); }
+        void print() const;
+        const Integer& getSecret() const { return m_secret; }
+        operator const Integer() const { return m_secret; }
 
         Signature sign(const Bitstream& h, const bool enforce_eip2 = true) const;
 
@@ -108,5 +113,15 @@ class Privkey
 
     private:
         Pubkey m_pubkey;
-        Bitstream m_secret;
+        Integer m_secret;
+};
+
+class DerivationPath
+{
+    public:
+        DerivationPath(string path);
+        Privkey deriveRootKey(const Privkey& root_key, const int32_t account_i = 0) const;
+    private:
+        vector<uint32_t> m_path;
+        uint8_t m_account_depth;
 };

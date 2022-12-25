@@ -6,7 +6,7 @@
 using namespace std;
 using namespace Givaro;
 
-Integer a2Integer(const uint8_t* input, const int32_t bitsize);
+Integer a2Integer(const uint8_t *input, const int32_t bitsize);
 
 class Bitstream
 {
@@ -14,8 +14,8 @@ class Bitstream
         Bitstream();
         Bitstream(const Bitstream&);
         Bitstream(const Integer& val, uint32_t bitsize);
-        Bitstream(const char* p, uint32_t bitsize);
-        Bitstream(const uint8_t* p, uint32_t bitsize);
+        Bitstream(const char *p, uint32_t bitsize);
+        Bitstream(const uint8_t *p, uint32_t bitsize);
         Bitstream(const string& str_value, const uint32_t bitsize, const uint8_t in_base);
         
         void set(const Integer& val, const uint32_t bitsize);
@@ -51,7 +51,7 @@ class Bitstream
         Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }*/
 
     protected:
-        void set_from_ptr(const uint8_t* p, const uint32_t bitsize);
+        void set_from_ptr(const uint8_t *p, const uint32_t bitsize);
 
     private:
         uint32_t end_boffset;
