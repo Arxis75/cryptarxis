@@ -18,13 +18,13 @@ class Mnemonic
         bool add_entropy(const string& entropy, const uint32_t bitsize, const uint8_t in_base);
         bool set_full_word_list(const string& list);
         const uint16_t getEntropySize() const { return m_ent; }
-        void setPassword(const string& pwd);
 
         bool is_valid() const;
         bool list_possible_last_word(vector<string>& list) const;
         const string get_word_list() const;
         const string get_last_word() const;
-        const Bitstream get_seed(const string& pwd);
+        const Bitstream get_seed(const string& pwd) const;
+        void setPassword(const string& pwd);
         const Bitstream get_seed() const;
         void print(bool as_index_list = false) const;
 

@@ -416,21 +416,20 @@ void Mnemonic::print(bool as_index_list) const
         cout << get_word_list() << endl;
 }
 
-const Bitstream Mnemonic::get_seed(const string& pwd)
+const Bitstream Mnemonic::get_seed() const
 {
-    m_pwd = pwd;
-    return get_seed();
+    return get_seed(m_pwd);
 }
 
-const Bitstream Mnemonic::get_seed() const
+const Bitstream Mnemonic::get_seed(const string& pwd) const
 {
     Bitstream the_seed(Integer::zero, 512);
     if (is_valid())
     {
         const string pass = get_word_list();
-        char salt[8 + m_pwd.size()];
+        char salt[8 + pwd.size()];
         strcpy(salt, "mnemonic");
-        strcat(salt, m_pwd.c_str()); // salt = "mnemonic" + password
+        strcat(salt, pwd.c_str()); // salt = "mnemonic" + password
 
         // Cf https://www.openssl.org/docs/manmaster/man3/PKCS5_PBKDF2_HMAC.html
 
@@ -466,7 +465,7 @@ DerivationPath::DerivationPath(string path)
                 value = 0x80000000;
                 index = index.substr(0, index.size()-1);
             }
-            if(!strcmp(index.c_str(), "x")) // value = 0 for x (convention)
+            if(!strcmp(index.c_str(), "x"))     // value = 0 for x (convention)
             {
                 assert(m_account_depth == 0);
                 m_account_depth = i;
