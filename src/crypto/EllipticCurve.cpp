@@ -321,41 +321,41 @@ void EllipticCurve::print_cyclic_subgroups() const
 	}
 }
 
-Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const Bitstream& h, const uint8_t nonce_to_skip) const
+Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream& h, const uint8_t nonce_to_skip) const
 {
 	assert(m_GOrder > 0);
-	assert(x > 0 && x < getGeneratorOrder()  && h.bitsize() == 256);
+	assert(x > 0 && x < getGeneratorOrder()  && h.byteSize() == 32);
 
 	unsigned char *res;
 	uint32_t dilen;
-	Bitstream V("0x0101010101010101010101010101010101010101010101010101010101010101", 256, 16);
-	Bitstream K("0x0000000000000000000000000000000000000000000000000000000000000000", 256, 16);
-	Bitstream V_;
+	ByteStream V("0x0101010101010101010101010101010101010101010101010101010101010101", 32, 16);
+	ByteStream K("0x0000000000000000000000000000000000000000000000000000000000000000", 32, 16);
+	ByteStream V_;
 
-	V_ = Bitstream(V);
-	V_.push_back(0x00,8);
-	V_.push_back(x,256);
-	V_.push_back(h, h.bitsize());
+	V_ = ByteStream(V);
+	V_.push_back(Integer::zero, 1);
+	V_.push_back(x, 32);
+	V_.push_back(h);
 	// K = HMAC(K, V || 0x00 || int2octets(x) || bits2octets(h))
-	res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+	res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
 	// V = HMAC(K, V)
-	res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+	res = HMAC( EVP_sha256(), K, 32, V, V.byteSize(), V, &dilen );
 
-	V_ = Bitstream(V);
-	V_.push_back(0x01,8);
-	V_.push_back(x,256);
-	V_.push_back(h, h.bitsize());
+	V_ = ByteStream(V);
+	V_.push_back(0x01, 1);
+	V_.push_back(x, 32);
+	V_.push_back(h);
 	// K = HMAC(K, V || 0x01 || int2octets(x) || bits2octets(h))
-	res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+	res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
 	// V = HMAC(K, V)
-	res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+	res = HMAC( EVP_sha256(), K, 32, V, V.byteSize(), V, &dilen );
 
 	Integer k;
 	uint8_t counter = 0;
 	while(true)
 	{
 		// V = HMAC(K, V)
-		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+		res = HMAC( EVP_sha256(), K, 32, V, V.byteSize(), V, &dilen );
 		//k ||= V
 		k = V;
 		k &= Givaro::pow(2, getGeneratorOrder().size_in_base(2)) - 1;		//truncate for testing purposes only (small fields)
@@ -363,12 +363,12 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const Bitstream&
 		if( counter >= nonce_to_skip && k > 0 && k < getGeneratorOrder() )
 			break;
 		
-		V_ = Bitstream(V);
-		V_.push_back(0x00,8);
+		V_ = ByteStream(V);
+		V_.push_back(Integer::zero, 1);
 		// K = HMAC(K, V || 0x00)
-		res = HMAC( EVP_sha256(), K, 32, V_, V_.bitsize()>>3, K, &dilen );
+		res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
 		// V = HMAC(K, V)
-		res = HMAC( EVP_sha256(), K, 32, V, V.bitsize()>>3, V, &dilen );
+		res = HMAC( EVP_sha256(), K, 32, V, V.byteSize(), V, &dilen );
 		counter++;
 	}
 
@@ -388,11 +388,11 @@ bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool impa
 }
 
 bool EllipticCurve::recover( Point& Q_candidate,
-                			 const Bitstream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
+                			 const ByteStream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
 							 const bool recover_alternate ) const
 {
 	assert(m_GOrder > 0);
-    assert(msg_hash.bitsize() == 256);
+    assert(msg_hash.byteSize() == 32);
     assert(r < m_GOrder);
     assert(s < m_GOrder);
 

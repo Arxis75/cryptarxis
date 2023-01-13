@@ -21,7 +21,7 @@ Pubkey::Pubkey(const Point& p, const EllipticCurve& curve)
     , m_point(p)
 { }
 
-Pubkey::Pubkey(const Point& p, const Bitstream& cc, const EllipticCurve& curve)
+Pubkey::Pubkey(const Point& p, const ByteStream& cc, const EllipticCurve& curve)
     : m_ecc(curve)
     , m_point(p)
     , m_chaincode(cc)
@@ -33,57 +33,45 @@ Pubkey::Pubkey(const Pubkey& key)
     , m_chaincode(key.m_chaincode)
 { }
 
-const Bitstream Pubkey::getKey(Format f) const
+const ByteStream Pubkey::getKey(Format f) const
 {   
-    uint32_t ecc_order_bsize = m_ecc.getGeneratorOrder().size_in_base(2);
-    uint32_t bsize;
-    Integer prefix = 0;
+    uint32_t point_size = m_ecc.getFieldOrder().size_in_base(16)>>1;
+    ByteStream retval;
     if( f == Format::PREFIXED_X )
     {
-        prefix = ((m_point.getY() % 2) ? 0x03 : 0x02);
-        bsize = ecc_order_bsize + 8;
+        retval.push_back(((m_point.getY() % 2) ? 0x03 : 0x02), 1);
+        retval.push_back(m_point.getX(), point_size);
     }
     else if( f == Format::PREFIXED_XY )
     {
-        prefix = 0x04;
-        bsize = ecc_order_bsize + 8;
+        retval.push_back(m_point.getX(), point_size);
+        retval.push_back(0x04, 1);
     }
-    else
-        bsize = ecc_order_bsize;     // Ethereum default: f == Format::XY
-
-    Integer publicKey = (prefix << ecc_order_bsize);
-    //cout << hex << publicKey << endl;
-    publicKey += m_point.getX();
-    //cout << hex << publicKey << endl;
-    
-    if( f == Format::PREFIXED_XY || f == Format::XY )
+    else if( f == Format::XY )
     {
-        publicKey <<= ecc_order_bsize;
-        publicKey += m_point.getY();
-        bsize += ecc_order_bsize;
+        retval.push_back(m_point.getX(), point_size);
+        retval.push_back(m_point.getY(), point_size);
     }
-    //cout << hex << publicKey << endl;
-    //cout << dec << bsize << endl;
-    return Bitstream(publicKey, bsize);
+    return retval;
 }
 
-uint32_t Pubkey::getFormatBitSize(Format f) const
+uint32_t Pubkey::getFormatByteSize(Format f) const
 {
     switch(f)
     {
         case Format::PREFIXED_X:
-            return m_ecc.getGeneratorOrder().size_in_base(2) + 8;
+            return 1 + (m_ecc.getGeneratorOrder().size_in_base(16)>>1);
         case Format::PREFIXED_XY:
-            return (m_ecc.getGeneratorOrder().size_in_base(2)<<1) + 8;
+            return 1 + m_ecc.getGeneratorOrder().size_in_base(16);
         default:
-            return (m_ecc.getGeneratorOrder().size_in_base(2)<<1);
+            return m_ecc.getGeneratorOrder().size_in_base(16);
     }
 }
 
-const Bitstream Pubkey::getAddress() const
+const ByteStream Pubkey::getAddress() const
 {
-    hash256 h = keccak256(getKey(Format::XY), getFormatBitSize(Format::XY)>>3);
-    return Bitstream(&h.bytes[32 - 20], 160);
+    hash256 h = keccak256(getKey(Format::XY), getFormatByteSize(Format::XY));
+    return ByteStream(&h.bytes[32 - 20], 20);
 }
 
 Signature::Signature(const Integer& r, const Integer& s, const bool imparity, const EllipticCurve& curve)
@@ -103,15 +91,15 @@ void Signature::fixMalleability()
     }
 }
 
-bool Signature::isValid(const Bitstream& h, const Bitstream& from_address, const bool enforce_eip2) const
+bool Signature::isValid(const ByteStream& h, const ByteStream& from_address, const bool enforce_eip2) const
 {
     Pubkey key;
-    return ( from_address.bitsize() == 160 &&
+    return ( from_address.byteSize() == 20 &&
              (m_s <= m_smax || !enforce_eip2) &&
              ecrecover(key, h, from_address) && from_address == key.getAddress() );
 }
 
-bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from_address) const
+bool Signature::ecrecover(Pubkey& key, const ByteStream& h, const ByteStream& from_address) const
 {
     bool ret = false;
     Point Q_candidate;
@@ -119,8 +107,7 @@ bool Signature::ecrecover(Pubkey& key, const Bitstream& h, const Bitstream& from
     {
         ret = true;
         key = Pubkey(Q_candidate, (*this));
-        //cout << hex << "Q_candidate adresse = 0x" << key.getAddress() << endl;
-        if( from_address.bitsize() == 160 && key.getAddress() != from_address )
+        if( from_address.byteSize() == 20 && key.getAddress() != from_address )
         {
             ret = false;
             if( recover(Q_candidate, h, m_r, m_s, m_imparity, true) )
@@ -150,20 +137,20 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
 {
     assert(index >= 0);
 
-    Bitstream parent_data;
-    Bitstream parent_cc(parent_privkey.getChainCode());
+    ByteStream parent_data;
+    ByteStream parent_cc(parent_privkey.getChainCode());
     uint32_t suffix = index;
     if(!hardened)
         parent_data = parent_privkey.getPubKey().getKey(Pubkey::Format::PREFIXED_X);
     else
     {
-        parent_data.set(0x00, 8);
-        parent_data.push_back(parent_privkey.getSecret(),256);
+        parent_data = ByteStream(Integer::zero, 1);
+        parent_data.push_back(parent_privkey.getSecret(), 32);
         suffix += 0x80000000;
     }      
-    parent_data.push_back(suffix, 32);
+    parent_data.push_back(suffix, 4);
    
-    Bitstream digest(Integer::zero, 512);
+    ByteStream digest(Integer::zero, 64);
     uint32_t dilen;
     unsigned char *res = HMAC( EVP_sha512(),
                                parent_cc, 32,
@@ -174,20 +161,20 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         //cout << "BIP32 " << dec << index << (hardened ? "'" : "") << " raw (hex): " << digest << dec << endl;
     
         EllipticCurve curve = parent_privkey.getCurve();
-        m_secret = a2Integer(&digest[0], 256); // first 256bits/512 = secret
+        m_secret = ByteStream(&digest[0], 32);               // first 32 bytes/64 = secret
         m_secret += parent_privkey.getSecret();
         m_secret %= curve.getGeneratorOrder();
 
-        Bitstream cc(&digest[32], 256);
+        ByteStream cc(&digest[32], 32);
         m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
 
-        //cout << "BIP32 " << index << (hardened ? "'" : "") << " chain code (hex): " << hex << m_pubkey.getChainCode() << dec << endl;
-        //cout << "BIP32 " << index << (hardened ? "'" : "") << " secret (hex): " << hex << m_secret << dec << endl;
+        //cout << "BIP32 " << index << (hardened ? "'" : "") << " chain code (hex):  " << hex << m_pubkey.getChainCode() << dec << endl;
+        //cout << "BIP32 " << index << (hardened ? "'" : "") << " secret (hex):      " << hex << m_secret << dec << endl;
         //cout << "BIP32 " << index << (hardened ? "'" : "") << " public key (hex): " << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X) << dec << endl << endl;
     }
 }
 
-Privkey::Privkey(const Bitstream& k, const EllipticCurve& curve)
+Privkey::Privkey(const ByteStream& k, const EllipticCurve& curve)
     : m_secret(k)
     , m_pubkey(Pubkey(curve.p_scalar(curve.getGenerator(), k), curve))
 {
@@ -198,28 +185,28 @@ Privkey::Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t acc
     : Privkey(mnc.get_seed(), path, account_i, curve)
 { }
 
-Privkey::Privkey(const Bitstream& seed, const char *path, const int32_t account_i, const EllipticCurve& curve)
+Privkey::Privkey(const ByteStream& seed, const char *path, const int32_t account_i, const EllipticCurve& curve)
 {
-    assert(seed.bitsize() >= 128 && seed.bitsize() <= 512);
+    assert(seed.byteSize() >= 16 && seed.byteSize() <= 64);
 
     // Cf https://www.openssl.org/docs/manmaster/man3/HMAC.html
     // Cf https://www.openssl.org/docs/manmaster/man3/EVP_sha512.html
 
-    Bitstream digest(Integer::zero, 512);
+    ByteStream digest(Integer::zero, 64);
     uint32_t dilen;
 
     unsigned char *res = HMAC( EVP_sha512(),
                             "Bitcoin seed", 12,
-                            seed, (seed.bitsize()>>3),
+                            seed, (seed.byteSize()),
                             digest, &dilen);
     if (res && dilen == 64)
     {
         //cout << "BIP32 Root raw (hex): " << digest << dec << endl;
 
-        m_secret = a2Integer(&digest[0], 256); // first 256bits/512 = secret
+        m_secret = ByteStream(&digest[0], 32); // first 32bytes/64 = secret
         m_secret %= curve.getGeneratorOrder();
 
-        Bitstream cc(&digest[32], 256);
+        ByteStream cc(&digest[32], 32);
         m_pubkey = Pubkey(curve.p_scalar(curve.getGenerator(), m_secret), cc, curve);
 
         DerivationPath dp(path);
@@ -231,7 +218,7 @@ Privkey::Privkey(const Bitstream& seed, const char *path, const int32_t account_
     }
 }
 
-Signature Privkey::sign(const Bitstream& h, const bool enforce_eip2) const
+Signature Privkey::sign(const ByteStream& h, const bool enforce_eip2) const
 {
     EllipticCurve ecc = m_pubkey.getCurve();
     Integer n = ecc.getGeneratorOrder();
@@ -318,7 +305,7 @@ bool Mnemonic::add_word(const string &word)
         if (is_last_word)
             controlled_went -= m_cs;
         uint32_t index = distance(m_dic->begin(), dic_it);
-        Bitstream e(m_entropy);
+        BitStream e(m_entropy);
         e.push_back(index >> (m_went - controlled_went), controlled_went);
         if (!is_last_word || e.sha256().at(0,m_cs).as_uint8() == (index & (0xFF >> (8 - m_cs))))
         {
@@ -388,7 +375,7 @@ bool Mnemonic::list_possible_last_word(vector<string> &list) const
         list.clear();
         for (int i = 0; i < (1 << (m_went - m_cs)); i++)
         {
-            Bitstream tmp(m_entropy);
+            BitStream tmp(m_entropy);
             tmp.push_back(i, m_went - m_cs);
             list.push_back(m_dic->at((i << m_cs) + tmp.sha256().at(0,m_cs).as_uint8()));
         }
@@ -416,14 +403,14 @@ void Mnemonic::print(bool as_index_list) const
         cout << get_word_list() << endl;
 }
 
-const Bitstream Mnemonic::get_seed() const
+const ByteStream Mnemonic::get_seed() const
 {
     return get_seed(m_pwd);
 }
 
-const Bitstream Mnemonic::get_seed(const string& pwd) const
+const ByteStream Mnemonic::get_seed(const string& pwd) const
 {
-    Bitstream the_seed(Integer::zero, 512);
+    ByteStream the_seed(Integer(0), 64);
     if (is_valid())
     {
         const string pass = get_word_list();
