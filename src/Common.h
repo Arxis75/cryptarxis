@@ -115,13 +115,13 @@ class ByteStream
 class RLPByteStream: public ByteStream
 {
     public:
-        RLPByteStream(const uint64_t val, uint32_t size) { fromByteStream(ByteStream(val, size)); }
-        RLPByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { fromByteStream(ByteStream(str_value, size, in_base)); }
+        RLPByteStream(const uint64_t val, uint32_t size) : ByteStream() { fromByteStream(ByteStream(val, size)); }
+        RLPByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) : ByteStream() { fromByteStream(ByteStream(str_value, size, in_base)); }
 
         //Empty RLP constructor
-        RLPByteStream(bool as_list = false) { push_back((as_list ? 0xC0 : 0x80 ), 1); }
+        RLPByteStream(bool as_list = false) : ByteStream() { push_back((as_list ? 0xC0 : 0x80 ), 1); }
         //RLP element constructor
-        RLPByteStream(const ByteStream& to_rlp_encode) { fromByteStream(to_rlp_encode); };
+        RLPByteStream(const ByteStream& to_rlp_encode) : ByteStream() { fromByteStream(to_rlp_encode); };
         //RLP list constructor
         RLPByteStream(const vector<RLPByteStream> list_to_rlp_encode);
 

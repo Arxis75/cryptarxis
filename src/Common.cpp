@@ -288,6 +288,34 @@ ostream& operator<< (ostream& out, const ByteStream& v) {
 
 //-------------------------------------------------------------------------------------------------------------------------------------
 
+RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
+    : ByteStream()
+{
+    if(rlp_list.size() > 0)
+    {
+        ByteStream rlp_payload;
+        for(int i=0;i<rlp_list.size();i++)
+            rlp_payload.push_back(rlp_list[i]);   
+        
+        uint32_t rlp_payload_size = rlp_payload.byteSize();
+        if( rlp_payload_size <= 55 )
+        {
+            push_back(0xC0 + rlp_payload_size, 1);
+            push_back(rlp_payload);
+        }
+        else
+        {
+            uint32_t list_size_size_nbits = log2(rlp_payload_size);  //Ca marche pas
+            uint8_t list_size_size = (list_size_size_nbits>>3) + ((list_size_size_nbits%8) ? 1 : 0);
+            push_back(0xF7 + list_size_size, 1);
+            push_back(rlp_payload_size, list_size_size);
+            push_back(rlp_payload);
+        }
+    }
+    else
+        push_back(0xC0, 1);
+}
+
 void RLPByteStream::fromByteStream(const ByteStream& field)
 {   
     uint32_t field_size = field.byteSize();
@@ -314,33 +342,6 @@ void RLPByteStream::fromByteStream(const ByteStream& field)
     }
     else
         push_back(0x80, 1);       
-}
-
-RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
-{
-    if(rlp_list.size() > 0)
-    {
-        ByteStream rlp_payload;
-        for(int i=0;i<rlp_list.size();i++)
-            rlp_payload.push_back(rlp_list[i]);   
-        
-        uint32_t rlp_payload_size = rlp_payload.byteSize();
-        if( rlp_payload_size <= 55 )
-        {
-            push_back(0xC0 + rlp_payload_size, 1);
-            push_back(rlp_payload);
-        }
-        else
-        {
-            uint32_t list_size_size_nbits = log2(rlp_payload_size);  //Ca marche pas
-            uint8_t list_size_size = (list_size_size_nbits>>3) + ((list_size_size_nbits%8) ? 1 : 0);
-            push_back(0xF7 + list_size_size, 1);
-            push_back(rlp_payload_size, list_size_size);
-            push_back(rlp_payload);
-        }
-    }
-    else
-        push_back(0xC0, 1);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------

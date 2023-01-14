@@ -56,7 +56,7 @@ int main(int argc , char *argv[])
     v.push_back(RLPByteStream("0xda23340cb8a3e75917bfc2a3cb3685046ee3bdb8527bb0b3f455baafba235ce4", 32, 16));
     v.push_back(RLPByteStream("0x1d2bb7a39793211811face204c35fa9de11229b93f3a300f0c512ec8ffd11a31", 32, 16));
     RLPByteStream payload(v);
-
+    cout << payload << endl;
 
     Privkey node_secret(ByteStream("0xb71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291", 16));
     
