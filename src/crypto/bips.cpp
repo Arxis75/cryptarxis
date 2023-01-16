@@ -35,24 +35,32 @@ Pubkey::Pubkey(const Pubkey& key)
 
 const ByteStream Pubkey::getKey(Format f) const
 {   
-    uint32_t point_size = sizeInBytes(m_ecc.getGeneratorOrder());
-    ByteStream retval;
+    uint32_t point_bitsize = sizeInBytes(m_ecc.getGeneratorOrder())<<3;
+    
+    Integer retval;
     if( f == Format::PREFIXED_X )
     {
-        retval.push_back(((m_point.getY() % 2) ? 0x03 : 0x02), 1);
-        retval.push_back(m_point.getX(), point_size);
+        retval = ((m_point.getY() % 2) ? 0x03 : 0x02);
+        retval <<= point_bitsize;
+        retval |= m_point.getX();
+        return ByteStream(retval, 33);
     }
     else if( f == Format::PREFIXED_XY )
     {
-        retval.push_back(m_point.getX(), point_size);
-        retval.push_back(0x04, 1);
+        retval = 0x04;
+        retval <<= point_bitsize;
+        retval |= m_point.getX();
+        retval <<= point_bitsize;
+        retval |= m_point.getY();
+        return ByteStream(retval, 65);
     }
-    else if( f == Format::XY )
+    else //if( f == Format::XY )
     {
-        retval.push_back(m_point.getX(), point_size);
-        retval.push_back(m_point.getY(), point_size);
+        retval = m_point.getX();
+        retval <<= point_bitsize;
+        retval |= m_point.getY();
+        return ByteStream(retval, 64);
     }
-    return retval;
 }
 
 uint32_t Pubkey::getFormatByteSize(Format f) const
@@ -73,6 +81,8 @@ const ByteStream Pubkey::getAddress() const
     hash256 h = keccak256(getKey(Format::XY), getFormatByteSize(Format::XY));
     return ByteStream(&h.bytes[32 - 20], 20);
 }
+
+//-----------------------------------------------------------------------------------------------------------------
 
 Signature::Signature(const Integer& r, const Integer& s, const bool imparity, const EllipticCurve& curve)
     : EllipticCurve(curve)
@@ -128,6 +138,8 @@ void Signature::print() const
     cout << "   imparity = " << get_imparity() << endl;
 }
 
+//-----------------------------------------------------------------------------------------------------------------
+
 Privkey::Privkey(const Privkey& privkey)
     : m_pubkey(privkey.m_pubkey)
     , m_secret(privkey.m_secret)
@@ -144,11 +156,10 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         parent_data = parent_privkey.getPubKey().getKey(Pubkey::Format::PREFIXED_X);
     else
     {
-        parent_data = ByteStream(Integer::zero, 1);
-        parent_data.push_back(parent_privkey.getSecret(), 32);
+        parent_data = ByteStream(parent_privkey.getSecret(), 33);   // 0x00 prefix + 32bytes
         suffix += 0x80000000;
     }      
-    cout << parent_data << endl;
+    //cout << parent_data << endl;
     parent_data.push_back(suffix, 4);
    
     ByteStream digest(Integer::zero, 64);
@@ -179,8 +190,8 @@ Privkey::Privkey(const ByteStream& k, const EllipticCurve& curve)
     : m_secret(k)
     , m_pubkey(Pubkey(curve.p_scalar(curve.getGenerator(), k), curve))
 {
-    cout << hex << k << endl;
-    cout << hex << curve.getGeneratorOrder() << endl;
+    //cout << hex << k << endl;
+    //cout << hex << curve.getGeneratorOrder() << endl;
     assert(Integer(k) > 0 && Integer(k) < curve.getGeneratorOrder());
 }
 
@@ -435,6 +446,8 @@ const ByteStream Mnemonic::get_seed(const string& pwd) const
     }
     return the_seed;
 }
+
+//-----------------------------------------------------------------------------------------------------------------
 
 DerivationPath::DerivationPath(string path)
     : m_account_depth(0)

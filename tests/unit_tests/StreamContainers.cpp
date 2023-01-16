@@ -248,7 +248,7 @@ TEST(StreamContainers, ByteStream_Constructors)
     ASSERT_EQ(actual, expected);
 }
 
-TEST(StreamContainers, ByteStream_pushBackInteger)
+TEST(StreamContainers, ByteStream_pushBackUint64)
 {
     // 1-byte + 1-byte = 2-byte
     ByteStream b(Integer(7), 1);

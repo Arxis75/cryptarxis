@@ -9,6 +9,16 @@
 using namespace std;
 using namespace Givaro;
 
+struct cmp_str {
+    bool operator()(char const *a, char const *b) const { return strcmp(a, b) < 0; }
+};
+
+static const map<const char*, const uint8_t, cmp_str> map_hexa_chars = { {"0", 0}, {"1", 1}, {"2", 2}, {"3", 3},
+                                                            {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7},
+                                                            {"8", 8}, {"9", 9}, {"a", 10}, {"A", 10},
+                                                            {"b", 11}, {"B", 11}, {"c", 12}, {"C", 12},
+                                                            {"d", 13}, {"D", 13}, {"e", 14}, {"E", 14},
+                                                            {"f", 15}, {"F", 15} };
 BitStream::BitStream()
     : end_boffset(0)
 {}
@@ -64,33 +74,23 @@ void BitStream::set_from_ptr(const uint8_t *p, uint32_t bitsize)
     end_boffset = bitsize;
 }
 
-struct cmp_str {
-   bool operator()(char const *a, char const *b) const { return strcmp(a, b) < 0; }
-};
-
 void BitStream::push_back(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
 {
     assert( in_base == 2 || in_base ==16 );
 
-    const map<const char*, const uint8_t, cmp_str> m = { {"0", 0}, {"1", 1}, {"2", 2}, {"3", 3},
-                                                         {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7},
-                                                         {"8", 8}, {"9", 9}, {"a", 10}, {"A", 10},
-                                                         {"b", 11}, {"B", 11}, {"c", 12}, {"C", 12},
-                                                         {"d", 13}, {"D", 13}, {"e", 14}, {"E", 14},
-                                                         {"f", 15}, {"F", 15} };
     //Removes the 0x or 0b header if necessary
     string tmp = str_value;
-    if( in_base == 2 && tmp.substr(0, 2) == "0b" )
+    if( in_base == 16 && tmp.substr(0, 2) == "0x" )
         tmp = tmp.substr(2, tmp.size() - 2);
-    else if( in_base == 16 && tmp.substr(0, 2) == "0x" )
+    else if( in_base == 2 && tmp.substr(0, 2) == "0b" )
         tmp = tmp.substr(2, tmp.size() - 2);
 
     Integer value(0);
     while(tmp.size()>0)
     {
-        auto it = m.find(tmp.substr(0, 1).c_str());
-        assert( it != m.end() && ((*it).second == 0 || (*it).second == 1 || in_base == 16) );
-        value <<= (in_base == 2 ? 1 : 4);
+        auto it = map_hexa_chars.find(tmp.substr(0, 1).c_str());
+        assert( it != map_hexa_chars.end() && (in_base == 16 || (*it).second == 0 || (*it).second == 1) );
+        value <<= (in_base == 16 ? 4 : 1);
         value += (*it).second;
         tmp = tmp.substr(1, tmp.size() - 1);
     }
@@ -182,6 +182,17 @@ ByteStream::ByteStream()
     vvalue.reserve(32);
 }
 
+ByteStream::ByteStream(const Integer& value, uint32_t size)
+{
+    vvalue.reserve(size);
+    uint32_t value_size = (size > sizeInBytes(value) ? sizeInBytes(value) : size);
+    uint32_t extra_size = size - value_size;
+    for(int i=0;i<extra_size;i++)
+        vvalue.push_back(0x00);
+    for(int i=1;i<=value_size;i++)
+        vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
+}
+
 void ByteStream::set_from_ptr(const uint8_t *p, uint32_t size)
 {
     clear();
@@ -193,42 +204,40 @@ void ByteStream::set_from_ptr(const uint8_t *p, uint32_t size)
 void ByteStream::push_back(const string& str_value, const uint32_t size, const uint8_t in_base)
 {
     assert( in_base == 2 || in_base ==16 );
-
-    const map<const char*, const uint8_t, cmp_str> m = { {"0", 0}, {"1", 1}, {"2", 2}, {"3", 3},
-                                                         {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7},
-                                                         {"8", 8}, {"9", 9}, {"a", 10}, {"A", 10},
-                                                         {"b", 11}, {"B", 11}, {"c", 12}, {"C", 12},
-                                                         {"d", 13}, {"D", 13}, {"e", 14}, {"E", 14},
-                                                         {"f", 15}, {"F", 15} };
+    
     //Removes the 0x or 0b header if necessary
     string tmp = str_value;
-    if( in_base == 2 && tmp.substr(0,2) == "0b" )
+    if( in_base == 16 && tmp.substr(0,2) == "0x" )
         tmp = tmp.substr(2, tmp.size() - 2);
-    else if( in_base == 16 && tmp.substr(0,2) == "0x" )
+    else if( in_base == 2 && tmp.substr(0,2) == "0b" )
         tmp = tmp.substr(2, tmp.size() - 2);
 
     //Forces byte-alignment
-    int32_t front_zero_padding_size = (in_base == 2 ? tmp.size()%8 : tmp.size()%2);
+    int32_t front_zero_padding_size = (in_base == 16 ? tmp.size()%2 : tmp.size()%8);
     while( front_zero_padding_size )
     {
         tmp = string("0") + tmp;
-        front_zero_padding_size = (in_base == 2 ? tmp.size()%8 : tmp.size()%2);
+        front_zero_padding_size = (in_base == 16 ? tmp.size()%2 : tmp.size()%8);
     }
 
     //Stores front 00-padding according to "size"
-    front_zero_padding_size = size - (in_base == 2 ? tmp.size()>>3 : tmp.size()>>1);
+    front_zero_padding_size = size - (in_base == 16 ? tmp.size()>>1 : tmp.size()>>3);
     for(int i=0;i<front_zero_padding_size;i++)
         vvalue.push_back(0x00);
+
+    //If empty ByteStream, optimizes the memory allocation
+    if( !byteSize() )
+        vvalue.reserve(in_base == 16 ? tmp.size()>>1 : tmp.size()>>3);
 
     while(tmp.size()>0)
     {
         uint8_t value = 0;
-        uint8_t nb_chars_in_one_byte = (in_base == 2 ? 8 : 2);
+        uint8_t nb_chars_in_one_byte = (in_base == 16 ? 2 : 8);
         for(int i=0;i<nb_chars_in_one_byte;i++)
         {
-            auto it = m.find(tmp.substr(0, 1).c_str());
-            assert( it != m.end() && ((*it).second == 0 || (*it).second == 1 || in_base == 16) );
-            value <<= (in_base == 2 ? 1 : 4);
+            auto it = map_hexa_chars.find(tmp.substr(0, 1).c_str());
+            assert( it != map_hexa_chars.end() && (in_base == 16 || (*it).second == 0 || (*it).second == 1) );
+            value <<= (in_base == 16 ? 4 : 1);
             value += (*it).second;
             tmp = tmp.substr(1, tmp.size() - 1);
         }
@@ -236,9 +245,9 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
     }
 }
 
-void ByteStream::push_back(const Integer value, uint32_t size)
+void ByteStream::push_back(const uint64_t value, uint32_t size)
 {
-    uint32_t value_size = (size > sizeInBytes(value) ? sizeInBytes(value) : size);
+    uint32_t value_size = (size > 8 ? 8 : size);
     uint32_t extra_size = size - value_size;
     for(int i=0;i<extra_size;i++)
         vvalue.push_back(0x00);
@@ -300,7 +309,7 @@ RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
         for(int i=0;i<rlp_list.size();i++)
             rlp_payload.push_back(rlp_list[i]);   
         
-        uint32_t rlp_payload_size = rlp_payload.byteSize();
+        uint64_t rlp_payload_size = rlp_payload.byteSize();
         if( rlp_payload_size <= 55 )
         {
             push_back(0xC0 + rlp_payload_size, 1);
@@ -308,7 +317,7 @@ RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
         }
         else
         {
-            uint32_t list_size_size_nbits = log2(rlp_payload_size);  //Ca marche pas
+            uint8_t list_size_size_nbits = log2(rlp_payload_size);  //Ca marche pas
             uint8_t list_size_size = (list_size_size_nbits>>3) + ((list_size_size_nbits%8) ? 1 : 0);
             push_back(0xF7 + list_size_size, 1);
             push_back(rlp_payload_size, list_size_size);
@@ -321,7 +330,7 @@ RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
 
 void RLPByteStream::fromByteStream(const ByteStream& field)
 {   
-    uint32_t field_size = field.byteSize();
+    uint64_t field_size = field.byteSize();
     if( field_size )
     {
         if( field_size == 1 && field.as_uint8() <= 0x7F )
@@ -335,7 +344,7 @@ void RLPByteStream::fromByteStream(const ByteStream& field)
             }
             else
             {
-                uint32_t field_size_size_nbits = log2(field_size);  //Ca marche pas
+                uint8_t field_size_size_nbits = log2(field_size);  //Ca marche pas
                 uint8_t field_size_size = (field_size_size_nbits>>3) + ((field_size_size_nbits%8) ? 1 : 0);
                 push_back(0xB7 + field_size_size, 1);
                 push_back(field_size, field_size_size);

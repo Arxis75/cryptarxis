@@ -62,13 +62,13 @@ class ByteStream
     public:       
         ByteStream();
         ByteStream(const ByteStream& b) { vvalue = b.vvalue; }
-        ByteStream(const Integer val, uint32_t size) { push_back(val, size); }
+        ByteStream(const Integer& value, uint32_t size);
         ByteStream(const char *p, uint32_t size) { set_from_ptr(reinterpret_cast<const uint8_t*>(p), size); }
         ByteStream(const uint8_t *p, uint32_t size) { set_from_ptr(p, size); }
         ByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { push_back(str_value, size, in_base); }
         
         void push_back(const ByteStream& b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
-        void push_back(const Integer value, uint32_t size);
+        void push_back(const uint64_t value, uint32_t size);
         void push_back(const string& str_value, const uint32_t size, const uint8_t in_base);
     
         void clear() { vvalue.clear(); }
@@ -85,7 +85,7 @@ class ByteStream
         
         operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
         operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
-        operator const Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
+        operator const Integer() const { return as_Integer(); }
 
         inline bool operator==(const ByteStream& b) const { return vvalue == b.vvalue; }
         inline bool operator!=(const ByteStream& b) const { return vvalue != b.vvalue; }
@@ -96,11 +96,11 @@ class ByteStream
 
         //Unaligned operators
         const ByteStream at(const uint32_t offset, const uint32_t size) const { return ByteStream(&vvalue.data()[offset], size); };
-        uint8_t as_uint8() const { return (vvalue.size()>0 ? vvalue[0] : 0); }
+        const uint8_t as_uint8() const { return (vvalue.size()>0 ? vvalue[0] : 0); }
         //uint16_t as_uint16(uint32_t ofs = 0) const { return Integer(at(ofs, min(ofs+2, byteSize()) - ofs)); }
         //uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
         //uint64_t as_uint64(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+64,end_boffset) - bofs)); }
-        //Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }
+        const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
 
     protected:
         void set_from_ptr(const uint8_t *p, const uint32_t size);
@@ -134,7 +134,7 @@ vector<string> split(const string list, const string separator);
 
 static inline uint32_t log2(const uint32_t x);
 
-static inline uint32_t sizeInBytes(Integer value)
+static inline uint32_t sizeInBytes(const Integer& value)
 {
     uint32_t tmp = value.size_in_base(2);
     return (tmp>>3) + (tmp%8);

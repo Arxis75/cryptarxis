@@ -29,8 +29,6 @@ TEST(BIP32Tests, TestBIP32_vector1)
     x = Privkey(x, 1, false);
     expected = ByteStream("0x3c6cb8d0f6a264c91ea8b5030fadaa8e538b020f0a387421a12de9319dc93368", 32, 16);
     actual = x.getSecret();
-    cout << expected << endl;
-    cout << actual << endl;
     ASSERT_EQ(actual, expected);
     expected = ByteStream("0x03501e454bf00751f24b1b489aa925215d66af2234e3891c3b21a52bedb3cd711c", 32+1, 16);
     actual = x.getPubKey().getKey(Pubkey::Format::PREFIXED_X);

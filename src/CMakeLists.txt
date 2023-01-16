@@ -1,18 +1,7 @@
 file(GLOB SOURCES "*.cpp")
 file(GLOB COMMON "Common.cpp")
 
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-find_package(OpenSSL REQUIRED)
-
 add_executable(cryptarxis ${SOURCES})
-
-include(FetchContent)
-FetchContent_Declare(reactor
-  GIT_REPOSITORY    https://github.com/Arxis75/reactor.git
-  GIT_TAG           origin/main     #latest commit
-  #GIT_TAG           v0.02          #stable commmit
-)
-FetchContent_MakeAvailable(reactor)
 
 find_library(gmp gmp)
 if(NOT gmp)
@@ -23,6 +12,17 @@ find_library(givaro givaro)
 if(NOT givaro)
   message(FATAL_ERROR "givaro not found")
 endif()
+
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+
+include(FetchContent)
+FetchContent_Declare(reactor
+  GIT_REPOSITORY    https://github.com/Arxis75/reactor.git
+  GIT_TAG           origin/main     #latest commit
+  #GIT_TAG           v0.02          #stable commmit
+)
+FetchContent_MakeAvailable(reactor)
 
 add_subdirectory(crypto)
 add_subdirectory(tools)

@@ -333,8 +333,8 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream
 	ByteStream V_;
 
 	V_ = ByteStream(V);
-	V_.push_back(Integer::zero, 1);
-	V_.push_back(x, 32);
+	V_.push_back(0x00, 1);
+	V_.push_back(ByteStream(x, 32));
 	V_.push_back(h);
 	// K = HMAC(K, V || 0x00 || int2octets(x) || bits2octets(h))
 	res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
@@ -343,7 +343,7 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream
 
 	V_ = ByteStream(V);
 	V_.push_back(0x01, 1);
-	V_.push_back(x, 32);
+	V_.push_back(ByteStream(x, 32));
 	V_.push_back(h);
 	// K = HMAC(K, V || 0x01 || int2octets(x) || bits2octets(h))
 	res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
@@ -364,7 +364,7 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream
 			break;
 		
 		V_ = ByteStream(V);
-		V_.push_back(Integer::zero, 1);
+		V_.push_back(0x00, 1);
 		// K = HMAC(K, V || 0x00)
 		res = HMAC( EVP_sha256(), K, 32, V_, V_.byteSize(), K, &dilen );
 		// V = HMAC(K, V)
