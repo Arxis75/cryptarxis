@@ -14,10 +14,20 @@ FetchContent_Declare(reactor
 )
 FetchContent_MakeAvailable(reactor)
 
+find_library(gmp gmp)
+if(NOT gmp)
+  message(FATAL_ERROR "gmp not found")
+endif()
+
+find_library(givaro givaro)
+if(NOT givaro)
+  message(FATAL_ERROR "givaro not found")
+endif()
+
 add_subdirectory(crypto)
 add_subdirectory(tools)
 
 target_include_directories(lib_reactor PUBLIC ${reactor_SOURCE_DIR}/src)
-target_link_libraries(cryptarxis PUBLIC OpenSSL::Crypto ethash::ethash givaro lib_reactor)
+target_link_libraries(cryptarxis PUBLIC OpenSSL::Crypto ethash::ethash gmp givaro lib_reactor)
 
 target_sources(cryptarxis_tests PUBLIC ${COMMON})

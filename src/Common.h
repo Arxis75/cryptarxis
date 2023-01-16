@@ -59,18 +59,16 @@ class BitStream
 
 class ByteStream
 {
-    public:
-        enum class RLP{BYTE, STRING, LIST};
-        
+    public:       
         ByteStream();
         ByteStream(const ByteStream& b) { vvalue = b.vvalue; }
-        ByteStream(const uint64_t val, uint32_t size) { push_back(val, size); }
+        ByteStream(const Integer val, uint32_t size) { push_back(val, size); }
         ByteStream(const char *p, uint32_t size) { set_from_ptr(reinterpret_cast<const uint8_t*>(p), size); }
         ByteStream(const uint8_t *p, uint32_t size) { set_from_ptr(p, size); }
         ByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { push_back(str_value, size, in_base); }
         
         void push_back(const ByteStream& b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
-        void push_back(const uint64_t value, uint32_t size);
+        void push_back(const Integer value, uint32_t size);
         void push_back(const string& str_value, const uint32_t size, const uint8_t in_base);
     
         void clear() { vvalue.clear(); }
@@ -135,3 +133,9 @@ class RLPByteStream: public ByteStream
 vector<string> split(const string list, const string separator);
 
 static inline uint32_t log2(const uint32_t x);
+
+static inline uint32_t sizeInBytes(Integer value)
+{
+    uint32_t tmp = value.size_in_base(2);
+    return (tmp>>3) + (tmp%8);
+}

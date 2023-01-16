@@ -261,6 +261,18 @@ TEST(StreamContainers, ByteStream_pushBackInteger)
     ASSERT_EQ(actual, expected);
 
     b.clear();
+    
+    //1-bytes with front 0-padding
+    b = ByteStream();
+    b.push_back(Integer(1), 32);
+    expected = 1;
+    actual = Integer(b);
+    ASSERT_EQ(actual, expected);
+    expected = 32;
+    actual = b.byteSize();
+    ASSERT_EQ(actual, expected);
+    
+    b.clear();
 
     //3-bytes with front 0-padding
     b = ByteStream(Integer::zero, 3);

@@ -177,7 +177,10 @@ ostream& operator<< (ostream& out, const BitStream& v) {
 
 //---------------------------------------------------------------------------------------------------------------------------------
 ByteStream::ByteStream()
-{}
+{
+    //default size for processing time optimization (memory consumming though)
+    vvalue.reserve(32);
+}
 
 void ByteStream::set_from_ptr(const uint8_t *p, uint32_t size)
 {
@@ -233,14 +236,14 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
     }
 }
 
-void ByteStream::push_back(const uint64_t value, uint32_t size)
+void ByteStream::push_back(const Integer value, uint32_t size)
 {
-    uint32_t value_size = (size > 8 ? 8 : size);
+    uint32_t value_size = (size > sizeInBytes(value) ? sizeInBytes(value) : size);
     uint32_t extra_size = size - value_size;
     for(int i=0;i<extra_size;i++)
         vvalue.push_back(0x00);
     for(int i=1;i<=value_size;i++)
-        vvalue.push_back((value>>((size-i)<<3)) & 0xFF);
+        vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
  };
 
 

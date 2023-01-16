@@ -372,7 +372,7 @@ Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream
 		counter++;
 	}
 
-	return k;    
+	return k;
 }
 
 bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool imparity) const

@@ -35,7 +35,7 @@ Pubkey::Pubkey(const Pubkey& key)
 
 const ByteStream Pubkey::getKey(Format f) const
 {   
-    uint32_t point_size = m_ecc.getFieldOrder().size_in_base(16)>>1;
+    uint32_t point_size = sizeInBytes(m_ecc.getGeneratorOrder());
     ByteStream retval;
     if( f == Format::PREFIXED_X )
     {
@@ -60,11 +60,11 @@ uint32_t Pubkey::getFormatByteSize(Format f) const
     switch(f)
     {
         case Format::PREFIXED_X:
-            return 1 + (m_ecc.getGeneratorOrder().size_in_base(16)>>1);
+            return 1 + sizeInBytes(m_ecc.getGeneratorOrder());
         case Format::PREFIXED_XY:
-            return 1 + m_ecc.getGeneratorOrder().size_in_base(16);
+            return 1 +  (sizeInBytes(m_ecc.getGeneratorOrder())<<1);
         default:
-            return m_ecc.getGeneratorOrder().size_in_base(16);
+            return sizeInBytes(m_ecc.getGeneratorOrder())<<1;
     }
 }
 
@@ -148,6 +148,7 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
         parent_data.push_back(parent_privkey.getSecret(), 32);
         suffix += 0x80000000;
     }      
+    cout << parent_data << endl;
     parent_data.push_back(suffix, 4);
    
     ByteStream digest(Integer::zero, 64);
@@ -178,7 +179,9 @@ Privkey::Privkey(const ByteStream& k, const EllipticCurve& curve)
     : m_secret(k)
     , m_pubkey(Pubkey(curve.p_scalar(curve.getGenerator(), k), curve))
 {
-        assert(Integer(k) > 0 && Integer(k) < curve.getGeneratorOrder());
+    cout << hex << k << endl;
+    cout << hex << curve.getGeneratorOrder() << endl;
+    assert(Integer(k) > 0 && Integer(k) < curve.getGeneratorOrder());
 }
 
 Privkey::Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t account_i, const EllipticCurve& curve)

@@ -76,7 +76,7 @@ TEST(SignatureTests, test_boundaries)
     EllipticCurve ecc = EllipticCurve(p, 0, 7, G, n);
 
     Integer x_candidate = 24;
-    Privkey x(ByteStream(x_candidate, 8), ecc);
+    Privkey x(ByteStream(x_candidate, 1), ecc);
     Pubkey Q;
 
     const char *msg = "hello";

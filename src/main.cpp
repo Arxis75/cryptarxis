@@ -10,8 +10,10 @@
 
 #include <crypto/bips.h>
 using namespace BIP39;
+using namespace Givaro;
 int main(int argc , char *argv[])  
-{   /*
+{   
+    /*
     0x02
     f873
     01
