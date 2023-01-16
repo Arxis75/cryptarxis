@@ -113,7 +113,7 @@ class ByteStream
 class RLPByteStream: public ByteStream
 {
     public:
-        RLPByteStream(const uint64_t val, uint32_t size) : ByteStream() { fromByteStream(ByteStream(val, size)); }
+        RLPByteStream(const uint64_t val, uint32_t size);
         RLPByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) : ByteStream() { fromByteStream(ByteStream(str_value, size, in_base)); }
 
         //Empty RLP constructor

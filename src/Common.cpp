@@ -300,6 +300,15 @@ ostream& operator<< (ostream& out, const ByteStream& v) {
 
 //-------------------------------------------------------------------------------------------------------------------------------------
 
+RLPByteStream::RLPByteStream(const uint64_t val, uint32_t size)
+    : ByteStream()
+{
+    //Avoids call to the ByteStream(const Integer& value, uint32_t size) constructor
+    ByteStream b;
+    b.push_back(val, size);
+    fromByteStream(b);
+}
+
 RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
     : ByteStream()
 {
