@@ -130,7 +130,7 @@ class RLPByteStream: public ByteStream
 // This function basically removes all separators and spreads the remaining words inside a vector
 // The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
 // are not interpreted as empty word(s); they are just removed)
-vector<string> split(const string list, const string separator);
+vector<string> split(const string& list, const string& separator);
 
 static inline uint32_t log2(const uint32_t x);
 
