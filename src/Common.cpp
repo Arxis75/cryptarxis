@@ -361,7 +361,7 @@ void RLPByteStream::fromByteStream(const ByteStream& field)
 // This function basically removes all separators and spreads the remaining words inside a vector
 // The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
 // are not interpreted as empty word(s); they are just removed)
-vector<string> split(const string list, const string separator)
+vector<string> split(const string& list, const string& separator)
 {
     vector<string> v;   
     int start = 0;
