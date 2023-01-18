@@ -18,6 +18,7 @@ class BitStream
         
         void set(const Integer& val, const uint32_t bitsize);
         void push_back(const Integer& bits_value, const uint32_t bitsize);
+        void push_back_ptr(const uint8_t *p, const uint32_t bitsize);
         void push_back(const string& str_value, const uint32_t bitsize, const uint8_t in_base);
         void clear();
         
@@ -49,7 +50,6 @@ class BitStream
         Integer as_Integer(uint32_t bofs = 0) const { return Integer(at(bofs, end_boffset - bofs)); }
 
     protected:
-        void set_from_ptr(const uint8_t *p, const uint32_t bitsize);
         const Integer a2Integer(const uint8_t *input, const int32_t bitsize) const;
 
     private:
@@ -60,71 +60,82 @@ class BitStream
 class ByteStream
 {
     public:       
-        ByteStream();
-        ByteStream(const ByteStream& b) { vvalue = b.vvalue; }
+        ByteStream() { vvalue.reserve(32); };
+        ByteStream(const ByteStream &b) { vvalue = b.vvalue; }
         ByteStream(const Integer& value, uint32_t size);
-        ByteStream(const char *p, uint32_t size) { set_from_ptr(reinterpret_cast<const uint8_t*>(p), size); }
-        ByteStream(const uint8_t *p, uint32_t size) { set_from_ptr(p, size); }
-        ByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { push_back(str_value, size, in_base); }
+        ByteStream(const char *p, uint32_t size) { vvalue.reserve(size); push_back_ptr(reinterpret_cast<const uint8_t*>(p), size); }
+        ByteStream(const uint8_t *p, uint32_t size) { vvalue.reserve(size); push_back_ptr(p, size); }
+        ByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { vvalue.reserve(size); push_back(str_value, size, in_base); }
         
-        void push_back(const ByteStream& b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
-        void push_back(const uint64_t value, uint32_t size);
+        void push_back(const ByteStream &b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
+        void push_back(const uint64_t value, const uint32_t size);
+        void push_back_ptr(const uint8_t *p, const uint32_t size);
         void push_back(const string& str_value, const uint32_t size, const uint8_t in_base);
-    
-        void clear() { vvalue.clear(); }
-        
-        const uint32_t byteSize() const { return vvalue.size(); }
+        const ByteStream pop_front(const uint32_t size);
 
         const ByteStream sha256() const;
         const ByteStream keccak256() const;
         const ByteStream address() const;
 
-        const vector<ByteStream> rlpListDecode() const;
+        friend ostream& operator<<(ostream& out, const ByteStream &v);
 
-        friend ostream& operator<<(ostream& out, const ByteStream& v);
-        
-        operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
-        operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
-        operator const Integer() const { return as_Integer(); }
+        inline void clear() { vvalue.clear(); }
+        inline const uint32_t byteSize() const { return vvalue.size(); }
 
-        inline bool operator==(const ByteStream& b) const { return vvalue == b.vvalue; }
-        inline bool operator!=(const ByteStream& b) const { return vvalue != b.vvalue; }
-        //inline bool operator< (const ByteStream& b) const { return Integer(*this) <  Integer(b); }
-        //inline bool operator> (const ByteStream& b) const { return Integer(*this) >  Integer(b); }
-        //inline bool operator<=(const ByteStream& b) const { return Integer(*this) <= Integer(b); }
-        //inline bool operator>=(const ByteStream& b) const { return Integer(*this) >= Integer(b); }
+        inline operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
+        inline operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
+        inline operator const Integer() const { return as_Integer(); }
+
+        inline bool operator==(const ByteStream &b) const { return vvalue == b.vvalue; }
+        inline bool operator!=(const ByteStream &b) const { return vvalue != b.vvalue; }
+        //inline bool operator< (const ByteStream &b) const { return Integer(*this) <  Integer(b); }
+        //inline bool operator> (const ByteStream &b) const { return Integer(*this) >  Integer(b); }
+        //inline bool operator<=(const ByteStream &b) const { return Integer(*this) <= Integer(b); }
+        //inline bool operator>=(const ByteStream &b) const { return Integer(*this) >= Integer(b); }
 
         //Unaligned operators
-        const ByteStream at(const uint32_t offset, const uint32_t size) const { return ByteStream(&vvalue.data()[offset], size); };
-        const uint8_t as_uint8() const { return (vvalue.size()>0 ? vvalue[0] : 0); }
-        //uint16_t as_uint16(uint32_t ofs = 0) const { return Integer(at(ofs, min(ofs+2, byteSize()) - ofs)); }
-        //uint32_t as_uint32(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+32,end_boffset) - bofs)); }
-        //uint64_t as_uint64(uint32_t bofs = 0) const { return Integer(at(bofs, min(bofs+64,end_boffset) - bofs)); }
+        //inline const ByteStream at(const uint32_t offset, const uint32_t size) const { return ByteStream(&vvalue.data()[offset], size); };
+        inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
+        inline const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
 
     protected:
-        void set_from_ptr(const uint8_t *p, const uint32_t size);
         const Integer a2Integer(const uint8_t *input, const int32_t size) const;
 
-    private:
+    protected:
         vector<uint8_t> vvalue;
 };
 
 class RLPByteStream: public ByteStream
 {
     public:
-        RLPByteStream(const uint64_t val, uint32_t size);
-        RLPByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) : ByteStream() { fromByteStream(ByteStream(str_value, size, in_base)); }
+        //Neutral Constructors (no encoding):
+        RLPByteStream() : ByteStream() { }
+        RLPByteStream(const RLPByteStream& b) : ByteStream(dynamic_cast<const ByteStream&>(b)) {}
+        RLPByteStream(const uint8_t *p, uint32_t size) : ByteStream(p, size) {}
+        
+        //Contructor can encode or not
+        RLPByteStream(const char *str_value, const bool encode = false);
 
-        //Empty RLP constructor
-        RLPByteStream(bool as_list = false) : ByteStream() { push_back((as_list ? 0xC0 : 0x80 ), 1); }
-        //RLP element constructor
-        RLPByteStream(const ByteStream& to_rlp_encode) : ByteStream() { fromByteStream(to_rlp_encode); };
-        //RLP list constructor
-        RLPByteStream(const vector<RLPByteStream> list_to_rlp_encode);
+        //Constructor = Empty RLP encoder:
+        RLPByteStream(bool as_list) : ByteStream() { push_back((as_list ? 0xC0 : 0x80 ), 1); }
+        //Constructor = ByteStream RLP encoder:
+        RLPByteStream(const ByteStream &to_rlp_encode) : ByteStream() { fromByteStream(to_rlp_encode); };
+        //Constructor = integer RLP encoder:
+        RLPByteStream(const uint64_t val, uint32_t size);
+        //Constructor = RLP list RLP encoder:
+        RLPByteStream(const vector<RLPByteStream>& list_to_rlp_encode);
+
+        //RLP decoder as element
+        const ByteStream decode();
+        //RLP decoder as list
+        const vector<RLPByteStream> decodeList();
+
+        bool isList() const { return byteSize() && as_uint8() >= 0xC0; }
 
     protected:
-        void fromByteStream(const ByteStream& to_rlp_encode);
+        void fromByteStream(const ByteStream &to_rlp_encode);
+        void getDataLocation(uint64_t &data_offset, uint64_t &data_size) const;
 };
 
 // This function basically removes all separators and spreads the remaining words inside a vector

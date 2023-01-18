@@ -321,7 +321,7 @@ void EllipticCurve::print_cyclic_subgroups() const
 	}
 }
 
-Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream& h, const uint8_t nonce_to_skip) const
+Integer EllipticCurve::generate_RFC6979_nonce(const Integer& x, const ByteStream &h, const uint8_t nonce_to_skip) const
 {
 	assert(m_GOrder > 0);
 	assert(x > 0 && x < getGeneratorOrder()  && h.byteSize() == 32);
@@ -388,7 +388,7 @@ bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool impa
 }
 
 bool EllipticCurve::recover( Point& Q_candidate,
-                			 const ByteStream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
+                			 const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool imparity,
 							 const bool recover_alternate ) const
 {
 	assert(m_GOrder > 0);

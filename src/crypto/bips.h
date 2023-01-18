@@ -46,7 +46,7 @@ class Pubkey
         
         Pubkey(const Pubkey& key); 
         Pubkey(const Point& p = Point(), const EllipticCurve& curve = Secp256k1::GetInstance());
-        Pubkey(const Point& p, const ByteStream& cc, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Pubkey(const Point& p, const ByteStream &cc, const EllipticCurve& curve = Secp256k1::GetInstance());
 
         const Point& getPoint() const { return m_point; }
         const EllipticCurve& getCurve() const { return m_ecc; }
@@ -55,7 +55,7 @@ class Pubkey
 
         uint32_t getFormatByteSize(Pubkey::Format f) const;
 
-        const ByteStream& getChainCode() const { return m_chaincode; }
+        const ByteStream &getChainCode() const { return m_chaincode; }
 
         inline bool operator==(const Pubkey& k) const { return m_ecc == k.getCurve() && m_point == k.getPoint() && m_chaincode == k.getChainCode(); }
 
@@ -73,8 +73,8 @@ class Signature: public EllipticCurve
         void fixMalleability();
         bool isMalleabilityFixed() const { return m_s <= m_smax; }
 
-        bool isValid(const ByteStream& h, const ByteStream& address, const bool enforce_eip2 = true) const;
-        bool ecrecover(Pubkey& key, const ByteStream& h, const ByteStream& from_address = ByteStream()) const;
+        bool isValid(const ByteStream &h, const ByteStream &address, const bool enforce_eip2 = true) const;
+        bool ecrecover(Pubkey& key, const ByteStream &h, const ByteStream &from_address = ByteStream()) const;
 
         const Integer& get_r() const { return m_r; }
         const Integer& get_s() const { return m_s; }
@@ -96,18 +96,18 @@ class Privkey
     public:
         Privkey(const Privkey& privkey);
         Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
-        Privkey(const ByteStream& seed, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const ByteStream &seed, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
         Privkey(const Privkey& parent_extprivkey, const int32_t index, const bool hardened);
-        Privkey(const ByteStream& k, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const ByteStream &k, const EllipticCurve& curve = Secp256k1::GetInstance());
 
         const EllipticCurve& getCurve() const { return m_pubkey.getCurve(); }
-        const ByteStream& getChainCode() const { return m_pubkey.getChainCode(); }
+        const ByteStream &getChainCode() const { return m_pubkey.getChainCode(); }
         const Pubkey& getPubKey() const { return m_pubkey; }
         void print() const;
         const Integer& getSecret() const { return m_secret; }
         operator const Integer() const { return m_secret; }
 
-        Signature sign(const ByteStream& h, const bool enforce_eip2 = true) const;
+        Signature sign(const ByteStream &h, const bool enforce_eip2 = true) const;
 
         inline bool operator==(const Privkey& k) const { return m_secret == k.getSecret(); }
 

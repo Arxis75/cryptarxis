@@ -21,7 +21,7 @@ Pubkey::Pubkey(const Point& p, const EllipticCurve& curve)
     , m_point(p)
 { }
 
-Pubkey::Pubkey(const Point& p, const ByteStream& cc, const EllipticCurve& curve)
+Pubkey::Pubkey(const Point& p, const ByteStream &cc, const EllipticCurve& curve)
     : m_ecc(curve)
     , m_point(p)
     , m_chaincode(cc)
@@ -101,7 +101,7 @@ void Signature::fixMalleability()
     }
 }
 
-bool Signature::isValid(const ByteStream& h, const ByteStream& from_address, const bool enforce_eip2) const
+bool Signature::isValid(const ByteStream &h, const ByteStream &from_address, const bool enforce_eip2) const
 {
     Pubkey key;
     return ( from_address.byteSize() == 20 &&
@@ -109,7 +109,7 @@ bool Signature::isValid(const ByteStream& h, const ByteStream& from_address, con
              ecrecover(key, h, from_address) && from_address == key.getAddress() );
 }
 
-bool Signature::ecrecover(Pubkey& key, const ByteStream& h, const ByteStream& from_address) const
+bool Signature::ecrecover(Pubkey& key, const ByteStream &h, const ByteStream &from_address) const
 {
     bool ret = false;
     Point Q_candidate;
@@ -186,7 +186,7 @@ Privkey::Privkey(const Privkey& parent_privkey, const int32_t index, const bool 
     }
 }
 
-Privkey::Privkey(const ByteStream& k, const EllipticCurve& curve)
+Privkey::Privkey(const ByteStream &k, const EllipticCurve& curve)
     : m_secret(k)
     , m_pubkey(Pubkey(curve.p_scalar(curve.getGenerator(), k), curve))
 {
@@ -199,7 +199,7 @@ Privkey::Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t acc
     : Privkey(mnc.get_seed(), path, account_i, curve)
 { }
 
-Privkey::Privkey(const ByteStream& seed, const char *path, const int32_t account_i, const EllipticCurve& curve)
+Privkey::Privkey(const ByteStream &seed, const char *path, const int32_t account_i, const EllipticCurve& curve)
 {
     assert(seed.byteSize() >= 16 && seed.byteSize() <= 64);
 
@@ -232,7 +232,7 @@ Privkey::Privkey(const ByteStream& seed, const char *path, const int32_t account
     }
 }
 
-Signature Privkey::sign(const ByteStream& h, const bool enforce_eip2) const
+Signature Privkey::sign(const ByteStream &h, const bool enforce_eip2) const
 {
     EllipticCurve ecc = m_pubkey.getCurve();
     Integer n = ecc.getGeneratorOrder();

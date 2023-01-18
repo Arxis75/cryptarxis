@@ -39,13 +39,13 @@ BitStream::BitStream(const Integer& val, uint32_t bitsize)
 BitStream::BitStream(const char *p, uint32_t bitsize)
     : end_boffset(0)
 {
-    set_from_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
+    push_back_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
 }
 
 BitStream::BitStream(const uint8_t *p, uint32_t bitsize)
     : end_boffset(0)
 {
-    set_from_ptr(p, bitsize);
+    push_back_ptr(p, bitsize);
 }
 
 BitStream::BitStream(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
@@ -61,10 +61,8 @@ void BitStream::set(const Integer& val, uint32_t bitsize)
     push_back(val, bitsize);
 }
 
-void BitStream::set_from_ptr(const uint8_t *p, uint32_t bitsize)
+void BitStream::push_back_ptr(const uint8_t *p, uint32_t bitsize)
 {
-    if(end_boffset)
-        clear();
     div_t d = div(bitsize, 8);
     for(uint32_t i=0;i<d.quot;i++) vvalue.push_back(0);
     if(d.quot)
@@ -176,12 +174,6 @@ ostream& operator<< (ostream& out, const BitStream& v) {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------
-ByteStream::ByteStream()
-{
-    //default size for processing time optimization (memory consumming though)
-    vvalue.reserve(32);
-}
-
 ByteStream::ByteStream(const Integer& value, uint32_t size)
 {
     vvalue.reserve(size);
@@ -193,10 +185,8 @@ ByteStream::ByteStream(const Integer& value, uint32_t size)
         vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
 }
 
-void ByteStream::set_from_ptr(const uint8_t *p, uint32_t size)
+void ByteStream::push_back_ptr(const uint8_t *p, uint32_t size)
 {
-    clear();
-    vvalue.reserve(size);
     for(uint32_t i=0;i<size;i++)
         vvalue.push_back(p[i]);
 }
@@ -212,7 +202,7 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
     else if( in_base == 2 && tmp.substr(0,2) == "0b" )
         tmp = tmp.substr(2, tmp.size() - 2);
 
-    //Forces byte-alignment
+    //Forces byte-alignment if ncesessary
     int32_t front_zero_padding_size = (in_base == 16 ? tmp.size()%2 : tmp.size()%8);
     while( front_zero_padding_size )
     {
@@ -220,7 +210,7 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
         front_zero_padding_size = (in_base == 16 ? tmp.size()%2 : tmp.size()%8);
     }
 
-    //Stores front 00-padding according to "size"
+    //Stores front 00-padding according to "size" if ncesessary
     front_zero_padding_size = size - (in_base == 16 ? tmp.size()>>1 : tmp.size()>>3);
     for(int i=0;i<front_zero_padding_size;i++)
         vvalue.push_back(0x00);
@@ -245,7 +235,7 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
     }
 }
 
-void ByteStream::push_back(const uint64_t value, uint32_t size)
+void ByteStream::push_back(const uint64_t value, const uint32_t size)
 {
     uint32_t value_size = (size > 8 ? 8 : size);
     uint32_t extra_size = size - value_size;
@@ -255,6 +245,42 @@ void ByteStream::push_back(const uint64_t value, uint32_t size)
         vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
  };
 
+const ByteStream ByteStream::pop_front(const uint32_t size)
+{
+    if( size )
+    {
+        if( size < byteSize() )
+        {
+            ByteStream retval(&(*this)[0], size);
+            memmove(&(*this)[0], &(*this)[size], byteSize() - size);    //overlapping memcpy
+            for(int i=0;i<size;i++)
+                vvalue.pop_back();
+            return retval;
+        }
+        else
+        {
+            ByteStream retval(*this);
+            clear();
+            return retval;
+        }
+    }
+    else
+        return ByteStream();
+}
+
+const uint64_t ByteStream::as_uint64() const
+{
+    uint64_t retval = 0;
+    if( vvalue.size() )
+    {
+        uint8_t s_1 = vvalue.size() - 1;
+        if(s_1 > 7)     
+            s_1 = 7;    // 7 = 8 bytes (uint64_t) - 1
+        for(int i=0;i<=s_1;i++)
+            retval += uint64_t(vvalue[i]) << ((s_1 - i) << 3 );
+    }
+    return retval;
+}
 
 const ByteStream ByteStream::sha256() const
 {
@@ -293,7 +319,7 @@ const Integer ByteStream::a2Integer(const uint8_t *input, const int32_t size) co
     return output;
 }
 
-ostream& operator<< (ostream& out, const ByteStream& v) {
+ostream& operator<< (ostream& out, const ByteStream &v) {
     out << hex << Integer(v);
     return out;
 }
@@ -303,19 +329,33 @@ ostream& operator<< (ostream& out, const ByteStream& v) {
 RLPByteStream::RLPByteStream(const uint64_t val, uint32_t size)
     : ByteStream()
 {
-    //Avoids call to the ByteStream(const Integer& value, uint32_t size) constructor
+    //For performance: avoid call to the ByteStream(const Integer& value, uint32_t size) constructor
     ByteStream b;
     b.push_back(val, size);
     fromByteStream(b);
 }
 
-RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
+RLPByteStream::RLPByteStream(const char *str_value, const bool encode)
     : ByteStream()
 {
-    if(rlp_list.size() > 0)
+    if( encode )
+    {
+        ByteStream b;
+        b.push_back(str_value, strlen(str_value)>>1, 16);
+        fromByteStream(b);
+    }
+    else
+        push_back(str_value, strlen(str_value)>>1, 16);
+}
+
+RLPByteStream::RLPByteStream(const vector<RLPByteStream>& rlp_list)
+    : ByteStream()
+{
+    uint64_t list_size = rlp_list.size() > 0;
+    if(list_size > 0)
     {
         ByteStream rlp_payload;
-        for(int i=0;i<rlp_list.size();i++)
+        for(int i=0;i<list_size;i++)
             rlp_payload.push_back(rlp_list[i]);   
         
         uint64_t rlp_payload_size = rlp_payload.byteSize();
@@ -337,7 +377,7 @@ RLPByteStream::RLPByteStream(const vector<RLPByteStream> rlp_list)
         push_back(0xC0, 1);
 }
 
-void RLPByteStream::fromByteStream(const ByteStream& field)
+void RLPByteStream::fromByteStream(const ByteStream &field)
 {   
     uint64_t field_size = field.byteSize();
     if( field_size )
@@ -363,6 +403,87 @@ void RLPByteStream::fromByteStream(const ByteStream& field)
     }
     else
         push_back(0x80, 1);       
+}
+
+void RLPByteStream::getDataLocation(uint64_t& data_offset, uint64_t &data_size) const
+{
+    if( byteSize() > 0)
+    {
+        uint8_t header = (*this)[0];
+        if( header <= 0x7F )
+        {
+            data_offset = 0;
+            data_size = 1;
+        }
+        else if( header >= 0x80 && header <= 0xB7 )
+        {
+            uint8_t field_size = header - 0x80;
+            data_offset = 1;
+            data_size = field_size;
+        }
+        else if( header >= 0xB8 && header <= 0xBF )
+        {
+            uint8_t field_size_size = header - 0xB7;
+            ByteStream fs(&(*this)[1], field_size_size);
+            uint64_t field_size = fs.as_uint64();
+            data_offset = 1 + field_size_size;
+            data_size = field_size;
+        }
+        else if( header >= 0xC0 && header <= 0xF7 )
+        {
+            uint8_t field_size = header - 0xC0;
+            data_offset = 1;
+            data_size = field_size;
+        }
+        else if( header >= 0xF8 && header <= 0xFF )
+        {
+            uint8_t field_size_size = header - 0xF7;
+            ByteStream fs(&(*this)[1], field_size_size);
+            uint64_t field_size = fs.as_uint64();
+            data_offset = 1 + field_size_size;
+            data_size = field_size;
+        }
+    }
+    else
+    {
+        data_offset = 0;
+        data_size = 0;
+    }
+}
+
+const ByteStream RLPByteStream::decode()
+{
+    if( !isList() )
+    {
+        uint64_t data_offset, data_size;
+        getDataLocation(data_offset, data_size);
+        pop_front(data_offset);                     // removes the header if necessary
+        return pop_front(data_size);                // consumes the data
+    }
+    else
+        return ByteStream();
+}
+
+const vector<RLPByteStream> RLPByteStream::decodeList()
+{
+    vector<RLPByteStream> retval;
+    uint64_t rlp_to_decode_size = byteSize();
+
+    if( isList() && rlp_to_decode_size >= 1)
+    {
+        uint64_t data_offset, data_size;
+        getDataLocation(data_offset, data_size);
+        pop_front(data_offset);                     //removes list header
+        while( byteSize() )
+        {
+            getDataLocation(data_offset, data_size);
+            cout << dec << data_offset << endl;
+            cout << dec << data_size << endl;
+            retval.push_back(RLPByteStream(&(*this)[0], data_offset + data_size));  // pushes full RLP record with header
+            pop_front(data_offset + data_size);                                     // consumes the data => next RLP record
+        }
+    }
+    return retval;
 }
 
 //-------------------------------------------------------------------------------------------------------------------------

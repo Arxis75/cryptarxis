@@ -49,7 +49,7 @@ class EllipticCurve
 
         Point p_scalar(const Point &P, const Integer& k) const;
 
-        Integer generate_RFC6979_nonce(const Integer& x, const ByteStream& h, const uint8_t nonce_to_skip = 0) const;
+        Integer generate_RFC6979_nonce(const Integer& x, const ByteStream &h, const uint8_t nonce_to_skip = 0) const;
 
         void print() const;
         void print_cyclic_subgroups() const;
@@ -77,7 +77,7 @@ class EllipticCurve
         bool sqrtmod(Integer& root, const Integer& n, const bool imparity) const;
 
         bool recover( Point& pubkeyPoint,
-              	      const ByteStream& msg_hash, const Integer& r, const Integer& s, const bool imparity,
+              	      const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool imparity,
                       const bool recover_alternate = false ) const;
 
     private:
