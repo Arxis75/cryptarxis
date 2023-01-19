@@ -63,8 +63,8 @@ class ByteStream
         ByteStream() { vvalue.reserve(32); };
         ByteStream(const ByteStream &b) { vvalue = b.vvalue; }
         ByteStream(const Integer& value, uint32_t size);
-        ByteStream(const char *p, uint32_t size) { vvalue.reserve(size); push_back_ptr(reinterpret_cast<const uint8_t*>(p), size); }
         ByteStream(const uint8_t *p, uint32_t size) { vvalue.reserve(size); push_back_ptr(p, size); }
+        //For string representing a number in base 2 or 16
         ByteStream(const string& str_value, const uint32_t size, const uint8_t in_base) { vvalue.reserve(size); push_back(str_value, size, in_base); }
         
         void push_back(const ByteStream &b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
@@ -114,16 +114,16 @@ class RLPByteStream: public ByteStream
         RLPByteStream(const RLPByteStream& b) : ByteStream(dynamic_cast<const ByteStream&>(b)) {}
         RLPByteStream(const uint8_t *p, uint32_t size) : ByteStream(p, size) {}
         
-        //Contructor can encode or not
-        RLPByteStream(const char *str_value, const bool encode = false);
+        //Opt-out RLP encoding Constructor: for a char array:
+        RLPByteStream(const string& str, bool as_array = true, bool rlp_encode = true);
 
-        //Constructor = Empty RLP encoder:
-        RLPByteStream(bool as_list) : ByteStream() { push_back((as_list ? 0xC0 : 0x80 ), 1); }
-        //Constructor = ByteStream RLP encoder:
+        //RLP encoding Constructor = Empty RLP encoder:
+        //RLPByteStream(bool as_list) : ByteStream() { push_back((as_list ? 0xC0 : 0x80 ), 1); }
+        //RLP encoding Constructor = ByteStream RLP encoder:
         RLPByteStream(const ByteStream &to_rlp_encode) : ByteStream() { fromByteStream(to_rlp_encode); };
-        //Constructor = integer RLP encoder:
+        //RLP encoding Constructor = integer RLP encoder:
         RLPByteStream(const uint64_t val, uint32_t size);
-        //Constructor = RLP list RLP encoder:
+        //RLP encoding Constructor = RLP list RLP encoder:
         RLPByteStream(const vector<RLPByteStream>& list_to_rlp_encode);
 
         //RLP decoder as element

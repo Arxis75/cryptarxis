@@ -326,6 +326,20 @@ ostream& operator<< (ostream& out, const ByteStream &v) {
 
 //-------------------------------------------------------------------------------------------------------------------------------------
 
+RLPByteStream::RLPByteStream(const string& str, bool as_array, bool rlp_encode)
+    : ByteStream()
+{
+    ByteStream b;
+    if(as_array)
+        b = ByteStream(reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
+    else
+        b = ByteStream(str, str.size()>>1, 16);
+    if( rlp_encode )
+        fromByteStream(b);
+    else
+        push_back(b);    
+}
+
 RLPByteStream::RLPByteStream(const uint64_t val, uint32_t size)
     : ByteStream()
 {
@@ -335,23 +349,10 @@ RLPByteStream::RLPByteStream(const uint64_t val, uint32_t size)
     fromByteStream(b);
 }
 
-RLPByteStream::RLPByteStream(const char *str_value, const bool encode)
-    : ByteStream()
-{
-    if( encode )
-    {
-        ByteStream b;
-        b.push_back(str_value, strlen(str_value)>>1, 16);
-        fromByteStream(b);
-    }
-    else
-        push_back(str_value, strlen(str_value)>>1, 16);
-}
-
 RLPByteStream::RLPByteStream(const vector<RLPByteStream>& rlp_list)
     : ByteStream()
 {
-    uint64_t list_size = rlp_list.size() > 0;
+    uint64_t list_size = rlp_list.size();
     if(list_size > 0)
     {
         ByteStream rlp_payload;
