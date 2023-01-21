@@ -8,7 +8,10 @@
 
 #include <map>
 
-using namespace std;
+using std::cout;
+using std::hex;
+using std::dec;
+using std::endl;
 
 // Function that checks whether n is prime or not
 bool isPrimeNumber(const Integer& n)
@@ -59,7 +62,6 @@ bool Point::operator==(const Point& P) const
 {
 	return (m_isIdentity && P.m_isIdentity) || (!m_isIdentity && !P.m_isIdentity && m_x == P.m_x && m_y == P.m_y);
 }
-
 
 void Point::print() const
 {

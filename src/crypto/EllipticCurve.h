@@ -4,8 +4,8 @@
 #include <givaro/modular-integer.h>
 #include <Common.h>
 
-using namespace std;
-using namespace Givaro;
+using Givaro::Modular;
+using Givaro::Integer;
 
 typedef Modular<Integer> ZP;
 typedef ZP::Element Element;

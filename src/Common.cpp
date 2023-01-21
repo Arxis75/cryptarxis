@@ -1,13 +1,21 @@
 #include "Common.h"
+#include <tools/tools.h>
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+
 #include <ethash/keccak.hpp>
+
+#include <map>
 #include <algorithm>
 
-using namespace std;
-using namespace Givaro;
+using Givaro::Integer;
+using std::map;
+using std::cout;
+using std::hex;
+using std::dec;
+using std::endl;
 
 struct cmp_str {
     bool operator()(char const *a, char const *b) const { return strcmp(a, b) < 0; }
@@ -275,6 +283,8 @@ const ByteStream ByteStream::pop_front(const uint64_t size)
         }
         else
         {
+            if( size > byteSize() )
+                cout << "Warning! ByteStream::pop_front() asked to pop data larger than the ByteStream size! The whole buffer was poped but not more..." << endl;
             ByteStream retval(*this);
             clear();
             return retval;
@@ -356,20 +366,22 @@ RLPByteStream::RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list
     //MAIN RLP ENCODING METHOD
     if( to_rlp_encode.byteSize() )
     {
-        if(to_rlp_encode.byteSize() != 1 || to_rlp_encode[0] >= 0x80)
+        // The only use-case of as_list = true here is to rebuild the list header
+        // from a truncated RLP list.The truncated RLPByteStream is passed
+        // as a simple ByteStream
+        uint8_t extra_prefix = (as_list ? 0x40 : 0);
+        if(to_rlp_encode.byteSize() == 1 && to_rlp_encode[0] < 0x80)
         {
-            // The only use-case of as_list = true here is to rebuild the list header
-            // from a truncated RLP list.The truncated RLPByteStream is passed
-            // as a simple ByteStream
-            uint8_t extra_prefix = (as_list ? 0x40 : 0);
-            if( to_rlp_encode.byteSize() <= 55 )
-                ByteStream::push_back(0x80 + extra_prefix + to_rlp_encode.byteSize(), 1);
-            else
-            {
-                uint64_t size_size = sizeInBytes64(to_rlp_encode.byteSize());
-                ByteStream::push_back(0xB7 + extra_prefix + size_size, 1);
-                ByteStream::push_back(to_rlp_encode.byteSize() , size_size);
-            }
+            if( as_list)
+                ByteStream::push_back(0xC1, 1);
+        }
+        else if( to_rlp_encode.byteSize() <= 55 )
+            ByteStream::push_back(0x80 + extra_prefix + to_rlp_encode.byteSize(), 1);
+        else
+        {
+            uint64_t size_size = sizeInBytes64(to_rlp_encode.byteSize());
+            ByteStream::push_back(0xB7 + extra_prefix + size_size, 1);
+            ByteStream::push_back(to_rlp_encode.byteSize() , size_size);
         }
         ByteStream::push_back(to_rlp_encode);
     }
@@ -377,7 +389,7 @@ RLPByteStream::RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list
         ByteStream::push_back((as_list ? 0xC0 : 0x80), 1);
 }
 
-void RLPByteStream::push_back(const RLPByteStream& rlp, const bool at_top_level)
+void RLPByteStream::push_back(const RLPByteStream &rlp, const bool at_top_level)
 {
     //MAIN RLP LIST ENCODING METHOD
     if( byteSize() )    
@@ -392,7 +404,7 @@ void RLPByteStream::push_back(const RLPByteStream& rlp, const bool at_top_level)
         {
             //Drops the previous list header
             ByteStream::pop_front(1);
-            if( front_header >= 0xF7 )
+            if( front_header > 0xF7 )
             {
                 list_size_size = front_header - 0xF7;
                 ByteStream::pop_front(list_size_size);
@@ -410,7 +422,7 @@ void RLPByteStream::push_back(const RLPByteStream& rlp, const bool at_top_level)
     ByteStream::push_back(rlp);
 }
 
-void RLPByteStream::push_front(const RLPByteStream& rlp, const bool at_top_level)
+void RLPByteStream::push_front(const RLPByteStream &rlp, const bool at_top_level)
 {
     //MAIN RLP LIST ENCODING METHOD
     if( byteSize() )    
@@ -425,7 +437,7 @@ void RLPByteStream::push_front(const RLPByteStream& rlp, const bool at_top_level
         {
             //Drops the previous list header
             ByteStream::pop_front(1);
-            if( front_header >= 0xF7 )
+            if( front_header > 0xF7 )
             {
                 list_size_size = front_header - 0xF7;
                 ByteStream::pop_front(list_size_size);
@@ -447,8 +459,9 @@ void RLPByteStream::push_front(const RLPByteStream& rlp, const bool at_top_level
         ByteStream::push_front(rlp);
 }
 
-ByteStream RLPByteStream::pop_front()
+RLPByteStream RLPByteStream::pop_front()
 {
+    RLPByteStream retval;
     if( byteSize() )
     {   
         uint8_t front_header = vvalue[0], front_elem_size_size = 0;
@@ -465,68 +478,54 @@ ByteStream RLPByteStream::pop_front()
                 ByteStream::pop_front(list_size_size);
             }
             rebuild_header = true;
+        }
+        if( byteSize() )
+        {
             front_header = vvalue[0];
-        }
-        if( front_header < 0x80 )
-        {
-            front_elem_size = 1;
-            front_header_size = 0;
-        }
-        else if( front_header >= 0x80 && front_header < 0xB7 )
-        {
-            front_elem_size = front_header - 0x80;
-            front_header_size = 1;
-        }
-        else if( front_header >= 0xB7 && front_header < 0xC0 )
-        {
-            front_elem_size_size = front_header - 0xB7;
-            front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
-            front_header_size = 1 + front_elem_size_size;
-        }
-        else if( front_header >= 0xC0 && front_header < 0xF7 )
-        {
-            front_elem_size = front_header - 0xC0;
-            front_header_size = 1;
-        }
-        else
-        {
-            front_elem_size_size = front_header - 0xF7;
-            front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
-            front_header_size = 1 + front_elem_size_size;
-        }
 
-        //Drops the first RLP element header
-        ByteStream::pop_front(front_header_size);
-        //Pops the first element
-        ByteStream elem = ByteStream::pop_front(front_elem_size);
+            if( front_header < 0x80 )       //[0x00, 0x7f] 
+            {
+                front_elem_size = 1;
+                front_header_size = 0;
+            }
+            else if( front_header < 0xB8 )  //[0x80, 0xb7]
+            {
+                front_elem_size = front_header - 0x80;
+                front_header_size = 1;
+            }
+            else if( front_header < 0xC0 )   //[0xb8, 0xbf]
+            {
+                front_elem_size_size = front_header - 0xB7;
+                front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                front_header_size = 1 + front_elem_size_size;
+            }
+            else if( front_header < 0xF8 )  //[0xc0, 0xf7]
+            {
+                //Do not remove the header of the sub-list when poping it:
+                front_elem_size = 1 + front_header - 0xC0;
+                front_header_size = 0;
+            }
+            else //[0xf8, 0xff] 
+            {
+                front_elem_size_size = front_header - 0xF7;//Do not remove the header of the sub-list when poping it
+                //Do not remove the header of the sub-list when poping it:
+                front_elem_size = 1 + front_elem_size_size + ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                front_header_size = 0;
+            }
 
-        if( byteSize() && rebuild_header )
-        {
-            //Rebuilds the list header if necessary
-            RLPByteStream b((*this), true);
-            vvalue = b.vvalue;
+            //Drops the first RLP element header (only if not list)
+            ByteStream::pop_front(front_header_size);
+            // Pops the first element (with header if list): the static_cast
+            // prevents the popped element to get re-RLP-encoded
+            retval.vvalue = ByteStream::pop_front(front_elem_size).getVector();
+
+            if( byteSize() && rebuild_header )
+            {
+                //Rebuilds the list header if necessary
+                RLPByteStream b((*this), true);
+                vvalue = b.vvalue;
+            }
         }
-        
-        return elem;
     }
-    else
-        return ByteStream();
-}
-//-------------------------------------------------------------------------------------------------------------------------
-
-// This function basically removes all separators and spreads the remaining words inside a vector
-// The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
-// are not interpreted as empty word(s); they are just removed)
-vector<string> split(const string& list, const string& separator)
-{
-    vector<string> v;   
-    int start = 0;
-    int end = list.find(separator);
-    while (end != -1) {
-        if(end > start ) v.push_back(list.substr(start, end - start));
-        start = end + separator.size();
-        end = list.find(separator, start);
-    }
-    if(start != list.size()) v.push_back(list.substr(start, list.size() - start));
-    return v;
+    return retval;
 }

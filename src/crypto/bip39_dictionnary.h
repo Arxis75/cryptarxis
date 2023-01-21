@@ -3,7 +3,8 @@
 #include <vector>
 #include <string>
 
-using namespace std;
+using std::string;
+using std::vector;
 
 namespace BIP39 { 
     namespace Dictionary {

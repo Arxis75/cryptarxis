@@ -3,8 +3,7 @@
 #include "EllipticCurve.h"
 #include <Common.h>
 
-using namespace std;
-using namespace Givaro;
+using Givaro::Integer;
 
 namespace BIP39 {
 

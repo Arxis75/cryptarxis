@@ -2,12 +2,40 @@
 #include <reactor/SocketHandler.h>
 
 #include <crypto/bips.h>
-#include <tools/rlp.h>
+#include <tools/tools.h>
+
+using std::cout;
+using std::hex;
+using std::dec;
+using std::endl;
 
 #define PORT 40404
 
 int main(int argc , char *argv[])  
 {
+RLPByteStream toto( "0xf902e2d694a56006a9bc78fd64404b34d44f06d1141f8589bec0d694e592427a"
+                                                        "0aece92de3edee1f18e0157c05861564c0f8fe94dac17f958d2ee523a220620699"
+                                                        "4597c13d831ec7f8e7a0f79325ef15d73bc873d975b0e4eedaf108f1a270300e4b"
+                                                        "40424347eae19bc685a0af50917ef266a63852df327a118d37bd04d770347c3dfc"
+                                                        "528d177928d9263066a00000000000000000000000000000000000000000000000"
+                                                        "000000000000000000a00000000000000000000000000000000000000000000000"
+                                                        "00000000000000000aa00000000000000000000000000000000000000000000000"
+                                                        "000000000000000004a00000000000000000000000000000000000000000000000"
+                                                        "000000000000000003a0447ca931bbc745ec7d2310d11914e4e40b840765b32592"
+                                                        "a566191228fbbd2ce4d694aa2ec16d77cfc057fb9c516282fef9da9de1e987c0f8"
+                                                        "bc94c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f8a5a00a57c8bae4ecff7c"
+                                                        "613785bbda00a69fbdda07ce911b9bfb285742752e6b4215a030bd84b96629f958"
+                                                        "113934633d3bd1b64c3d259a85c57ceac65da8c5ec9bf3a7a0b0b00dbdb054c95b"
+                                                        "5c2e5f3f7facd24c4530e27329e985fe8efb5f6876c253f9a0217fdff7afc5cd5a"
+                                                        "4e8ef4146b5a8c30926ffa20f0ff879ffdc9ed3476cd86eea040f963d8ab5de525"
+                                                        "9e130f6865b75ceb44638428ca149b7fe63a511f142fedb7f8dd944e68ccd3e89f"
+                                                        "51c3074ca5072bbac773960dfa36f8c6a0ad860a26b2adedd5a0c5d198c9503a42"
+                                                        "0ba615f9041c00093858eff051edf0a0a000000000000000000000000000000000"
+                                                        "00000000000000000000000000000001a000000000000000000000000000000000"
+                                                        "00000000000000000000000000000000a000000000000000000000000000000000"
+                                                        "00000000000000000000000000000004a000000000000000000000000000000000"
+                                                        "0000000000000000000000000000000da000000000000000000000000000000000"
+                                                        "0000000000000000000000000000000c" );
     //+chain_id                               0x01                    (EIP2930)
     //nonce                                   0x01
     //+max_priority_fee_per_gas   0x80+0x04/  0x58370200              (EIP1559)

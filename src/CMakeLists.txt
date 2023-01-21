@@ -24,8 +24,8 @@ FetchContent_Declare(reactor
 )
 FetchContent_MakeAvailable(reactor)
 
-add_subdirectory(crypto)
 add_subdirectory(tools)
+add_subdirectory(crypto)
 
 target_include_directories(lib_reactor PUBLIC ${reactor_SOURCE_DIR}/src)
 target_link_libraries(cryptarxis PUBLIC OpenSSL::Crypto ethash::ethash gmp givaro lib_reactor)

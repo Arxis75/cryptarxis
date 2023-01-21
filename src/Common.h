@@ -1,37 +1,12 @@
 #pragma once
 
 #include <givaro/modular-integer.h>
-
+#include <tools/tools.h>
 #include <map>
 
-using namespace std;
-using namespace Givaro;
-
-static const int log2_tab64[64] = {
-    63,  0, 58,  1, 59, 47, 53,  2,
-    60, 39, 48, 27, 54, 33, 42,  3,
-    61, 51, 37, 40, 49, 18, 28, 20,
-    55, 30, 34, 11, 43, 14, 22,  4,
-    62, 57, 46, 52, 38, 26, 32, 41,
-    50, 36, 17, 19, 29, 10, 13, 21,
-    56, 45, 25, 31, 35, 16,  9, 12,
-    44, 24, 15,  8, 23,  7,  6,  5};
-
-static inline int log2_64 (uint64_t value)
-{
-    value |= value >> 1;
-    value |= value >> 2;
-    value |= value >> 4;
-    value |= value >> 8;
-    value |= value >> 16;
-    value |= value >> 32;
-    return log2_tab64[((uint64_t)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
-}
-
-static inline uint64_t sizeInBytes64(const uint64_t& value)
-{
-    return 1 + (log2_64(value)>>3);
-}
+using std::ostream;
+using std::min;
+using Givaro::Integer;
 
 class BitStream
 {
@@ -139,7 +114,9 @@ class ByteStream
         inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
         inline const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
-
+        
+        const vector<uint8_t>& getVector() const { return vvalue; }
+        
     protected:
         const Integer a2Integer(const uint8_t *input, const int32_t size) const;
 
@@ -154,29 +131,18 @@ class RLPByteStream: public ByteStream
         RLPByteStream() { vvalue.reserve(1+32); }
         RLPByteStream(const RLPByteStream &b) : ByteStream(b) {}
         RLPByteStream(const uint8_t *p, uint64_t size) : ByteStream(p, size) { }
-        RLPByteStream(const char* str) : ByteStream(str, strlen(str)>1, 16) { }
+        RLPByteStream(const char *str) : ByteStream(str, strlen(str)>1, 16) { } //for raw RLP init from hex string only
         
         // Encoding constructor:
         // "as_list" is used to:
-        //      - rebuild an erased list header,
-        //      - discriminates for an empty input between 0x80 and 0xC0
+        //      - rebuild an erased list header (internal use only),
+        //      - discriminates between 0x80 and 0xC0 for an empty input
         RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list = false);
 
         // Push/Pop Elements to/from a serialized RLP
         // "at_top_level" used to choose between putting under existing list (false) or
-        // putting at the same level as an existing list (true), thus creating a new top-list
-        void push_back(const RLPByteStream& rlp, const bool at_top_level = false);
-        void push_front(const RLPByteStream& rlp, const bool at_top_level = false);
-        ByteStream pop_front();
+        // putting at the top level like the existing list (true), thus creating a new top-list header
+        void push_back(const RLPByteStream &rlp, const bool at_top_level = false);
+        void push_front(const RLPByteStream &rlp, const bool at_top_level = false);
+        RLPByteStream pop_front();
 };
-
-// This function basically removes all separators and spreads the remaining words inside a vector
-// The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
-// are not interpreted as empty word(s); they are just removed)
-vector<string> split(const string& list, const string& separator);
-
-static inline uint64_t sizeInBytes(const Integer& value)
-{
-    uint64_t tmp = value.size_in_base(2);
-    return (tmp>>3) + (tmp%8);
-}

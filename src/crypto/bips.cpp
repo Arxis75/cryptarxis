@@ -12,8 +12,13 @@
 #include <ethash/keccak.hpp>
 
 using namespace BIP39;
-using namespace ethash;
-
+using ethash::keccak256;
+using ethash::hash256;
+using std::cout;
+using std::hex;
+using std::dec;
+using std::endl;
+using std::stoi;
 //----------------------------------------------------------- BIP32 -----------------------------------------------------------------
 
 Pubkey::Pubkey(const Point& p, const EllipticCurve& curve)
