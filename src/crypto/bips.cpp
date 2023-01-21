@@ -424,7 +424,7 @@ const ByteStream Mnemonic::get_seed() const
 
 const ByteStream Mnemonic::get_seed(const string& pwd) const
 {
-    ByteStream the_seed(Integer(0), 64);
+    ByteStream the_seed(Integer::zero, 64);
     if (is_valid())
     {
         const string pass = get_word_list();

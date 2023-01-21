@@ -30,41 +30,41 @@ BitStream::BitStream(const BitStream& b)
     vvalue = b.vvalue;   
 }
 
-BitStream::BitStream(const Integer& val, uint32_t bitsize)
+BitStream::BitStream(const Integer& val, uint64_t bitsize)
     : end_boffset(0)
 {
     set(val, bitsize);
 }
 
-BitStream::BitStream(const char *p, uint32_t bitsize)
+BitStream::BitStream(const char *p)
     : end_boffset(0)
 {
-    push_back_ptr(reinterpret_cast<const u_int8_t*>(p), bitsize);
+    push_back_ptr(reinterpret_cast<const u_int8_t*>(p), strlen(p)<<3);
 }
 
-BitStream::BitStream(const uint8_t *p, uint32_t bitsize)
+BitStream::BitStream(const uint8_t *p, uint64_t bitsize)
     : end_boffset(0)
 {
     push_back_ptr(p, bitsize);
 }
 
-BitStream::BitStream(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
+BitStream::BitStream(const string& str_value, const uint64_t bitsize, const uint8_t in_base)
     : end_boffset(0)
 {
     push_back(str_value, bitsize, in_base);
 }
 
-void BitStream::set(const Integer& val, uint32_t bitsize)
+void BitStream::set(const Integer& val, uint64_t bitsize)
 {
     if(end_boffset)
         clear();
     push_back(val, bitsize);
 }
 
-void BitStream::push_back_ptr(const uint8_t *p, uint32_t bitsize)
+void BitStream::push_back_ptr(const uint8_t *p, uint64_t bitsize)
 {
     div_t d = div(bitsize, 8);
-    for(uint32_t i=0;i<d.quot;i++) vvalue.push_back(0);
+    for(uint64_t i=0;i<d.quot;i++) vvalue.push_back(0);
     if(d.quot)
         memcpy(vvalue.data(), p, d.quot);
     if(d.rem)
@@ -72,7 +72,7 @@ void BitStream::push_back_ptr(const uint8_t *p, uint32_t bitsize)
     end_boffset = bitsize;
 }
 
-void BitStream::push_back(const string& str_value, const uint32_t bitsize, const uint8_t in_base)
+void BitStream::push_back(const string& str_value, const uint64_t bitsize, const uint8_t in_base)
 {
     assert( in_base == 2 || in_base ==16 );
 
@@ -95,11 +95,11 @@ void BitStream::push_back(const string& str_value, const uint32_t bitsize, const
     push_back(value, bitsize);
 }
 
-void BitStream::push_back(const Integer& bits_value, const uint32_t bitsize)
+void BitStream::push_back(const Integer& bits_value, const uint64_t bitsize)
 {
     Integer max_size_mask = Givaro::pow(2, bitsize) - 1;
     Integer bits_to_push(0);
-    uint32_t nbitsleft = bitsize;
+    uint64_t nbitsleft = bitsize;
     while(nbitsleft)
     {   
         uint8_t nbits_to_push = min(8-(end_boffset%8), nbitsleft);
@@ -112,11 +112,11 @@ void BitStream::push_back(const Integer& bits_value, const uint32_t bitsize)
     }
 }
 
-const BitStream BitStream::at(uint32_t bitoffset, uint32_t bitsize) const       // not aligned
+const BitStream BitStream::at(uint64_t bitoffset, uint64_t bitsize) const       // not aligned
 {
     assert(bitoffset+bitsize <= end_boffset);
     Integer mask = pow(2, bitsize) - 1;
-    uint32_t rshift = end_boffset - bitoffset - bitsize;
+    uint64_t rshift = end_boffset - bitoffset - bitsize;
     Integer v = mask & (Integer(*this)>>rshift);
     return BitStream(v, bitsize);
 }
@@ -174,24 +174,24 @@ ostream& operator<< (ostream& out, const BitStream& v) {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------
-ByteStream::ByteStream(const Integer& value, uint32_t size)
+ByteStream::ByteStream(const Integer& value, uint64_t size)
 {
     vvalue.reserve(size);
-    uint32_t value_size = (size > sizeInBytes(value) ? sizeInBytes(value) : size);
-    uint32_t extra_size = size - value_size;
+    uint64_t value_size = (size > sizeInBytes(value) ? sizeInBytes(value) : size);
+    uint64_t extra_size = size - value_size;
     for(int i=0;i<extra_size;i++)
         vvalue.push_back(0x00);
     for(int i=1;i<=value_size;i++)
         vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
 }
 
-void ByteStream::push_back_ptr(const uint8_t *p, uint32_t size)
+void ByteStream::push_back_ptr(const uint8_t *p, uint64_t size)
 {
-    for(uint32_t i=0;i<size;i++)
+    for(uint64_t i=0;i<size;i++)
         vvalue.push_back(p[i]);
 }
 
-void ByteStream::push_back(const string& str_value, const uint32_t size, const uint8_t in_base)
+void ByteStream::push_back(const string& str_value, const uint64_t size, const uint8_t in_base)
 {
     assert( in_base == 2 || in_base ==16 );
     
@@ -235,17 +235,33 @@ void ByteStream::push_back(const string& str_value, const uint32_t size, const u
     }
 }
 
-void ByteStream::push_back(const uint64_t value, const uint32_t size)
+void ByteStream::push_back(const uint64_t value, const uint64_t size)
 {
-    uint32_t value_size = (size > 8 ? 8 : size);
-    uint32_t extra_size = size - value_size;
+    //Factorize code with push_front(const uint64_t value, const uint64_t size)
+    ByteStream b;
+    uint64_t value_size = (size > 8 ? 8 : size);
+    uint64_t extra_size = size - value_size;
     for(int i=0;i<extra_size;i++)
-        vvalue.push_back(0x00);
+        b.vvalue.push_back(0x00);
     for(int i=1;i<=value_size;i++)
-        vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
+        b.vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
+    push_back(b);
  };
 
-const ByteStream ByteStream::pop_front(const uint32_t size)
+const void ByteStream::push_front(const uint64_t value, const uint64_t size)
+{
+    //Factorize code with push_back(const uint64_t value, const uint64_t size)
+    ByteStream b;
+    uint64_t value_size = (size > 8 ? 8 : size);
+    uint64_t extra_size = size - value_size;
+    for(int i=0;i<extra_size;i++)
+        b.vvalue.push_back(0x00);
+    for(int i=1;i<=value_size;i++)
+        b.vvalue.push_back(0xFF & uint8_t(value>>((value_size-i)<<3)));
+    push_front(b);
+}
+
+const ByteStream ByteStream::pop_front(const uint64_t size)
 {
     if( size )
     {
@@ -268,25 +284,11 @@ const ByteStream ByteStream::pop_front(const uint32_t size)
         return ByteStream();
 }
 
-const uint64_t ByteStream::as_uint64() const
-{
-    uint64_t retval = 0;
-    if( vvalue.size() )
-    {
-        uint8_t s_1 = vvalue.size() - 1;
-        if(s_1 > 7)     
-            s_1 = 7;    // 7 = 8 bytes (uint64_t) - 1
-        for(int i=0;i<=s_1;i++)
-            retval += uint64_t(vvalue[i]) << ((s_1 - i) << 3 );
-    }
-    return retval;
-}
-
 const ByteStream ByteStream::sha256() const
 {
-    char zero[32];
+    uint8_t zero[32];
     memset(&zero,0,sizeof(zero));
-    ByteStream digest(zero, sizeof(zero));
+    ByteStream digest(&zero[0], sizeof(zero));
     SHA256(*this, byteSize(), digest);
     return digest;
 }
@@ -319,6 +321,29 @@ const Integer ByteStream::a2Integer(const uint8_t *input, const int32_t size) co
     return output;
 }
 
+ByteStream::operator const string() const
+{
+    uint64_t size = byteSize();
+    string s("");
+    for (uint64_t i = 0; i < size; i++)
+        s += vvalue[i];
+    return s;
+}
+
+inline const uint64_t ByteStream::as_uint64() const
+{
+    uint64_t retval = 0;
+    if( vvalue.size() )
+    {
+        uint8_t s_1 = vvalue.size() - 1;
+        if(s_1 > 7)     
+            s_1 = 7;    // 7 = 8 bytes (uint64_t) - 1
+        for(int i=0;i<=s_1;i++)
+            retval += uint64_t(vvalue[i]) << ((s_1 - i) << 3 );
+    }
+    return retval;
+}
+
 ostream& operator<< (ostream& out, const ByteStream &v) {
     out << hex << Integer(v);
     return out;
@@ -326,167 +351,167 @@ ostream& operator<< (ostream& out, const ByteStream &v) {
 
 //-------------------------------------------------------------------------------------------------------------------------------------
 
-RLPByteStream::RLPByteStream(const string& str, bool as_array, bool rlp_encode)
-    : ByteStream()
+RLPByteStream::RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list)
 {
-    ByteStream b;
-    if(as_array)
-        b = ByteStream(reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
-    else
-        b = ByteStream(str, str.size()>>1, 16);
-    if( rlp_encode )
-        fromByteStream(b);
-    else
-        push_back(b);    
-}
-
-RLPByteStream::RLPByteStream(const uint64_t val, uint32_t size)
-    : ByteStream()
-{
-    //For performance: avoid call to the ByteStream(const Integer& value, uint32_t size) constructor
-    ByteStream b;
-    b.push_back(val, size);
-    fromByteStream(b);
-}
-
-RLPByteStream::RLPByteStream(const vector<RLPByteStream>& rlp_list)
-    : ByteStream()
-{
-    uint64_t list_size = rlp_list.size();
-    if(list_size > 0)
+    //MAIN RLP ENCODING METHOD
+    if( to_rlp_encode.byteSize() )
     {
-        ByteStream rlp_payload;
-        for(int i=0;i<list_size;i++)
-            rlp_payload.push_back(rlp_list[i]);   
-        
-        uint64_t rlp_payload_size = rlp_payload.byteSize();
-        if( rlp_payload_size <= 55 )
+        if(to_rlp_encode.byteSize() != 1 || to_rlp_encode[0] >= 0x80)
         {
-            push_back(0xC0 + rlp_payload_size, 1);
-            push_back(rlp_payload);
-        }
-        else
-        {
-            uint8_t list_size_size_nbits = log2(rlp_payload_size);  //Ca marche pas
-            uint8_t list_size_size = (list_size_size_nbits>>3) + ((list_size_size_nbits%8) ? 1 : 0);
-            push_back(0xF7 + list_size_size, 1);
-            push_back(rlp_payload_size, list_size_size);
-            push_back(rlp_payload);
-        }
-    }
-    else
-        push_back(0xC0, 1);
-}
-
-void RLPByteStream::fromByteStream(const ByteStream &field)
-{   
-    uint64_t field_size = field.byteSize();
-    if( field_size )
-    {
-        if( field_size == 1 && field.as_uint8() <= 0x7F )
-            push_back(field);
-        else
-        {
-            if( field_size <= 55 )
-            {   
-                push_back(0x80 + field_size, 1);
-                push_back(field);
-            }
+            // The only use-case of as_list = true here is to rebuild the list header
+            // from a truncated RLP list.The truncated RLPByteStream is passed
+            // as a simple ByteStream
+            uint8_t extra_prefix = (as_list ? 0x40 : 0);
+            if( to_rlp_encode.byteSize() <= 55 )
+                ByteStream::push_back(0x80 + extra_prefix + to_rlp_encode.byteSize(), 1);
             else
             {
-                uint8_t field_size_size_nbits = log2(field_size);  //Ca marche pas
-                uint8_t field_size_size = (field_size_size_nbits>>3) + ((field_size_size_nbits%8) ? 1 : 0);
-                push_back(0xB7 + field_size_size, 1);
-                push_back(field_size, field_size_size);
-                push_back(field);
+                uint64_t size_size = sizeInBytes64(to_rlp_encode.byteSize());
+                ByteStream::push_back(0xB7 + extra_prefix + size_size, 1);
+                ByteStream::push_back(to_rlp_encode.byteSize() , size_size);
             }
         }
+        ByteStream::push_back(to_rlp_encode);
     }
     else
-        push_back(0x80, 1);       
+        ByteStream::push_back((as_list ? 0xC0 : 0x80), 1);
 }
 
-void RLPByteStream::getDataLocation(uint64_t& data_offset, uint64_t &data_size) const
+void RLPByteStream::push_back(const RLPByteStream& rlp, const bool at_top_level)
 {
-    if( byteSize() > 0)
+    //MAIN RLP LIST ENCODING METHOD
+    if( byteSize() )    
     {
-        uint8_t header = (*this)[0];
-        if( header <= 0x7F )
+        //There is already some RLP data
+        uint64_t list_size = byteSize();
+        uint8_t list_size_size = 0;
+        
+        uint8_t front_header = vvalue[0];
+
+        if( !at_top_level && front_header >= 0xC0 )
         {
-            data_offset = 0;
-            data_size = 1;
+            //Drops the previous list header
+            ByteStream::pop_front(1);
+            if( front_header >= 0xF7 )
+            {
+                list_size_size = front_header - 0xF7;
+                ByteStream::pop_front(list_size_size);
+            }
         }
-        else if( header >= 0x80 && header <= 0xB7 )
+        // Creates a new list header
+        list_size = byteSize() + rlp.byteSize();
+        if(list_size > 55)
         {
-            uint8_t field_size = header - 0x80;
-            data_offset = 1;
-            data_size = field_size;
+            list_size_size = sizeInBytes64(list_size);
+            ByteStream::push_front(list_size, list_size_size);
         }
-        else if( header >= 0xB8 && header <= 0xBF )
+        ByteStream::push_front((list_size <= 55 ? 0xC0 + list_size : 0xF7 + list_size_size), 1);
+    }
+    ByteStream::push_back(rlp);
+}
+
+void RLPByteStream::push_front(const RLPByteStream& rlp, const bool at_top_level)
+{
+    //MAIN RLP LIST ENCODING METHOD
+    if( byteSize() )    
+    {
+        //There is already some RLP data
+        uint64_t list_size = byteSize();
+        uint8_t list_size_size = 0;
+        
+        uint8_t front_header = vvalue[0];
+
+        if( !at_top_level && front_header >= 0xC0 )
         {
-            uint8_t field_size_size = header - 0xB7;
-            ByteStream fs(&(*this)[1], field_size_size);
-            uint64_t field_size = fs.as_uint64();
-            data_offset = 1 + field_size_size;
-            data_size = field_size;
+            //Drops the previous list header
+            ByteStream::pop_front(1);
+            if( front_header >= 0xF7 )
+            {
+                list_size_size = front_header - 0xF7;
+                ByteStream::pop_front(list_size_size);
+            }
         }
-        else if( header >= 0xC0 && header <= 0xF7 )
+
+        ByteStream::push_front(rlp);
+
+        // Creates a new list header
+        list_size = byteSize();
+        if(list_size > 55)
         {
-            uint8_t field_size = header - 0xC0;
-            data_offset = 1;
-            data_size = field_size;
+            list_size_size = sizeInBytes64(list_size);
+            ByteStream::push_front(list_size, list_size_size);
         }
-        else if( header >= 0xF8 && header <= 0xFF )
-        {
-            uint8_t field_size_size = header - 0xF7;
-            ByteStream fs(&(*this)[1], field_size_size);
-            uint64_t field_size = fs.as_uint64();
-            data_offset = 1 + field_size_size;
-            data_size = field_size;
-        }
+        ByteStream::push_front((list_size <= 55 ? 0xC0 + list_size : 0xF7 + list_size_size), 1);
     }
     else
-    {
-        data_offset = 0;
-        data_size = 0;
-    }
+        ByteStream::push_front(rlp);
 }
 
-const ByteStream RLPByteStream::decode()
+ByteStream RLPByteStream::pop_front()
 {
-    if( !isList() )
-    {
-        uint64_t data_offset, data_size;
-        getDataLocation(data_offset, data_size);
-        pop_front(data_offset);                     // removes the header if necessary
-        return pop_front(data_size);                // consumes the data
+    if( byteSize() )
+    {   
+        uint8_t front_header = vvalue[0], front_elem_size_size = 0;
+        uint64_t front_header_size = 0, front_elem_size = 0;
+        bool rebuild_header = false;
+        
+        if( front_header >= 0xC0 )
+        {
+            //Drops the previous list header
+            ByteStream::pop_front(1);
+            if( front_header >= 0xF7 )
+            {
+                uint8_t list_size_size = front_header - 0xF7;
+                ByteStream::pop_front(list_size_size);
+            }
+            rebuild_header = true;
+            front_header = vvalue[0];
+        }
+        if( front_header < 0x80 )
+        {
+            front_elem_size = 1;
+            front_header_size = 0;
+        }
+        else if( front_header >= 0x80 && front_header < 0xB7 )
+        {
+            front_elem_size = front_header - 0x80;
+            front_header_size = 1;
+        }
+        else if( front_header >= 0xB7 && front_header < 0xC0 )
+        {
+            front_elem_size_size = front_header - 0xB7;
+            front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+            front_header_size = 1 + front_elem_size_size;
+        }
+        else if( front_header >= 0xC0 && front_header < 0xF7 )
+        {
+            front_elem_size = front_header - 0xC0;
+            front_header_size = 1;
+        }
+        else
+        {
+            front_elem_size_size = front_header - 0xF7;
+            front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+            front_header_size = 1 + front_elem_size_size;
+        }
+
+        //Drops the first RLP element header
+        ByteStream::pop_front(front_header_size);
+        //Pops the first element
+        ByteStream elem = ByteStream::pop_front(front_elem_size);
+
+        if( byteSize() && rebuild_header )
+        {
+            //Rebuilds the list header if necessary
+            RLPByteStream b((*this), true);
+            vvalue = b.vvalue;
+        }
+        
+        return elem;
     }
     else
         return ByteStream();
 }
-
-const vector<RLPByteStream> RLPByteStream::decodeList()
-{
-    vector<RLPByteStream> retval;
-    uint64_t rlp_to_decode_size = byteSize();
-
-    if( isList() && rlp_to_decode_size >= 1)
-    {
-        uint64_t data_offset, data_size;
-        getDataLocation(data_offset, data_size);
-        pop_front(data_offset);                     //removes list header
-        while( byteSize() )
-        {
-            getDataLocation(data_offset, data_size);
-            cout << dec << data_offset << endl;
-            cout << dec << data_size << endl;
-            retval.push_back(RLPByteStream(&(*this)[0], data_offset + data_size));  // pushes full RLP record with header
-            pop_front(data_offset + data_size);                                     // consumes the data => next RLP record
-        }
-    }
-    return retval;
-}
-
 //-------------------------------------------------------------------------------------------------------------------------
 
 // This function basically removes all separators and spreads the remaining words inside a vector
@@ -504,13 +529,4 @@ vector<string> split(const string& list, const string& separator)
     }
     if(start != list.size()) v.push_back(list.substr(start, list.size() - start));
     return v;
-}
-
-static inline uint32_t log2(const uint32_t x) {
-  uint32_t y;
-  asm ( "\tbsr %1, %0\n"
-      : "=r"(y)
-      : "r" (x)
-  );
-  return y;
 }

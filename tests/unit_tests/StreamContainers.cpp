@@ -248,11 +248,11 @@ TEST(StreamContainers, ByteStream_Constructors)
     ASSERT_EQ(actual, expected);
 }
 
-TEST(StreamContainers, ByteStream_pushBackUint64)
+TEST(StreamContainers, ByteStream_pushBackInteger)
 {
     // 1-byte + 1-byte = 2-byte
     ByteStream b(Integer(7), 1);
-    b.push_back(Integer(3),1);
+    b.push_back(Integer(3), 1);
     Integer expected = 1795;
     Integer actual = Integer(b);
     ASSERT_EQ(actual, expected);

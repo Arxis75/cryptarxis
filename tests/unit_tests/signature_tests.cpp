@@ -6,7 +6,7 @@ TEST(SignatureTests, Micah_verify_vectors)
     //https://github.com/Zoltu/ethereum-crypto/blob/master/tests/source/index.ts
 
     const char *message = "hello";
-    ByteStream t_raw(message,strlen(message));
+    ByteStream t_raw(message);
     ByteStream t_h(t_raw.keccak256());
 
     Privkey x(ByteStream("1", 32, 16));
@@ -49,7 +49,7 @@ TEST(SignatureTests, Micah_recover_vectors)
 
     Pubkey k;
     const char *message = "hello";
-    ByteStream t_raw(message,strlen(message));
+    ByteStream t_raw(message);
     ByteStream t_h(t_raw.keccak256());
 
     Privkey x(ByteStream("1", 32, 16));
@@ -80,7 +80,7 @@ TEST(SignatureTests, test_boundaries)
     Pubkey Q;
 
     const char *msg = "hello";
-    ByteStream msg_raw(msg,strlen(msg));
+    ByteStream msg_raw(msg);
     ByteStream msg_h(msg_raw.keccak256());
     
     //pre EIP-2 signature:
