@@ -3,4 +3,4 @@ Cryptarxis
 This program handles ethereum crypto primitives.
 
 To Fix:
-=> const ByteStream Pubkey::getKey(Format f) should return ByteStream while manipulating Integer coordinates
+=> RLPByteStream::pop_front() requires public getVector() from ByteStream; it is a bit ugly.
