@@ -511,7 +511,11 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     //A copy is necessary because popping data truncates the rlp
     RLPByteStream expected_rlp_copy(expected_rlp);  
 
-    ByteStream actual_chain_id = expected_rlp_copy.pop_front();
+    //Test the type recognition (element/list) before casting to an element
+    RLPByteStream actual_chain_id_candidate = expected_rlp_copy.pop_front();
+    ASSERT_EQ(actual_chain_id_candidate.isList(), false);
+    ByteStream actual_chain_id = actual_chain_id_candidate;
+    
     ByteStream actual_nonce = expected_rlp_copy.pop_front();
     ByteStream actual_max_priority_fee_per_gas = expected_rlp_copy.pop_front();
     ByteStream actual_max_fee_per_gas = expected_rlp_copy.pop_front();
@@ -520,6 +524,8 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     ByteStream actual_eth = expected_rlp_copy.pop_front();
     ByteStream actual_data = expected_rlp_copy.pop_front();
     RLPByteStream actual_access_list = expected_rlp_copy.pop_front();   //RLPByteStream allows further demultiplexing
+    //Test the type recognition (=list)
+    ASSERT_EQ(actual_access_list.isList(), true);
     ByteStream actual_signature_y_parity = expected_rlp_copy.pop_front();
     ByteStream actual_signature_r = expected_rlp_copy.pop_front();
     ByteStream actual_signature_s = expected_rlp_copy.pop_front();

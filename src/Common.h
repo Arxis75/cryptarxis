@@ -141,7 +141,7 @@ class RLPByteStream: public ByteStream
         //      - rebuild an erased list header (internal use only, by pop_front()),
         RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list = false);
 
-        // Serializes a new RLP into a existing RLP
+        // Inserts a RLP into an existing RLP
         // NOTA:
         //      - If the rlp param provided is a ByteStream, a call to the RLPByteStream
         //        constructor is made prior to executing the push.
@@ -150,18 +150,14 @@ class RLPByteStream: public ByteStream
         void push_back(const RLPByteStream &rlp, const bool at_top_level = false);
         void push_front(const RLPByteStream &rlp, const bool at_top_level = false);
 
-        // Pops Elements from a serialized RLP
+        // Pops the front Element from a serialized RLP
         // NOTA:
-        //      - if the rlp is a list of list, pop_front is not seek reccursively the first underlying
-        //        non-list element. It just pops the whole root sub-list and consumes all the rlp.
+        //      - if the poped RLPByteStream is a list, further calls to pop_front on this list
+        //        are necessary to reach down the payload,
+        //      - if the poped RLPByteStream is a string (non-list), the header is removed
+        //        and thus safe to treat as a strict ByteStream payload.
         RLPByteStream pop_front();
 
-        //If isList = false, allows to cast a RLPByteStream to a ByteStream
-        bool isList()const
-        {
-            bool retval = false;
-            if( byteSize() )
-                retval = ( vvalue[0] >= 0xC0 );
-            return retval;
-        }
+        //If isList = false, it is safe to cast a poped RLPByteStream to a ByteStream
+        inline bool isList() const { return (byteSize() ? ( vvalue[0] >= 0xC0 ) : false); }
 };
