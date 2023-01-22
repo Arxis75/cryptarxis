@@ -37,18 +37,69 @@ TEST(RLPTests, TestRLP_EncodingConstructors)
     actual = RLPByteStream(ByteStream(), true);
     ASSERT_EQ(actual, expected);
 
-    // Encoding 1-byte RLP with as_list = false
+    // Encoding 1-byte ByteStream with as_list = false
     expected = ByteStream("0x01", 1, 16);
     actual = RLPByteStream(ByteStream(0x01), false);
     ASSERT_EQ(actual, expected);
 
-    // Encoding 1-byte RLP with as_list = true
+    // Encoding 1-byte ByteStream with as_list = true
     expected = ByteStream("0xC101", 2, 16);
     actual = RLPByteStream(ByteStream(0x01), true);
     ASSERT_EQ(actual, expected);
 
+    // Encoding 1-byte ByteStream with as_list = false
+    expected = ByteStream("0x8181", 2, 16);
+    actual = RLPByteStream(ByteStream(0x81), false);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
+    expected = ByteStream("0xC181", 2, 16);
+    actual = RLPByteStream(ByteStream(0x81), true);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = false
+    expected = ByteStream("0x81B8", 2, 16);
+    actual = RLPByteStream(ByteStream(0xB8), false);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
+    expected = ByteStream("0xC1B8", 2, 16);
+    actual = RLPByteStream(ByteStream(0xB8), true);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = false
+    expected = ByteStream("0x81C1", 2, 16);
+    actual = RLPByteStream(ByteStream(0xC1), false);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
+    expected = ByteStream("0xC1C1", 2, 16);
+    actual = RLPByteStream(ByteStream(0xC1), true);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = false
+    expected = ByteStream("0x81F8", 2, 16);
+    actual = RLPByteStream(ByteStream(0xF8), false);
+    ASSERT_EQ(actual, expected);
+
+    // Encoding 1-byte ByteStream with as_list = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
+    expected = ByteStream("0xC1F8", 2, 16);
+    actual = RLPByteStream(ByteStream(0xF8), true);
+    ASSERT_EQ(actual, expected);
+
     // Encoding 55 bytes RLP with as_list = false
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
     expected = ByteStream("0xB7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                           "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 56, 16);
     actual = RLPByteStream(ByteStream("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -56,7 +107,9 @@ TEST(RLPTests, TestRLP_EncodingConstructors)
     ASSERT_EQ(actual, expected);
 
     // Encoding 55 bytes RLP with as_list = true
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream("0xF7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                           "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 56, 16);
     actual = RLPByteStream(ByteStream("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -64,7 +117,6 @@ TEST(RLPTests, TestRLP_EncodingConstructors)
     ASSERT_EQ(actual, expected);
 
     // Encoding 56 bytes RLP with as_list = false
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
     expected = ByteStream("0xB838FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                           "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 58, 16);
     actual = RLPByteStream(ByteStream("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -72,7 +124,9 @@ TEST(RLPTests, TestRLP_EncodingConstructors)
     ASSERT_EQ(actual, expected);
 
     // Encoding 56 bytes RLP with as_list = true
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream("0xF838FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                           "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 58, 16);
     actual = RLPByteStream(ByteStream("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -83,14 +137,17 @@ TEST(RLPTests, TestRLP_EncodingConstructors)
     expected= ByteStream(Integer::zero, 65535);
     expected.push_front(0x01, 1);
     actual = RLPByteStream(expected, false);
-    expected.push_front(0xBA010000, 4);
+    expected.push_front(0xBA010000, 4); //element header + 3-bytes added-prefix for the 65536 bytes element
     ASSERT_EQ(actual, expected);
 
     // Encoding 65536 bytes (3 bytes-sized) RLP with as_list = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected= ByteStream(Integer::zero, 65535);
     expected.push_front(0x01, 1);
     actual = RLPByteStream(expected, true);
-    expected.push_front(0xFA010000, 4);
+    expected.push_front(0xFA010000, 4); //list header + 3-bytes added-prefix for the 65536 bytes element
     ASSERT_EQ(actual, expected);
 }
 
@@ -156,7 +213,9 @@ TEST(RLPTests, TestRLP_PushBack)
     ASSERT_EQ(actual, expected);
 
     //Push-back 56-bytes element over 55-bytes list with at_top_level = false
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xF871"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -169,7 +228,9 @@ TEST(RLPTests, TestRLP_PushBack)
     ASSERT_EQ(actual, expected);
 
     //Push-back 56-bytes element over 55-bytes list with at_top_level = true
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xF872"
                            "F7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -194,12 +255,18 @@ TEST(RLPTests, TestRLP_PushBack)
     ASSERT_EQ(actual, expected);
 
     //Push-back 1-byte list over 1-byte list with at_top_level = false
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xC3FFC101", 4, 16);
     actual = RLPByteStream("0xC1FF");
     actual.push_back(RLPByteStream(ByteStream(0x01), true), false);
     ASSERT_EQ(actual, expected);
 
     //Push-back 1-byte list over 1-byte list with at_top_level = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xC4C1FFC101", 5, 16);
     actual = RLPByteStream("0xC1FF");
     actual.push_back(RLPByteStream(ByteStream(0x01), true), true);
@@ -268,7 +335,9 @@ TEST(RLPTests, TestRLP_PushFront)
     ASSERT_EQ(actual, expected);
 
     //Push_front 56-bytes element over 55-bytes list with at_top_level = false
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xF871"
                            "B838FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -281,7 +350,9 @@ TEST(RLPTests, TestRLP_PushFront)
     ASSERT_EQ(actual, expected);
 
     //Push_front 56-bytes element over 55-bytes list with at_top_level = true
-    //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xF872"
                            "B838FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -308,10 +379,16 @@ TEST(RLPTests, TestRLP_PushFront)
     //Push_front 1-byte list over 1-byte list with at_top_level = false
     expected = ByteStream( "0xC3C101FF", 4, 16);
     actual = RLPByteStream("0xC1FF");
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     actual.push_front(RLPByteStream(ByteStream(0x01), true), false);
     ASSERT_EQ(actual, expected);
 
     //Push_front 1-byte list over 1-byte list with at_top_level = true
+    // NOTA: the input here is an invalid RLP element
+    // NOTA: It is up to the program to build valid RLP input
+    // NOTA: before inclusion in a list
     expected = ByteStream( "0xC4C101C1FF", 5, 16);
     actual = RLPByteStream("0xC1FF");
     actual.push_front(RLPByteStream(ByteStream(0x01), true), true);
@@ -442,7 +519,7 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     ByteStream actual_to = expected_rlp_copy.pop_front();
     ByteStream actual_eth = expected_rlp_copy.pop_front();
     ByteStream actual_data = expected_rlp_copy.pop_front();
-    RLPByteStream actual_access_list = expected_rlp_copy.pop_front();
+    RLPByteStream actual_access_list = expected_rlp_copy.pop_front();   //RLPByteStream allows further demultiplexing
     ByteStream actual_signature_y_parity = expected_rlp_copy.pop_front();
     ByteStream actual_signature_r = expected_rlp_copy.pop_front();
     ByteStream actual_signature_s = expected_rlp_copy.pop_front();
@@ -551,6 +628,31 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     ASSERT_EQ(actual_access_list4, expected_access_list4);
     ASSERT_EQ(actual_access_list5, expected_access_list5);
     ASSERT_EQ(actual_access_list6, expected_access_list6);
+    ASSERT_EQ(actual_access_list.byteSize(), 0);
+
+    //Deserializes until reaching address/keystores for list5
+    ByteStream actual_access_list5_address = actual_access_list5.pop_front();
+    RLPByteStream actual_access_list5_keystore_list = actual_access_list5.pop_front();  //RLPByteStream allows further demultiplexing
+    ByteStream actual_access_list5_keystore1 = actual_access_list5_keystore_list.pop_front();
+    ByteStream actual_access_list5_keystore2 = actual_access_list5_keystore_list.pop_front();
+    ByteStream actual_access_list5_keystore3 = actual_access_list5_keystore_list.pop_front();
+    ByteStream actual_access_list5_keystore4 = actual_access_list5_keystore_list.pop_front();
+    ByteStream actual_access_list5_keystore5 = actual_access_list5_keystore_list.pop_front();
+
+    ByteStream expected_access_list5_address = ByteStream("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", 20, 16);
+    ByteStream expected_access_list5_keystore1 = ByteStream("0x0a57c8bae4ecff7c613785bbda00a69fbdda07ce911b9bfb285742752e6b4215", 32, 16);
+    ByteStream expected_access_list5_keystore2 = ByteStream("0x30bd84b96629f958113934633d3bd1b64c3d259a85c57ceac65da8c5ec9bf3a7", 32, 16);
+    ByteStream expected_access_list5_keystore3 = ByteStream("0xb0b00dbdb054c95b5c2e5f3f7facd24c4530e27329e985fe8efb5f6876c253f9", 32, 16);
+    ByteStream expected_access_list5_keystore4 = ByteStream("0x217fdff7afc5cd5a4e8ef4146b5a8c30926ffa20f0ff879ffdc9ed3476cd86ee", 32, 16);
+    ByteStream expected_access_list5_keystore5 = ByteStream("0x40f963d8ab5de5259e130f6865b75ceb44638428ca149b7fe63a511f142fedb7", 32, 16);
+
+    ASSERT_EQ(actual_access_list5_address, expected_access_list5_address);
+    ASSERT_EQ(actual_access_list5_keystore1, expected_access_list5_keystore1);
+    ASSERT_EQ(actual_access_list5_keystore2, expected_access_list5_keystore2);
+    ASSERT_EQ(actual_access_list5_keystore3, expected_access_list5_keystore3);
+    ASSERT_EQ(actual_access_list5_keystore4, expected_access_list5_keystore4);
+    ASSERT_EQ(actual_access_list5_keystore5, expected_access_list5_keystore5);
+    ASSERT_EQ(actual_access_list5.byteSize(), 0);
 
     //Rebuilding the transaction from scratch:
     RLPByteStream actual_rlp;

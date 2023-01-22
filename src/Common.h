@@ -135,14 +135,33 @@ class RLPByteStream: public ByteStream
         
         // Encoding constructor:
         // "as_list" is used to:
-        //      - rebuild an erased list header (internal use only),
-        //      - discriminates between 0x80 and 0xC0 for an empty input
+        //      - discriminates between 0x80 and 0xC0 for an empty input,
+        //      - build a list over a single RLP element: this single element 
+        //        must have been previously RLP-encoded and is passed as ByteStream,
+        //      - rebuild an erased list header (internal use only, by pop_front()),
         RLPByteStream(const ByteStream &to_rlp_encode, const bool as_list = false);
 
-        // Push/Pop Elements to/from a serialized RLP
-        // "at_top_level" used to choose between putting under existing list (false) or
-        // putting at the top level like the existing list (true), thus creating a new top-list header
+        // Serializes a new RLP into a existing RLP
+        // NOTA:
+        //      - If the rlp param provided is a ByteStream, a call to the RLPByteStream
+        //        constructor is made prior to executing the push.
+        //      - "at_top_level" used to choose between putting under existing list (false) or
+        //        putting at the top level like the existing list (true), thus creating a new top-list header
         void push_back(const RLPByteStream &rlp, const bool at_top_level = false);
         void push_front(const RLPByteStream &rlp, const bool at_top_level = false);
+
+        // Pops Elements from a serialized RLP
+        // NOTA:
+        //      - if the rlp is a list of list, pop_front is not seek reccursively the first underlying
+        //        non-list element. It just pops the whole root sub-list and consumes all the rlp.
         RLPByteStream pop_front();
+
+        //If isList = false, allows to cast a RLPByteStream to a ByteStream
+        bool isList()const
+        {
+            bool retval = false;
+            if( byteSize() )
+                retval = ( vvalue[0] >= 0xC0 );
+            return retval;
+        }
 };
