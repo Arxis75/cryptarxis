@@ -15,7 +15,7 @@ int main(int argc , char *argv[])
 {
     // Initialize logging server endpoint and
     // register with the Initiation_Dispatcher.
-    SocketHandler tcp_server(PORT, IPPROTO_TCP);
+    //SocketHandler tcp_server(PORT, IPPROTO_TCP);
     SocketHandler udp_server(PORT, IPPROTO_UDP);
 
     // Main event loop that handles client

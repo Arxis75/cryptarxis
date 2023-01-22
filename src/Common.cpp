@@ -459,8 +459,9 @@ void RLPByteStream::push_front(const RLPByteStream &rlp, const bool at_top_level
         ByteStream::push_front(rlp);
 }
 
-RLPByteStream RLPByteStream::pop_front()
+RLPByteStream RLPByteStream::pop_front(bool &is_list)
 {
+    is_list = false;
     RLPByteStream retval;
     if( byteSize() )
     {   
@@ -487,23 +488,27 @@ RLPByteStream RLPByteStream::pop_front()
             {
                 front_elem_size = 1;
                 front_header_size = 0;
+                is_list = false;
             }
             else if( front_header < 0xB8 )  //[0x80, 0xb7]
             {
                 front_elem_size = front_header - 0x80;
                 front_header_size = 1;
+                is_list = false;
             }
             else if( front_header < 0xC0 )   //[0xb8, 0xbf]
             {
                 front_elem_size_size = front_header - 0xB7;
                 front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
                 front_header_size = 1 + front_elem_size_size;
+                is_list = false;
             }
             else if( front_header < 0xF8 )  //[0xc0, 0xf7]
             {
                 //Do not remove the header of the sub-list when poping it:
                 front_elem_size = 1 + front_header - 0xC0;
                 front_header_size = 0;
+                is_list = true;
             }
             else //[0xf8, 0xff] 
             {
@@ -511,6 +516,7 @@ RLPByteStream RLPByteStream::pop_front()
                 //Do not remove the header of the sub-list when poping it:
                 front_elem_size = 1 + front_elem_size_size + ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
                 front_header_size = 0;
+                is_list = true;
             }
 
             //Drops the first RLP element header (only if not list)

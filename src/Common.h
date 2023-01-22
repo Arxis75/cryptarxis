@@ -156,7 +156,9 @@ class RLPByteStream: public ByteStream
         //        are necessary to reach down the payload,
         //      - if the poped RLPByteStream is a string (non-list), the header is removed
         //        and thus safe to treat as a strict ByteStream payload.
-        RLPByteStream pop_front();
+        //      - if is_list = false, it is safe to cast the poped RLPByteStream to a ByteStream
+        //        representing the element payload.
+        RLPByteStream pop_front(bool &is_list);
 
         //If isList = false, it is safe to cast a poped RLPByteStream to a ByteStream
         inline bool isList() const { return (byteSize() ? ( vvalue[0] >= 0xC0 ) : false); }

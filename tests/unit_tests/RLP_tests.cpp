@@ -396,25 +396,31 @@ TEST(RLPTests, TestRLP_PushFront)
 }
 
 TEST(RLPTests, TestRLP_PopFront)
-{   //Pop_front from empty ByteStream
+{   
+    bool is_list;
+
+    //Pop_front from empty ByteStream
     ByteStream expected;
     RLPByteStream rlp;
-    ByteStream actual = rlp.pop_front();
+    ByteStream actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
 
     //Pop_front from empty element
     expected = ByteStream();
     rlp = RLPByteStream("0x80");
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
 
    //Pop_front from empty list
     expected = ByteStream();
     rlp = RLPByteStream("0xC0");
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
 
-    //Pop_front 56-bytes element over 55-bytes element
+    //Pop_front 55-bytes element over 56-bytes element
     expected = ByteStream( "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 55, 16);
     rlp = RLPByteStream( "0xF872"
@@ -422,10 +428,11 @@ TEST(RLPTests, TestRLP_PopFront)
                          "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                          "B7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                          "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" );
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
 
-    //Pop_front 56-bytes element over 55-bytes list
+    //Pop_front 55-bytes element over 56-bytes list
     //NOTA: the validity of the sub-elements of the 55-bytes list is not tested
     expected = ByteStream( "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 55, 16);
@@ -434,28 +441,31 @@ TEST(RLPTests, TestRLP_PopFront)
                          "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                          "F7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
                          "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" );
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
 
     //Pop_front 1-byte list over 1-byte element
     expected = ByteStream("0xC101", 1, 16);
     rlp = RLPByteStream("0xC4C10181FF");
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, true);
 
     //Pop_front 1-byte list over 1-byte list
     expected = ByteStream("0xC101", 1, 16);
     rlp = RLPByteStream("0xC3C101C281FF");
-    actual = rlp.pop_front();
+    actual = rlp.pop_front(is_list);
     ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, true);
 
     //Test the full consumption of the list
     rlp = RLPByteStream("0xC3C10180C281FF81FFC0");
-    rlp.pop_front();
-    rlp.pop_front();
-    rlp.pop_front();
-    rlp.pop_front();
-    rlp.pop_front();
+    rlp.pop_front(is_list);
+    rlp.pop_front(is_list);
+    rlp.pop_front(is_list);
+    rlp.pop_front(is_list);
+    rlp.pop_front(is_list);
     ASSERT_EQ(rlp.byteSize(), 0);
 }
 
@@ -512,23 +522,24 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     RLPByteStream expected_rlp_copy(expected_rlp);  
 
     //Test the type recognition (element/list) before casting to an element
-    RLPByteStream actual_chain_id_candidate = expected_rlp_copy.pop_front();
-    ASSERT_EQ(actual_chain_id_candidate.isList(), false);
+    bool is_list;
+    RLPByteStream actual_chain_id_candidate = expected_rlp_copy.pop_front(is_list);
+    ASSERT_EQ(is_list, false);
     ByteStream actual_chain_id = actual_chain_id_candidate;
     
-    ByteStream actual_nonce = expected_rlp_copy.pop_front();
-    ByteStream actual_max_priority_fee_per_gas = expected_rlp_copy.pop_front();
-    ByteStream actual_max_fee_per_gas = expected_rlp_copy.pop_front();
-    ByteStream actual_gas_limit = expected_rlp_copy.pop_front();
-    ByteStream actual_to = expected_rlp_copy.pop_front();
-    ByteStream actual_eth = expected_rlp_copy.pop_front();
-    ByteStream actual_data = expected_rlp_copy.pop_front();
-    RLPByteStream actual_access_list = expected_rlp_copy.pop_front();   //RLPByteStream allows further demultiplexing
+    ByteStream actual_nonce = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_max_priority_fee_per_gas = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_max_fee_per_gas = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_gas_limit = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_to = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_eth = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_data = expected_rlp_copy.pop_front(is_list);
+    RLPByteStream actual_access_list = expected_rlp_copy.pop_front(is_list);   //RLPByteStream allows further demultiplexing
     //Test the type recognition (=list)
-    ASSERT_EQ(actual_access_list.isList(), true);
-    ByteStream actual_signature_y_parity = expected_rlp_copy.pop_front();
-    ByteStream actual_signature_r = expected_rlp_copy.pop_front();
-    ByteStream actual_signature_s = expected_rlp_copy.pop_front();
+    ASSERT_EQ(is_list, true);
+    ByteStream actual_signature_y_parity = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_signature_r = expected_rlp_copy.pop_front(is_list);
+    ByteStream actual_signature_s = expected_rlp_copy.pop_front(is_list);
 
     ByteStream expected_chain_id = ByteStream(0x01);
     ByteStream expected_nonce = ByteStream(0x6eb7);
@@ -595,12 +606,12 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     ASSERT_EQ(actual_signature_s, expected_signature_s);
 
     //Test the conformity of the access_list sub-lists
-    RLPByteStream actual_access_list1 = actual_access_list.pop_front();
-    RLPByteStream actual_access_list2 = actual_access_list.pop_front();
-    RLPByteStream actual_access_list3 = actual_access_list.pop_front();
-    RLPByteStream actual_access_list4 = actual_access_list.pop_front();
-    RLPByteStream actual_access_list5 = actual_access_list.pop_front();
-    RLPByteStream actual_access_list6 = actual_access_list.pop_front();
+    RLPByteStream actual_access_list1 = actual_access_list.pop_front(is_list);
+    RLPByteStream actual_access_list2 = actual_access_list.pop_front(is_list);
+    RLPByteStream actual_access_list3 = actual_access_list.pop_front(is_list);
+    RLPByteStream actual_access_list4 = actual_access_list.pop_front(is_list);
+    RLPByteStream actual_access_list5 = actual_access_list.pop_front(is_list);
+    RLPByteStream actual_access_list6 = actual_access_list.pop_front(is_list);
     RLPByteStream expected_access_list1 = RLPByteStream( "d694a56006a9bc78fd64404b34d44f06d1141f8589bec0" );
     RLPByteStream expected_access_list2 = RLPByteStream( "d694e592427a0aece92de3edee1f18e0157c05861564c0" );
     RLPByteStream expected_access_list3 = RLPByteStream( "f8fe94dac17f958d2ee523a220620699"
@@ -637,13 +648,13 @@ TEST(RLPTests, TestRLP_EIP1559WithAccessList)
     ASSERT_EQ(actual_access_list.byteSize(), 0);
 
     //Deserializes until reaching address/keystores for list5
-    ByteStream actual_access_list5_address = actual_access_list5.pop_front();
-    RLPByteStream actual_access_list5_keystore_list = actual_access_list5.pop_front();  //RLPByteStream allows further demultiplexing
-    ByteStream actual_access_list5_keystore1 = actual_access_list5_keystore_list.pop_front();
-    ByteStream actual_access_list5_keystore2 = actual_access_list5_keystore_list.pop_front();
-    ByteStream actual_access_list5_keystore3 = actual_access_list5_keystore_list.pop_front();
-    ByteStream actual_access_list5_keystore4 = actual_access_list5_keystore_list.pop_front();
-    ByteStream actual_access_list5_keystore5 = actual_access_list5_keystore_list.pop_front();
+    ByteStream actual_access_list5_address = actual_access_list5.pop_front(is_list);
+    RLPByteStream actual_access_list5_keystore_list = actual_access_list5.pop_front(is_list);  //RLPByteStream allows further demultiplexing
+    ByteStream actual_access_list5_keystore1 = actual_access_list5_keystore_list.pop_front(is_list);
+    ByteStream actual_access_list5_keystore2 = actual_access_list5_keystore_list.pop_front(is_list);
+    ByteStream actual_access_list5_keystore3 = actual_access_list5_keystore_list.pop_front(is_list);
+    ByteStream actual_access_list5_keystore4 = actual_access_list5_keystore_list.pop_front(is_list);
+    ByteStream actual_access_list5_keystore5 = actual_access_list5_keystore_list.pop_front(is_list);
 
     ByteStream expected_access_list5_address = ByteStream("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", 20, 16);
     ByteStream expected_access_list5_keystore1 = ByteStream("0x0a57c8bae4ecff7c613785bbda00a69fbdda07ce911b9bfb285742752e6b4215", 32, 16);
