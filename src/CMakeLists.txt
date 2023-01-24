@@ -3,32 +3,18 @@ file(GLOB COMMON "Common.cpp")
 
 add_executable(cryptarxis ${SOURCES})
 
-find_library(gmp gmp)
-if(NOT gmp)
-  message(FATAL_ERROR "gmp not found")
-endif()
-
-find_library(givaro givaro)
-if(NOT givaro)
-  message(FATAL_ERROR "givaro not found")
-endif()
-
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-find_package(OpenSSL REQUIRED)
-
-#include(FetchContent)
-#FetchContent_Declare(reactor
-#  GIT_REPOSITORY    https://github.com/Arxis75/reactor.git
-#  GIT_TAG           origin/main     #latest commit
-#  #GIT_TAG           v0.02          #stable commmit
-#)
-#FetchContent_MakeAvailable(reactor)
-
 add_subdirectory(tools)
 add_subdirectory(crypto)
-add_subdirectory(reactor)
+add_subdirectory(p2p)
+#add_subdirectory(reactor)
 
-target_include_directories(lib_reactor PUBLIC ${reactor_SOURCE_DIR}/src)
+#Libraries/Package declaration in root MakeFile!
+
+#Remember to add lib_reactor to the following line of /tests/CMakeLists.txt !!
+#target_include_directories(cryptarxis_tests PUBLIC ${reactor_SOURCE_DIR}/src)
+#target_link_libraries(cryptarxis_tests PUBLIC [...] lib_reactor PRIVATE GTest::gtest)
+
+target_include_directories(cryptarxis PUBLIC ${reactor_SOURCE_DIR}/src)  #Mandatory For library use in cryptarxis
 target_link_libraries(cryptarxis PUBLIC OpenSSL::Crypto ethash::ethash gmp givaro lib_reactor)
 
 target_sources(cryptarxis_tests PUBLIC ${COMMON})

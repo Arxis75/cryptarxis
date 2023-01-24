@@ -10,11 +10,26 @@ project(myProject VERSION 1.0)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Dependencies:
-    # openssl
-    # ethash
-    # givaro
-    # gmp
+find_library(gmp gmp)
+if(NOT gmp)
+  message(FATAL_ERROR "gmp not found")
+endif()
+
+find_library(givaro givaro)
+if(NOT givaro)
+  message(FATAL_ERROR "givaro not found")
+endif()
+
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+
+include(FetchContent)
+FetchContent_Declare(reactor
+  GIT_REPOSITORY    https://github.com/Arxis75/reactor.git
+  GIT_TAG           origin/main     #latest commit
+  #GIT_TAG           v0.02          #stable commmit
+)
+FetchContent_MakeAvailable(reactor)
 
 enable_testing()
 
