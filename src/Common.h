@@ -82,9 +82,9 @@ class ByteStream
         void push_back(const ByteStream &b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
         void push_back(const uint64_t value, const uint64_t size);
         void push_back_ptr(const uint8_t *p, const uint64_t size);
-        void push_back(const string& str_value, const uint64_t size, const uint8_t in_base);
+        void push_back(const string &str_value, const uint64_t size, const uint8_t in_base);
 
-        const void push_front(ByteStream b) { b.push_back(*this); vvalue = b.vvalue; };
+        const void push_front(const ByteStream &b) { vvalue.insert(vvalue.begin(), b.vvalue.begin(), b.vvalue.end()); };
         const void push_front(const uint64_t value, const uint64_t size);
         const ByteStream pop_front(const uint64_t size);
 
@@ -92,7 +92,7 @@ class ByteStream
         const ByteStream keccak256() const;
         const ByteStream address() const;
 
-        friend ostream& operator<<(ostream& out, const ByteStream &v);
+        friend ostream& operator<<(ostream &out, const ByteStream &v);
 
         inline void clear() { vvalue.clear(); }
         inline const uint64_t byteSize() const { return vvalue.size(); }
@@ -114,8 +114,6 @@ class ByteStream
         inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
         inline const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
-        
-        const vector<uint8_t>& getVector() const { return vvalue; }
         
     protected:
         const Integer a2Integer(const uint8_t *input, const int32_t size) const;
@@ -159,7 +157,4 @@ class RLPByteStream: public ByteStream
         //      - if is_list = false, it is safe to cast the poped RLPByteStream to a ByteStream
         //        representing the element payload.
         RLPByteStream pop_front(bool &is_list);
-
-        //If isList = false, it is safe to cast a poped RLPByteStream to a ByteStream
-        inline bool isList() const { return (byteSize() ? ( vvalue[0] >= 0xC0 ) : false); }
 };

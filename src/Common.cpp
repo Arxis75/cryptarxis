@@ -523,7 +523,7 @@ RLPByteStream RLPByteStream::pop_front(bool &is_list)
             ByteStream::pop_front(front_header_size);
             // Pops the first element (with header if list): the low-level vector copy
             // prevents the ByteStream to get re-RLP-encoded
-            retval.vvalue = ByteStream::pop_front(front_elem_size).getVector();
+            *static_cast<ByteStream*>(&retval) = ByteStream::pop_front(front_elem_size);
 
             if( byteSize() && rebuild_header )
             {

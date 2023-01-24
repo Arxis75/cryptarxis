@@ -15,8 +15,11 @@ int main(int argc , char *argv[])
 {
     // Initialize logging server endpoint and
     // register with the Initiation_Dispatcher.
-    //SocketHandler tcp_server(PORT, IPPROTO_TCP);
-    SocketHandler udp_server(PORT, IPPROTO_UDP);
+
+    if( shared_ptr<SessionManager> tcp = make_shared<SessionManager>(PORT, IPPROTO_TCP) )
+        tcp->start();
+    if( shared_ptr<SessionManager> udp = make_shared<SessionManager>(PORT, IPPROTO_UDP) )
+        udp->start();
 
     // Main event loop that handles client
     // logging records and connection requests.
