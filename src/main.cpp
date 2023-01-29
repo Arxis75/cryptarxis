@@ -10,15 +10,13 @@ int main(int argc , char *argv[])
     // Initialize logging server endpoint and
     // register with the Initiation_Dispatcher.
 
-    EthNode node;
-
-    node.start(PORT, IPPROTO_UDP);
-    node.start(PORT, IPPROTO_TCP);
+    EthNode::GetInstance().startServer(PORT, IPPROTO_UDP);
+    EthNode::GetInstance().startServer(PORT, IPPROTO_TCP);
 
     //if( shared_ptr<EthSessionManager> tcp = make_shared<EthSessionManager>(PORT, IPPROTO_TCP) )
     //    tcp->start();
-    if( shared_ptr<EthSessionManager> udp = make_shared<EthSessionManager>(node, PORT, IPPROTO_UDP) )
-        udp->start();
+    //if( shared_ptr<EthSessionManager> udp = make_shared<EthSessionManager>(node, PORT, IPPROTO_UDP) )
+    //    udp->start();
 
     // Main event loop that handles client
     // logging records and connection requests.

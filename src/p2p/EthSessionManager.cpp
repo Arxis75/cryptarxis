@@ -10,9 +10,51 @@ using std::dec;
 using std::endl;
 using std::min;
 
-EthSessionManager::EthSessionManager(const EthNode &node,const uint16_t master_port, const int master_protocol)
+#define NODE_BIP39_MNC "agree turn detail assume express sheriff buzz dinner jungle method drift brush bless talent army rude secret mercy dilemma cluster climb foot duck dizzy"
+#define NODE_BIP39_MNC_PWD "Cryptarxis75"
+#define NODE_BIP32_ACCOUNT_NBR 0
+
+EthNode::EthNode(const Privkey &secret, const sockaddr_in &local_internet_address)
+    : m_seq(0)
+{}
+
+void EthNode::startServer(const uint16_t master_port, const int master_protocol)
+{
+    if( shared_ptr<EthSessionManager> server = make_shared<EthSessionManager>(master_port, master_protocol) )
+        server->start();
+}
+
+void EthNode::registerIdentity()
+{
+    //Should be done from file/cli parameters
+    BIP39::Mnemonic mnc(256);
+    mnc.set_full_word_list(NODE_BIP39_MNC);
+    ByteStream seed = mnc.get_seed(NODE_BIP39_MNC_PWD);
+    m_secret = Privkey(seed, "m");
+    m_secret = Privkey(m_secret, 44, true);
+    m_secret = Privkey(m_secret, 60, true);
+    m_secret = Privkey(m_secret, 0, true);
+    m_secret = Privkey(m_secret, 0, false);
+    m_secret = Privkey(m_secret, NODE_BIP32_ACCOUNT_NBR, false);
+}
+
+EthNode &EthNode::GetInstance()
+{
+    if (m_sInstancePtr == NULL)
+    {
+        m_sInstancePtr = new EthNode();
+        Ethnode.registerIdentity();
+    }
+
+    return *m_sInstancePtr;
+}
+
+EthNode *EthNode::m_sInstancePtr = NULL;
+
+//--------------------------------------------------------------------------------
+
+EthSessionManager::EthSessionManager(const uint16_t master_port, const int master_protocol)
     : SessionManager(master_port, master_protocol)
-    , m_node(node)
 { }
 
 void EthSessionManager::onNewMessage(const shared_ptr<const SocketHandlerMessage> msg_in) 
