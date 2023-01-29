@@ -469,6 +469,26 @@ TEST(RLPTests, TestRLP_PopFront)
     ASSERT_EQ(rlp.byteSize(), 0);
 }
 
+TEST(RLPTests, TestRLP_BadRLPs)
+{
+    bool is_list;
+
+    //First element B8 is invalid because it should be followed by a 1 byte string
+    RLPByteStream bad_rlp("0xB8");
+
+    RLPByteStream expected;
+    RLPByteStream actual = bad_rlp.pop_front(is_list);
+    ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, false);
+
+    //First element F9 is invalid because it should be followed by at least 2 bytes of size
+    bad_rlp = "0xF801F9";
+    expected = RLPByteStream("0xF9");
+    actual = bad_rlp.pop_front(is_list);
+    ASSERT_EQ(actual, expected);
+    ASSERT_EQ(is_list, true);
+}
+
 TEST(RLPTests, TestRLP_EIP1559WithAccessList)
 {
     //From https://etherscan.io/tx/0x900aaf292c81909d9bc4d50812f30b36d44c774338b111f174b77d8a1e17e1c1

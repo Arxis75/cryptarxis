@@ -106,7 +106,7 @@ class Privkey
         const Integer& getSecret() const { return m_secret; }
         operator const Integer() const { return m_secret; }
 
-        Signature sign(const ByteStream &h, const bool enforce_eip2 = true) const;
+        const Signature sign(const ByteStream &h, const bool enforce_eip2 = true) const;
 
         inline bool operator==(const Privkey& k) const { return m_secret == k.getSecret(); }
 

@@ -13,6 +13,7 @@
 using Givaro::Integer;
 using std::map;
 using std::cout;
+using std::cerr;
 using std::hex;
 using std::dec;
 using std::endl;
@@ -284,7 +285,7 @@ const ByteStream ByteStream::pop_front(const uint64_t size)
         else
         {
             if( size > byteSize() )
-                cout << "Warning! ByteStream::pop_front() asked to pop data larger than the ByteStream size! The whole buffer was poped but not more..." << endl;
+                cerr << "Warning! ByteStream::pop_front() asked to pop data larger than the ByteStream size! The whole buffer was poped but not more..." << endl;
             ByteStream retval(*this);
             clear();
             return retval;
@@ -499,7 +500,13 @@ RLPByteStream RLPByteStream::pop_front(bool &is_list)
             else if( front_header < 0xC0 )   //[0xb8, 0xbf]
             {
                 front_elem_size_size = front_header - 0xB7;
-                front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                if( front_elem_size_size < byteSize() )
+                    front_elem_size = ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                else
+                {
+                    cerr << "Warning! ByteStream::pop_front() found a wrong RLP encoding! Doing our best..." << endl;
+                    front_elem_size = 0;
+                }
                 front_header_size = 1 + front_elem_size_size;
                 is_list = false;
             }
@@ -513,8 +520,14 @@ RLPByteStream RLPByteStream::pop_front(bool &is_list)
             else //[0xf8, 0xff] 
             {
                 front_elem_size_size = front_header - 0xF7;//Do not remove the header of the sub-list when poping it
-                //Do not remove the header of the sub-list when poping it:
-                front_elem_size = 1 + front_elem_size_size + ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                if( front_elem_size_size < byteSize() )
+                    //Do not remove the header of the sub-list when poping it:
+                    front_elem_size = 1 + front_elem_size_size + ByteStream(&vvalue[1], front_elem_size_size).as_uint64();
+                else
+                {
+                    cerr << "Warning! ByteStream::pop_front() found a wrong RLP encoding! Doing our best..." << endl;
+                    front_elem_size = 1;
+                }
                 front_header_size = 0;
                 is_list = true;
             }

@@ -237,7 +237,7 @@ Privkey::Privkey(const ByteStream &seed, const char *path, const int32_t account
     }
 }
 
-Signature Privkey::sign(const ByteStream &h, const bool enforce_eip2) const
+const Signature Privkey::sign(const ByteStream &h, const bool enforce_eip2) const
 {
     EllipticCurve ecc = m_pubkey.getCurve();
     Integer n = ecc.getGeneratorOrder();
@@ -278,7 +278,7 @@ void Privkey::print() const
 
 //----------------------------------------------------------- BIP39 -----------------------------------------------------------------
 
-Mnemonic::Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionnary)
+Mnemonic::Mnemonic(const size_t entropy_bitsize, const string& word_list, const vector<string> *dictionnary)
     : m_pwd("")
 {
     div_t d;
