@@ -51,6 +51,7 @@ class EllipticCurve
 
         Integer generate_RFC6979_nonce(const Integer& x, const ByteStream &h, const uint8_t nonce_to_skip = 0) const;
 
+        const Point getPointFromX(const Element x, const bool y_imparity) const;
         void print() const;
         void print_cyclic_subgroups() const;
 
@@ -74,12 +75,11 @@ class EllipticCurve
         bool isInv(const Point& Q, const Point& P) const;
         Element getY2(const Element& X) const;
 
-        bool sqrtmod(Integer& root, const Integer& n, const bool imparity) const;
+        bool sqrtmod(Integer& root, const Integer& value, const bool imparity) const;
 
         bool recover( Point& pubkeyPoint,
-              	      const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool imparity,
+              	      const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool y_imparity,
                       const bool recover_alternate = false ) const;
-
     private:
         ZP m_FField;
         Element m_A, m_B;

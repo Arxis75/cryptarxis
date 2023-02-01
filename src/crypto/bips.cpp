@@ -38,6 +38,35 @@ Pubkey::Pubkey(const Pubkey& key)
     , m_chaincode(key.m_chaincode)
 { }
 
+Pubkey::Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const EllipticCurve& curve)
+    : m_ecc(curve)
+{
+    ByteStream tmp(formated_key);
+    if( f == Format::PREFIXED_X )
+    {
+        assert(tmp.byteSize() == 33);
+        bool y_imparity = (tmp.pop_front(1).as_uint8() % 2);
+        Element x = tmp.pop_front(32).as_Integer();
+        m_point = m_ecc.getPointFromX(x, y_imparity);
+    }
+    else if( f == Format::PREFIXED_XY )
+    {
+        assert(tmp.byteSize() == 65);
+        tmp.pop_front(1);
+        Element x = tmp.pop_front(32);
+        Element y = tmp.pop_front(32);
+        m_point = Point(x, y);
+
+    }
+    else //if( f == Format::XY )
+    {
+        assert(tmp.byteSize() == 64);
+        Element x = tmp.pop_front(32);
+        Element y = tmp.pop_front(32);
+        m_point = Point(x, y);
+    }    
+}
+
 const ByteStream Pubkey::getKey(Format f) const
 {   
     uint32_t point_bitsize = sizeInBytes(m_ecc.getGeneratorOrder())<<3;
@@ -278,7 +307,7 @@ void Privkey::print() const
 
 //----------------------------------------------------------- BIP39 -----------------------------------------------------------------
 
-Mnemonic::Mnemonic(const size_t entropy_bitsize, const string& word_list, const vector<string> *dictionnary)
+Mnemonic::Mnemonic(const size_t entropy_bitsize, const vector<string> *dictionnary)
     : m_pwd("")
 {
     div_t d;

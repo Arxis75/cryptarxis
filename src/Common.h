@@ -112,7 +112,7 @@ class ByteStream
         //Unaligned operators
         //inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue.data()[offset], size); };
         inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
-        inline const uint64_t as_uint64() const;
+        const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
         
     protected:

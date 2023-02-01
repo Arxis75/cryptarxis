@@ -46,13 +46,14 @@ class Pubkey
         Pubkey(const Pubkey& key); 
         Pubkey(const Point& p = Point(), const EllipticCurve& curve = Secp256k1::GetInstance());
         Pubkey(const Point& p, const ByteStream &cc, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const EllipticCurve& curve = Secp256k1::GetInstance()); 
 
         const Point& getPoint() const { return m_point; }
         const EllipticCurve& getCurve() const { return m_ecc; }
-        const ByteStream getKey(Format f) const;
+        const ByteStream getKey(const Format f) const;
         const ByteStream getAddress() const;
 
-        uint32_t getFormatByteSize(Pubkey::Format f) const;
+        uint32_t getFormatByteSize(const Pubkey::Format f) const;
 
         const ByteStream &getChainCode() const { return m_chaincode; }
 

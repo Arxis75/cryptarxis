@@ -389,8 +389,15 @@ bool EllipticCurve::sqrtmod(Integer& root, const Integer& value, const bool impa
     return ret;
 }
 
+const Point EllipticCurve::getPointFromX(const Element x, const bool y_imparity) const
+{
+		Element y, y2 = getY2(x);
+        sqrtmod(y, y2, y_imparity);
+        return Point(x, y);
+}
+
 bool EllipticCurve::recover( Point& Q_candidate,
-                			 const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool imparity,
+                			 const ByteStream &msg_hash, const Integer& r, const Integer& s, const bool y_imparity,
 							 const bool recover_alternate ) const
 {
 	assert(m_GOrder > 0);
@@ -404,7 +411,7 @@ bool EllipticCurve::recover( Point& Q_candidate,
     if( r_candidate < m_FField.size() )
     {
 		Integer y_candidate;
-		if( sqrtmod(y_candidate, getY2(r_candidate), imparity) )
+		if( sqrtmod(y_candidate, getY2(r_candidate), y_imparity) )
 		{
 			Point R = Point(r_candidate, y_candidate);
 			if( verifyPoint(R) && verifyPointOrder(R) )

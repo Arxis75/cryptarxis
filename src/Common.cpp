@@ -341,7 +341,7 @@ ByteStream::operator const string() const
     return s;
 }
 
-inline const uint64_t ByteStream::as_uint64() const
+const uint64_t ByteStream::as_uint64() const
 {
     uint64_t retval = 0;
     if( vvalue.size() )
