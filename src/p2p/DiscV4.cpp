@@ -93,7 +93,7 @@ DiscV4SessionManager::DiscV4SessionManager(const ENRV4Identity &host_enr)
     , m_host_enr(host_enr)
 { }
 
-void DiscV4SessionManager::onNewMessage(const shared_ptr<const SocketHandlerMessage> msg_in)
+void DiscV4SessionManager::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
 {
     shared_ptr<DiscV4Session> peer_session = shared_ptr<DiscV4Session>(nullptr);
     

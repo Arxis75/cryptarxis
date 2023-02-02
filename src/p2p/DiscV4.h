@@ -57,7 +57,7 @@ class DiscV4SessionManager: public SessionManager, public std::enable_shared_fro
 
         void start() const { SessionManager::start(m_host_enr.getUDPPort(), IPPROTO_UDP); }
 
-        virtual void onNewMessage(const shared_ptr<const SocketHandlerMessage> msg_in);
+        virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 
         const ENRV4Identity &getHostENR() const { return m_host_enr; }
 
