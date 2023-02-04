@@ -1,8 +1,7 @@
-#include "Node.h"
+#include "Network.h"
 
-#include <Common.h>
-#include <crypto/bips.h>
-#include <iostream>         //cout, EXIT_FAILURE, NULL
+#include <arpa/inet.h>      // IPPROTO_TCP
+#include <iostream>         // cout, EXIT_FAILURE, NULL
 
 using std::cout;
 using std::hex;
@@ -10,30 +9,12 @@ using std::dec;
 using std::endl;
 using std::min;
 
-ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t port, const int protocol)
-    : m_seq(0)
-    , m_scheme("unknown")
-    , m_ip(ip)
-    , m_tcp_port(0)
-    , m_udp_port(0)
-    , m_secret(0)
-    , m_pubkey(Point())
-    , m_ID(Integer::zero)
-    , m_signed_rlp(RLPByteStream())
-{
-    if(protocol == IPPROTO_TCP)
-       m_tcp_port = port;
-    else if(protocol == IPPROTO_UDP)
-        m_udp_port = port;
-}
-
 ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
     : m_scheme("unknown")
     , m_ip(0)
     , m_tcp_port(0)
     , m_udp_port(0)
     , m_secret(0)
-    , m_pubkey(Point())
     , m_ID(Integer::zero)
     , m_signed_rlp(signed_rlp)
 {
@@ -169,29 +150,49 @@ const Signature ENRV4Identity::sign(const ByteStream &hash) const
     return retval;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------
-
-/*EthNode::EthNode(ENRV4Identity *enr)
+void ENRV4Identity::print() const
 {
-    m_sEnr = enr;
+    cout << "   ENR name = " << m_name << endl;
+    cout << "   ENR ID = 0x" << hex << m_ID << endl;
+    cout << "   ENR scheme = " << m_scheme << endl;
+    cout << "   ENR seq = " << dec << m_seq << endl;
+    cout << "   ENR IP = " << dec << ((m_ip >> 24) & 0xFF) << "."
+                                  << ((m_ip >> 16) & 0xFF) << "."
+                                  << ((m_ip >> 8) & 0xFF) << "."
+                                  << (m_ip & 0xFF) << endl;
+    cout << "   ENR TCP port = " << dec << m_tcp_port << endl;
+    cout << "   ENR UDP port = " << dec << m_udp_port << endl;
+    cout << "   ENR public key = 0x" << hex << m_pubkey.getKey(Pubkey::Format::XY).as_Integer() << endl;
 }
 
-void EthNode::startServer(const int master_protocol)
-{
-    uint16_t master_port = (master_protocol == IPPROTO_TCP ? m_sEnr->getTCPPort() :  m_sEnr->getUDPPort());
-    if( shared_ptr<EthSessionManager> server = make_shared<EthSessionManager>(master_port, master_protocol) )
-        server->start();
-}
+//-------------------------------------------------------------------------------------------------------------------------
 
-EthNode &EthNode::GetInstance(ENRV4Identity *enr)
+Network& Network::GetInstance()
 {
     if (m_sInstancePtr == NULL)
-    {
-        m_sInstancePtr = new EthNode(enr);
-    }
+        m_sInstancePtr = new Network();
 
     return *m_sInstancePtr;
 }
 
-EthNode *EthNode::m_sInstancePtr = NULL;
-ENRV4Identity* EthNode::m_sEnr = NULL;*/
+void Network::start(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, const uint64_t seq)
+{
+    m_host_enr = new ENRV4Identity(ip, tcp_port, udp_port, secret, seq);
+
+    if( shared_ptr<DiscV4Server> m_udp_server = make_shared<DiscV4Server>(m_host_enr->getUDPPort(), IPPROTO_UDP) )
+    {
+        m_udp_server->start();
+
+        //if( shared_ptr<Eth67Server> m_tcp_tcp = make_shared<Eth67Server>(m_host_enr->getTCPPort(), IPPROTO_TCP) )
+        //{
+        //    m_tcp_server->start();
+
+            // Main event loop that handles client
+            // logging records and connection requests.
+            while(true)
+                Initiation_Dispatcher::GetInstance().handle_events();
+        //}
+    }
+}
+
+Network *Network::m_sInstancePtr = NULL;

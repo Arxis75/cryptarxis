@@ -1,67 +1,65 @@
 #pragma once
 
-#include <reactor/SocketHandler.h>
-#include <p2p/Node.h>
+#include "DiscV4Msg.h"
 
 #include <Common.h>
-#include <crypto/bips.h>
+#include<crypto/bips.h>
+#include <reactor/SocketHandler.h>
+#include <vector>
 
-class DiscV4Session;
-class DiscV4Message;
+using std::vector;
 
-// Ping (0x01):
-// Pong (0x02):
-// FindNode (0x03):
-// Neighbors Packet (0x04):
-// ENRRequest Packet (0x05):
-// ENRResponse Packet (0x06):
-class DiscV4Message
+class DiscV4PingMessage;
+class DiscV4PongMessage;
+class DiscV4FindNodeMessage;
+class DiscV4NeighborsMessage;
+class DiscV4ENRRequestMessage;
+class DiscV4ENRResponseMessage;
+
+class DiscV4Server: public SocketHandler
 {
     public:
-        //Ingress constructor
-        DiscV4Message(const ByteStream msg, const shared_ptr<DiscV4Session> peer = 0);
-        //Egress constructor
-        DiscV4Message(const uint8_t type);
+        DiscV4Server(const uint16_t binding_port, const int protocol,
+                              const int read_buffer_size = 1280, const int write_buffer_size = 1280,
+                              const int tcp_connection_backlog_size = 10);
+        DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler);
 
-        ByteStream serialize(const Privkey &secret, const RLPByteStream &rlp_payload) const;
-        
-        uint8_t getPacketType() const;
-        bool getPublicKey(Pubkey &key) const;
-        
-        bool has_valid_hash() const;
-        bool has_valid_signature(Pubkey expected_pubkey) const;
-
-    private:
-        uint8_t m_type;
-        RLPByteStream m_msg;
+    protected:
+        virtual const shared_ptr<SocketHandler> makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const;
+        virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
 
-class DiscV4Session: public std::enable_shared_from_this<DiscV4Session>
+class DiscV4Session: public SessionHandler
 {
     public:
-        DiscV4Session(const std::weak_ptr<const SocketHandler> socket_handler, const sockaddr_in &peer_address);
-
-        void onNewMessage(const shared_ptr<const DiscV4Message> msg_in);
-
-        const ENRV4Identity &getPeerENR() const { return m_peer_enr; }
-    
-    private:
-        ENRV4Identity m_peer_enr;
-        const std::weak_ptr<const SocketHandler> m_socket_handler;
-};
-
-class DiscV4SessionManager: public SessionManager, public std::enable_shared_from_this<DiscV4SessionManager>
-{
-    public:
-        DiscV4SessionManager(const ENRV4Identity &host_enr);
-
-        void start() const { SessionManager::start(m_host_enr.getUDPPort(), IPPROTO_UDP); }
+        DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
 
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 
-        const ENRV4Identity &getHostENR() const { return m_host_enr; }
+        void onNewPing(shared_ptr<DiscV4PingMessage> msg);
+        void onNewPong(shared_ptr<DiscV4PongMessage> msg);
+        /*void onNewFindNode(shared_ptr<DiscV4FindNodeMessage> msg);
+        void onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg);*/
+        void onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg);
+        void onNewENRResponse(shared_ptr<DiscV4ENRResponseMessage> msg);
+    
+        void sendPing();
+        void sendPong(const ByteStream &ack_hash) const;      
+        /*void sendFindNode() const;
+        void sendNeighbors() const;*/
+        void sendENRRequest();
+        void sendENRResponse(const ByteStream &ack_hash) const;
 
-    protected:
-        ENRV4Identity m_host_enr;
-        map<uint64_t, shared_ptr<DiscV4Session>> m_peer_session_list;
+        inline const Pubkey &getPubKey() const { return m_pubkey; }
+        inline const ByteStream &getLastSentPingHash() const { return m_last_sent_ping_hash; }
+        inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }
+
+        bool isQualifiedForTCPQueries() const;
+
+    private:
+        Pubkey m_pubkey;
+        ByteStream m_last_sent_ping_hash;
+        ByteStream m_last_sent_enr_request_hash;
+        time_t m_last_verified_pong;
 };

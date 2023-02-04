@@ -21,24 +21,28 @@ using std::endl;
 using std::stoi;
 //----------------------------------------------------------- BIP32 -----------------------------------------------------------------
 
-Pubkey::Pubkey(const Point& p, const EllipticCurve& curve)
+Pubkey::Pubkey(const EllipticCurve& curve)
+    : m_ecc(curve)
+{ }
+
+Pubkey::Pubkey(const Point& p, const EllipticCurve &curve)
     : m_ecc(curve)
     , m_point(p)
 { }
 
-Pubkey::Pubkey(const Point& p, const ByteStream &cc, const EllipticCurve& curve)
+Pubkey::Pubkey(const Point &p, const ByteStream &cc, const EllipticCurve &curve)
     : m_ecc(curve)
     , m_point(p)
     , m_chaincode(cc)
 { }
 
-Pubkey::Pubkey(const Pubkey& key) 
+Pubkey::Pubkey(const Pubkey &key) 
     : m_ecc(key.m_ecc)
     , m_point(key.m_point)
     , m_chaincode(key.m_chaincode)
 { }
 
-Pubkey::Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const EllipticCurve& curve)
+Pubkey::Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const EllipticCurve &curve)
     : m_ecc(curve)
 {
     ByteStream tmp(formated_key);
@@ -143,7 +147,7 @@ bool Signature::isValid(const ByteStream &h, const ByteStream &from_address, con
              ecrecover(key, h, from_address) && from_address == key.getAddress() );
 }
 
-bool Signature::ecrecover(Pubkey& key, const ByteStream &h, const ByteStream &from_address) const
+bool Signature::ecrecover(Pubkey &key, const ByteStream &h, const ByteStream &from_address) const
 {
     bool ret = false;
     Point Q_candidate;

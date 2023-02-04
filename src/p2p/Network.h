@@ -1,13 +1,16 @@
 #pragma once
 
-#include <reactor/SocketHandler.h>
+#include "DiscV4.h"
+
+#include <Common.h>
 #include <crypto/bips.h>
+#include <map>
+
+using std::map;
 
 class ENRV4Identity
 {
     public:
-        //Unknown-ENR Peer
-        ENRV4Identity(const uint32_t ip, const uint16_t port, const int protocol);
         //Peer-sent ENR
         ENRV4Identity(const RLPByteStream &rlp);
         //This node ENR
@@ -29,6 +32,8 @@ class ENRV4Identity
         const Signature sign(const ByteStream &hash) const;
         bool validatePubKey(const Pubkey &key);
 
+        void print() const;
+
     private:
         string m_scheme;
         uint32_t m_ip;
@@ -44,20 +49,25 @@ class ENRV4Identity
         string m_name;
 };
 
-/*class EthNode
+class Network
 {
     private:
-        EthNode(ENRV4Identity *enr);
-    
+        Network() {}
+
     public:
-        static EthNode& GetInstance(ENRV4Identity *enr);
-        EthNode(const EthNode &obj) = delete;
+        ~Network() { if(m_host_enr) delete m_host_enr;}
+        static Network &GetInstance();
+        Network(const Network& obj) = delete;
 
-        void startServer(const int master_protocol);
+        void start(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, const uint64_t seq = 1);
 
-        //const Privkey &getSecret() const { return m_sEnr->getSecret(); }
+        const ENRV4Identity *getHostENR() const { return m_host_enr; }
+        map<const ByteStream, const ENRV4Identity> &getENRList() { return m_enr_list; }
 
     private:
-        static ENRV4Identity* m_sEnr;
-        static EthNode *m_sInstancePtr;
-};*/
+        static Network *m_sInstancePtr;
+        ENRV4Identity *m_host_enr;
+        shared_ptr<DiscV4Server> udp_server;
+        //shared_ptr<Eth67Server> tcp_server;
+        map<const ByteStream, const ENRV4Identity> m_enr_list;
+};

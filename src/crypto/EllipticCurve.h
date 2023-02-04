@@ -19,8 +19,8 @@ class Point
         Point(const Point& p);
         Point(const Element& x, const Element& y);
         
-        const Element& getX() const { return m_x; }
-        const Element& getY() const { return m_y; }
+        const Element& getX() const { return m_isIdentity ? Integer::zero : m_x; }
+        const Element& getY() const { return m_isIdentity ? Integer::zero : m_y; }
         bool isIdentity() const { return m_isIdentity; }
 
         void setX(Element x) { m_x = x; }

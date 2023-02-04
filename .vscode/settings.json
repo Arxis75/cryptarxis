@@ -1,0 +1,26 @@
+{
+    "files.associations": {
+        "deque": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "stdexcept": "cpp",
+        "ostream": "cpp",
+        "iostream": "cpp",
+        "any": "cpp",
+        "array": "cpp",
+        "chrono": "cpp",
+        "compare": "cpp",
+        "functional": "cpp",
+        "ratio": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "variant": "cpp"
+    }
+    "files.exclude": {
+        ".ignore": true
+    }
+    "search.exclude": {
+        ".ignore": true
+    }
+}

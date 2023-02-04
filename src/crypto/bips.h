@@ -44,7 +44,8 @@ class Pubkey
         enum class Format{PREFIXED_X, XY, PREFIXED_XY};
         
         Pubkey(const Pubkey& key); 
-        Pubkey(const Point& p = Point(), const EllipticCurve& curve = Secp256k1::GetInstance());
+        Pubkey(const EllipticCurve& curve = Secp256k1::GetInstance());
+        Pubkey(const Point& p, const EllipticCurve& curve = Secp256k1::GetInstance());
         Pubkey(const Point& p, const ByteStream &cc, const EllipticCurve& curve = Secp256k1::GetInstance());
         Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const EllipticCurve& curve = Secp256k1::GetInstance()); 
 

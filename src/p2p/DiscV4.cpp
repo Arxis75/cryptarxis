@@ -1,189 +1,207 @@
+#include "Network.h"
 #include "DiscV4.h"
+#include "DiscV4Msg.h"
+
+#include <tools/tools.h>
+#include <chrono>
+#include <iostream>         //cout
 
 using std::cout;
 using std::hex;
 using std::dec;
 using std::endl;
+using std::dynamic_pointer_cast;
 
-DiscV4Session::DiscV4Session(const std::weak_ptr<const SocketHandler> socket_handler, const sockaddr_in &peer_address)
-    : m_peer_enr(peer_address.sin_addr.s_addr, peer_address.sin_port, IPPROTO_UDP)
-    , m_socket_handler(socket_handler)
-{}
-
-void DiscV4Session::onNewMessage(const shared_ptr<const DiscV4Message> msg_in)
-{
-    try
-    {
-        /*if(msg_in)
-        {
-            if( auto sh_in = msg_in->getSocketHandler() )
-                cout << dec << "@ " << (sh_in->getProtocol() == IPPROTO_TCP ? "TCP" : "UDP") << " socket = " << sh_in->getSocket()
-                        << " => @" << inet_ntoa(msg_in->getPeerAddress().sin_addr) << ":" << ntohs(msg_in->getPeerAddress().sin_port)
-                        << ", " << msg_in->payload_vector().size() << " Bytes received" << endl;
-        }
-
-        //Worker job:
-        auto msg_out = msg_in; //echo server here for example
-        if(msg_out)
-        {   
-            
-            RLPByteStream rlp(&msg_out->payload_vector()[0], msg_out->payload_vector().size());
-
-            cout << hex << rlp.as_Integer() << endl;
-            ByteStream h = rlp.ByteStream::pop_front(32);
-            cout << hex << h << endl;
-
-            bool valid_h = (h == rlp.keccak256());
-
-            cout << "Is valid = " << valid_h << endl;
-
-            ByteStream r = rlp.ByteStream::pop_front(32);
-            cout << hex << r << endl;
-            ByteStream s = rlp.ByteStream::pop_front(32);
-            cout << hex << s << endl;
-            ByteStream y = rlp.ByteStream::pop_front(1);
-            cout << hex << y << endl;
-
-            Pubkey key;
-            Signature sig(r,s,y);
-            sig.ecrecover(key,rlp.keccak256());
-
-            cout << "PubKey = " << key.getKey(Pubkey::Format::XY) << endl;
-
-            ByteStream msg_out_id = rlp.ByteStream::pop_front(1);
-            cout << hex << msg_out_id << endl;
-            
-            bool is_list;
-            RLPByteStream field = rlp.pop_front(is_list);
-            while(rlp.byteSize() > 0)
-            {    
-                if(is_list)
-                {
-                    RLPByteStream list = field;
-                    cout << "[" << endl;
-                    while( list.byteSize() > 0 )
-                    {
-                        bool is_list2;
-                        field = list.pop_front(is_list2);
-                        cout << hex << field.as_Integer() << endl;
-                    }
-                    cout << "]" << endl;
-                }
-                else
-                    cout << hex << field.as_Integer() << endl;
-                field = rlp.pop_front(is_list);
-            }
-            if( auto sh_out = msg_out->getSocketHandler() )
-                if( auto sm_out = sh_out->getSessionManager() )
-                    const_pointer_cast<SocketHandler>(sh_out)->sendMsg(msg_out);    //test echo
-        }*/
-    }
-    catch(const std::exception& e)
-    {
-        //TODO: CLOSE THE CONNECTION!
-
-        std::cerr << "Invalid DiscV4 msg received from " << m_peer_enr.getIP() << ":" << m_peer_enr.getUDPPort() << endl;
-    }
-}
-
-//-------------------------------------------------------------------------------------------------------
-
-DiscV4SessionManager::DiscV4SessionManager(const ENRV4Identity &host_enr)
-    : SessionManager()
-    , m_host_enr(host_enr)
+DiscV4Server::DiscV4Server(const uint16_t binding_port, const int protocol,
+                                             const int read_buffer_size, const int write_buffer_size,
+                                             const int tcp_connection_backlog_size)
+    : SocketHandler(binding_port, protocol, read_buffer_size, write_buffer_size, tcp_connection_backlog_size)
 { }
 
-void DiscV4SessionManager::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
-{
-    shared_ptr<DiscV4Session> peer_session = shared_ptr<DiscV4Session>(nullptr);
-    
-    uint64_t peer_key = (msg_in->getPeerAddress().sin_addr.s_addr << 16) + msg_in->getPeerAddress().sin_port;
-    
-    auto it = m_peer_session_list.find(peer_key);
-    if( it != m_peer_session_list.end() )
-        peer_session = it->second;
-    else
-        peer_session = make_shared<DiscV4Session>(msg_in->getSocketHandler(), msg_in->getPeerAddress());
+DiscV4Server::DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler)
+    : SocketHandler(socket, master_handler)
+{ }
 
-    peer_session->onNewMessage(make_shared<DiscV4Message>(ByteStream(&msg_in->payload_vector()[0], msg_in->payload_vector().size()), peer_session));
+const shared_ptr<SocketHandler> DiscV4Server::makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const
+{ 
+    return make_shared<DiscV4Server>(socket, master_handler);
 }
 
-//---------------------------------------------------------------------------------------------------------------
-
-//Ingress constructor
-DiscV4Message::DiscV4Message(const ByteStream msg, const shared_ptr<DiscV4Session> peer_session)
+const shared_ptr<SessionHandler> DiscV4Server::makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
 {
-    if( msg && msg.byteSize() > 97)
+    return make_shared<DiscV4Session>(socket_handler, peer_address);
+}
+
+const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const
+{
+    return make_shared<DiscV4SignedMessage>(session_handler);
+}
+
+//------------------------------------------------------------------------------------------------------
+
+DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
+    : SessionHandler(socket_handler, peer_address)
+    , m_last_verified_pong(0)   // 00:00, Jan 1 1970 UTC Posix time
+{ }
+
+bool DiscV4Session::isQualifiedForTCPQueries() const
+{
+    return getUnixTimeStamp() - getUnixTimeStamp(&m_last_verified_pong) < 43200;    // 43200s = 12 Hours
+}
+
+void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
+{
+    auto signed_msg = dynamic_pointer_cast<const DiscV4SignedMessage>(msg_in);
+    uint8_t msg_type = signed_msg->getType();
+
+    if( signed_msg && signed_msg->hasValidSize() &&
+        signed_msg->hasValidHash() &&
+        signed_msg->hasValidPubKey(m_pubkey) )
     {
-        m_msg = RLPByteStream(msg[0], msg.byteSize());
-        if( !has_valid_hash() )
-            throw std::invalid_argument("Invalid DiscV4 message hash!");
+        switch( msg_type )
+        {
+        case 0x01:
+            onNewPing(make_shared<DiscV4PingMessage>(signed_msg));
+            break;
+        case 0x02:
+            onNewPong(make_shared<DiscV4PongMessage>(signed_msg));
+            break;
+        case 0x03:
+            //onNewFindNode(make_shared<DiscV4UnsignedMessage>(signed_msg));
+            break;
+        case 0x04:
+            //onNewNeighbors(make_shared<DiscV4UnsignedMessage>(signed_msg));
+            break;
+        case 0x05:
+            onNewENRRequest(make_shared<DiscV4ENRRequestMessage>(signed_msg));
+            break;
+        case 0x06:
+            onNewENRResponse(make_shared<DiscV4ENRResponseMessage>(signed_msg));
+            break;
+        default:
+            break;
+        }
+    }
+    //else
+    //  close();
+}
+
+void DiscV4Session::onNewPing(shared_ptr<DiscV4PingMessage> msg)
+{
+        //const_pointer_cast<DiscV4Server>(server)->sendMsg(signed_msg);     // echo
+    if( msg && msg->hasValidVersion() && msg->hasNotExpired() )
+    {
+        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg->print();
+        sendPong(msg->getHash());
         
-        m_type = m_msg[97];
-        if(m_type > 0x06)
-            throw std::invalid_argument("Invalid DiscV4 message type!");
-
-        if( peer_session )
-        {
-            Pubkey key(peer_session->getPeerENR().getPubKey());
-            if( !key.getKey(Pubkey::Format::XY).byteSize() )
-            {
-                // new pubkey, will be registered with the functionalMsg sent to the Session
-            }
-            else if( !has_valid_signature(peer_session->getPeerENR().getPubKey()) )
-                //If this peer had already registered a different pubkey, throws
-                throw std::invalid_argument("Invalid DiscV4 message signature!");
-        }
+        sendPing();
+        sendENRRequest();
     }
-    else
-        throw std::invalid_argument("Invalid DiscV4 message size!");
 }
 
-//Egress constructor
-DiscV4Message::DiscV4Message(const uint8_t type)
-    : m_type(type)
-{ }
-
-ByteStream DiscV4Message::serialize(const Privkey &secret, const RLPByteStream &rlp_payload) const
+void DiscV4Session::onNewPong(shared_ptr<DiscV4PongMessage> msg)
 {
-    if( m_msg.byteSize() )
-        return m_msg;
-    else
+    if( msg && msg->hasValidPingHash(m_last_sent_ping_hash) && msg->hasNotExpired() )
     {
-        RLPByteStream msg = rlp_payload;
-        msg.ByteStream::push_front(m_type, 1); //no RLP-encoding for the type
-        Signature sig = secret.sign(msg.keccak256());
-        msg.ByteStream::push_front(sig.get_imparity());
-        msg.ByteStream::push_front(ByteStream(sig.get_s(), 32));
-        msg.ByteStream::push_front(ByteStream(sig.get_r(), 32));
-        msg.ByteStream::push_front(msg.keccak256());
-        return msg;
+        m_last_verified_pong = getUnixTimeStamp();
+        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg->print();
     }
 }
 
-uint8_t DiscV4Message::getPacketType() const
+void DiscV4Session::onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg)
 {
-    return (m_msg.byteSize() > 97 ? m_msg[97] : 0);
-}
-
-bool DiscV4Message::has_valid_hash() const
-{
-    return (m_msg.byteSize() > 32 ? ByteStream(m_msg[0], 32) == ByteStream(m_msg[32], m_msg.byteSize() - 32).keccak256() : false); 
-}
-
-bool DiscV4Message::has_valid_signature(Pubkey expected_pubkey) const
-{
-    Pubkey actual_pubkey;
-    return getPublicKey(actual_pubkey) && actual_pubkey == expected_pubkey;
-}
-
-bool DiscV4Message::getPublicKey(Pubkey &key) const
-{
-    if(m_msg.byteSize() > 96)
+    if( msg && msg->hasNotExpired() )
     {
-        Signature sig(ByteStream(m_msg[32], 32), ByteStream(m_msg[64], 32), ByteStream(m_msg[96], 1));
-        return sig.ecrecover(key, ByteStream(m_msg[32], m_msg.byteSize() - 32).keccak256());
+        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg->print();
+        sendENRResponse(ByteStream(&(*msg)[0], msg->size()).keccak256());
     }
-    else
-        return false;
 }
+
+void DiscV4Session::onNewENRResponse(shared_ptr<DiscV4ENRResponseMessage> msg)
+{
+    if( msg && msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) && msg->getPeerENR()->validatePubKey(m_pubkey) )
+    {
+        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg->print();
+    }
+}
+
+void DiscV4Session::sendPing()
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        auto msg_out = make_shared<const DiscV4PingMessage>(shared_from_this());
+        m_last_sent_ping_hash = msg_out->getHash();
+        const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
+
+        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg_out->print();
+    }
+}
+void DiscV4Session::sendPong(const ByteStream &ack_hash) const
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        auto msg_out = make_shared<const DiscV4PongMessage>(shared_from_this(), ack_hash);
+        const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
+
+        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg_out->print();
+    }
+}
+void DiscV4Session::sendENRRequest()
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        auto msg_out = make_shared<const DiscV4ENRRequestMessage>(shared_from_this());
+        m_last_sent_enr_request_hash = msg_out->getHash();
+        const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
+
+        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg_out->print();
+    }
+}
+void DiscV4Session::sendENRResponse(const ByteStream &ack_hash) const
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        auto msg_out = make_shared<const DiscV4ENRResponseMessage>(shared_from_this(), ack_hash);
+        const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
+
+        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg_out->print();
+    }
+}
+
+/*void DiscV4Session::onNewFindNode(shared_ptr<DiscV4UnsignedMessage> msg)
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        cout << dec << "@ UDP DiscV4 socket = " << server->getSocket()
+            << " <= @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port)
+            << ", FINDNODE received!" << endl;
+
+        //const_pointer_cast<DiscV4Server>(server)->sendMsg(signed_msg);     // echo
+    }
+}
+
+void DiscV4Session::onNewNeighbors(shared_ptr<DiscV4UnsignedMessage> msg)
+{
+    auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
+    if(server)
+    {
+        cout << dec << "@ UDP DiscV4 socket = " << server->getSocket()
+            << " <= @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port)
+            << ", NEIGHBORS received!" << endl;
+
+        //const_pointer_cast<DiscV4Server>(server)->sendMsg(signed_msg);     // echo
+    }
+}*/
