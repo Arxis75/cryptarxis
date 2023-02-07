@@ -1,9 +1,7 @@
 #pragma once
 
-#include "DiscV4Msg.h"
-
 #include <Common.h>
-#include<crypto/bips.h>
+#include <crypto/bips.h>
 #include <reactor/SocketHandler.h>
 #include <vector>
 
@@ -29,6 +27,8 @@ class DiscV4Server: public SocketHandler
         virtual const shared_ptr<SocketHandler> makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const;
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
+
+class Network;
 
 class DiscV4Session: public SessionHandler
 {
@@ -56,6 +56,10 @@ class DiscV4Session: public SessionHandler
         inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }
 
         bool isVerified() const;
+
+    protected:
+        friend class Network;   // Network::onNewNodeCandidates() calls initPublicKey
+        void initPublicKey(Pubkey &advertised_key) { m_pubkey = advertised_key; }
 
     private:
         Pubkey m_pubkey;

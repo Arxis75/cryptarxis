@@ -5,8 +5,10 @@
 #include <Common.h>
 #include <crypto/bips.h>
 #include <map>
+#include <array>
 
 using std::map;
+using std::array;
 using Givaro::Integer;
 
 class ENRV4Identity
@@ -77,4 +79,5 @@ class Network
         ENRV4Identity *m_host_enr;
         shared_ptr<DiscV4Server> m_udp_server;
         //shared_ptr<Eth67Server> tcp_server;
+        array<map<ByteStream, ENRV4Identity>, 256> m_host_buckets;
 };

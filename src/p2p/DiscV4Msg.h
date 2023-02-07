@@ -1,10 +1,7 @@
 #pragma once
 
-#include "DiscV4.h"
-#include "Network.h"
-
 #include <Common.h>
-#include<crypto/bips.h>
+#include <crypto/bips.h>
 #include <reactor/SocketHandler.h>
 #include <vector>
 
@@ -28,7 +25,7 @@ class DiscV4SignedMessage: public SocketMessage
         bool hasValidSize() const;
         bool hasValidHash() const;
         bool hasValidPubKey(Pubkey &pubkey) const;
-        bool hasValidType() const;
+        bool hasValidType(uint8_t &type) const;
 
         virtual uint64_t size() const;
 

@@ -219,11 +219,7 @@ void Network::onNewNodeCandidates(const RLPByteStream &node_list)
         uint32_t node_ip = node_i.pop_front(is_list).as_uint64();
         uint16_t node_udp_port = node_i.pop_front(is_list).as_uint64();
         uint16_t node_tcp_port = node_i.pop_front(is_list).as_uint64();
-        
-        struct sockaddr_in peer_address;
-        peer_address.sin_family = AF_INET;
-        peer_address.sin_addr.s_addr = htonl(node_ip);
-        peer_address.sin_port = htons(node_udp_port); 
+        ByteStream node_pub_key = node_i.pop_front(is_list);
         
         // Is it a real peer and not me?
         // Does this peer need a ping?
@@ -232,12 +228,21 @@ void Network::onNewNodeCandidates(const RLPByteStream &node_list)
             //Get the master UDP socket
             if(m_udp_server)
             {
-                //Is there already a session for this peer?
+                struct sockaddr_in peer_address;
+                peer_address.sin_family = AF_INET;
+                peer_address.sin_addr.s_addr = htonl(node_ip);
+                peer_address.sin_port = htons(node_udp_port); 
+                
+                Pubkey pub_key(node_pub_key, Pubkey::Format::XY);
+
+                //Is there already a existing session (IP/Port) for this peer?
                 auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(peer_address));
                 if(!session)
                 {
                     //Creates a new session for this new peer
                     session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
+                    //Sets the pubkey according to what was advertised
+                    const_pointer_cast<DiscV4Session>(session)->initPublicKey(pub_key);
                 }
                 
                 //Has this peer recently responded to a ping?

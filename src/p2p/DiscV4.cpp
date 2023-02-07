@@ -52,11 +52,13 @@ bool DiscV4Session::isVerified() const
 void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
 {
     auto signed_msg = dynamic_pointer_cast<const DiscV4SignedMessage>(msg_in);
-    uint8_t msg_type = signed_msg->getType();
+    uint8_t msg_type;
 
-    if( signed_msg && signed_msg->hasValidSize() &&
+    if( signed_msg &&
+        signed_msg->hasValidSize() &&
         signed_msg->hasValidHash() &&
-        signed_msg->hasValidPubKey(m_pubkey) )
+        signed_msg->hasValidType(msg_type) &&
+        (signed_msg->hasValidPubKey(m_pubkey) || msg_type == 0x01) )
     {
         switch( msg_type )
         {
@@ -81,9 +83,11 @@ void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
         default:
             break;
         }
+        cout << "--------------------------------------------------------------- SESSION COUNT = " << getSocketHandler()->getSessionsCount() << endl;
     }
-    //else
-    //  close();
+    else
+        //Something's fishy with this peer...
+        close();
 }
 
 void DiscV4Session::onNewPing(shared_ptr<DiscV4PingMessage> msg)
@@ -93,10 +97,12 @@ void DiscV4Session::onNewPing(shared_ptr<DiscV4PingMessage> msg)
     if( msg && msg->hasNotExpired() )
     {
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        m_pubkey = msg->getPubKey();
         msg->print();
         sendPong(msg->getHash());
 
-        sendPing();
+        if(!isVerified())
+            sendPing();
     }
 }
 
@@ -169,6 +175,7 @@ void DiscV4Session::sendPing()
         msg_out->print();
     }
 }
+
 void DiscV4Session::sendPong(const ByteStream &ack_hash) const
 {
     auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());

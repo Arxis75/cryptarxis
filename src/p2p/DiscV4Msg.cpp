@@ -1,3 +1,4 @@
+#include "Network.h"
 #include "DiscV4Msg.h"
 
 #include <iostream>         //cout
@@ -57,28 +58,14 @@ bool DiscV4SignedMessage::hasValidHash() const
     return getHash() == ByteStream(&(*this)[32], size() - 32).keccak256(); 
 }
 
-bool DiscV4SignedMessage::hasValidPubKey(Pubkey &known_key) const
+bool DiscV4SignedMessage::hasValidPubKey(Pubkey &session_recorded_key) const
 {
-    bool retval = false;
-    Pubkey key = getPubKey();
-    if( !known_key.getPoint().isIdentity() )
-    {
-        // There was a previously known public key
-        retval = (key == known_key);
-    }
-    else
-    {
-        // There was no previously known public key
-        // => this is the key
-        known_key = key;
-        retval = true;
-    }
-    return retval;
+    return (session_recorded_key == getPubKey());
 }
 
-bool DiscV4SignedMessage::hasValidType() const
+bool DiscV4SignedMessage::hasValidType(uint8_t &type) const
 {
-    uint8_t type = getType();
+    type = getType();
     return type > 0 && type < 7;
 }
 
