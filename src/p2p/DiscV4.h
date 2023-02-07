@@ -25,8 +25,8 @@ class DiscV4Server: public SocketHandler
         DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler);
 
     protected:
-        virtual const shared_ptr<SocketHandler> makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const;
         virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
+        virtual const shared_ptr<SocketHandler> makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const;
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
 
@@ -39,15 +39,15 @@ class DiscV4Session: public SessionHandler
 
         void onNewPing(shared_ptr<DiscV4PingMessage> msg);
         void onNewPong(shared_ptr<DiscV4PongMessage> msg);
-        /*void onNewFindNode(shared_ptr<DiscV4FindNodeMessage> msg);
-        void onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg);*/
+        void onNewFindNode(shared_ptr<DiscV4FindNodeMessage> msg);
+        void onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg);
         void onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg);
         void onNewENRResponse(shared_ptr<DiscV4ENRResponseMessage> msg);
     
         void sendPing();
         void sendPong(const ByteStream &ack_hash) const;      
-        /*void sendFindNode() const;
-        void sendNeighbors() const;*/
+        void sendFindNode() const;
+        void sendNeighbors() const;
         void sendENRRequest();
         void sendENRResponse(const ByteStream &ack_hash) const;
 
@@ -55,7 +55,7 @@ class DiscV4Session: public SessionHandler
         inline const ByteStream &getLastSentPingHash() const { return m_last_sent_ping_hash; }
         inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }
 
-        bool isQualifiedForTCPQueries() const;
+        bool isVerified() const;
 
     private:
         Pubkey m_pubkey;

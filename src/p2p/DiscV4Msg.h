@@ -18,7 +18,7 @@ class DiscV4SignedMessage: public SocketMessage
         //Constructor for building msg to send
         DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler);
 
-        void signAndHash(const RLPByteStream &rlp_payload);
+        void addTypeSignAndHash(const RLPByteStream &rlp_payload);
 
         ByteStream getHash() const;
         Pubkey getPubKey() const;
@@ -110,6 +110,46 @@ class DiscV4PongMessage : public DiscV4SignedMessage
         uint16_t m_recipient_tcp_port; 
         uint64_t m_expiration;
         uint64_t m_enr_seq;
+};
+
+class DiscV4FindNodeMessage : public DiscV4SignedMessage
+{
+    public:
+        //Constructor for received msg
+        DiscV4FindNodeMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
+        //Constructor for building msg to send
+        DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &pub_key);
+
+        inline virtual uint8_t getType() const {return 0x03; }
+        inline const ByteStream &getTarget() const { return m_target; }
+
+        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+
+        void print() const;
+
+    private:
+        ByteStream m_target;
+        uint64_t m_expiration;
+};
+
+class DiscV4NeighborsMessage : public DiscV4SignedMessage
+{
+    public:
+        //Constructor for received msg
+        DiscV4NeighborsMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
+        //Constructor for building msg to send
+        DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler);
+
+        inline virtual uint8_t getType() const {return 0x04; }
+        inline const RLPByteStream &getRLPNodes() const { return m_nodes; } //FIXME!!!!
+
+        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+
+        void print() const;
+
+    private:
+        RLPByteStream m_nodes;  //FIXME!!!!
+        uint64_t m_expiration;
 };
 
 class DiscV4ENRRequestMessage : public DiscV4SignedMessage
