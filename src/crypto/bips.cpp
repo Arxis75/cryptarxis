@@ -153,16 +153,23 @@ bool Signature::ecrecover(Pubkey &key, const ByteStream &h, const ByteStream &fr
     Point Q_candidate;
     if( recover(Q_candidate, h, m_r, m_s, m_imparity, false) )
     {
-        ret = true;
-        key = Pubkey(Q_candidate, (*this));
-        if( from_address.byteSize() == 20 && key.getAddress() != from_address )
+        Pubkey key_candidate(Q_candidate, (*this));
+        if( from_address.byteSize() == 20 && key_candidate.getAddress() != from_address )
         {
-            ret = false;
             if( recover(Q_candidate, h, m_r, m_s, m_imparity, true) )
             {
-                key = Pubkey(Q_candidate, (*this));
-                ret = (key.getAddress() == from_address);
+                key_candidate = Pubkey(Q_candidate, (*this));
+                if(key_candidate.getAddress() == from_address)
+                {
+                    key = key_candidate;
+                    ret = true;
+                }
             }
+        }
+        else
+        {
+            key = key_candidate;
+            ret = true;
         }
     }
     return ret;

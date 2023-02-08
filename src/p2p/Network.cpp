@@ -9,17 +9,36 @@ using std::dec;
 using std::endl;
 using std::min;
 
+ENRV4Identity::ENRV4Identity(const ENRV4Identity& id)
+    : m_timestamp(id.m_timestamp)
+    , m_seq(id.m_seq)
+    , m_scheme(id.m_scheme)
+    , m_ip(id.m_ip)
+    , m_tcp_port(id.m_tcp_port)
+    , m_udp_port(id.m_udp_port)
+    , m_ip6(id.m_ip6)
+    , m_tcp6_port(id.m_tcp6_port)
+    , m_udp6_port(id.m_udp6_port)
+    , m_secret(id.m_secret)
+    , m_pubkey(id.m_pubkey)
+    , m_ID(id.m_ID)
+    , m_signed_rlp(id.m_signed_rlp)
+    , m_is_signed(id.m_is_signed)
+{ }
+
 ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_rlp)
-    : m_scheme("unknown")
+    : m_timestamp(getUnixTimeStamp())
+    , m_scheme("unknown")
     , m_ip(0)
     , m_tcp_port(0)
     , m_udp_port(0)
     , m_ip6(Integer::zero)
     , m_tcp6_port(0)
     , m_udp6_port(0)
-    , m_secret(0)
+    , m_secret(shared_ptr<const Privkey>(nullptr))
     , m_pubkey(pub_key)
     , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
+    , m_is_signed(true)
     , m_signed_rlp(signed_rlp)
 {
     bool is_list;
@@ -91,16 +110,18 @@ ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_
 }
 
 ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const char *secret)
-    : m_scheme(ByteStream("v4"))
+    : m_timestamp(getUnixTimeStamp())
+    , m_scheme(ByteStream("v4"))
     , m_ip(ip)
     , m_tcp_port(tcp_port)
     , m_udp_port(udp_port)
     , m_ip6(Integer::zero)
     , m_tcp6_port(0)
     , m_udp6_port(0)
-    , m_secret(new Privkey(ByteStream(secret, 32, 16)))
+    , m_secret(make_shared<const Privkey>(ByteStream(secret, 32, 16)))
     , m_pubkey(m_secret->getPubKey())
     , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
+    , m_is_signed(true)
 { 
     //TODO: retrieve it from a config file
     m_seq = 1;
@@ -126,10 +147,29 @@ ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const u
     m_signed_rlp.push_front(signature_field);
 }
 
-ENRV4Identity::~ENRV4Identity()
+ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const Pubkey & pub_key)
+    : m_timestamp(getUnixTimeStamp())
+    , m_seq(seq)
+    , m_scheme(ByteStream("v4"))
+    , m_ip(ip)
+    , m_tcp_port(tcp_port)
+    , m_udp_port(udp_port)
+    , m_ip6(Integer::zero)
+    , m_tcp6_port(0)
+    , m_udp6_port(0)
+    , m_secret(0)
+    , m_pubkey(pub_key)
+    , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
+    , m_is_signed(false)
+{ }
+
+bool ENRV4Identity::equals(const shared_ptr<const ENRV4Identity> enr) const
 {
-    if(m_secret)
-        delete m_secret;
+    return  //m_seq == enr->m_seq &&
+            m_ip == enr->m_ip &&
+            m_tcp_port == enr->m_tcp_port &&
+            m_udp_port == enr->m_udp_port &&
+            m_pubkey == enr->m_pubkey;          //implicitely compares the private keys
 }
 
 const Signature ENRV4Identity::sign(const ByteStream &hash) const
@@ -179,6 +219,12 @@ void ENRV4Identity::print() const
 
 //-------------------------------------------------------------------------------------------------------------------------
 
+Network::Network()
+    : m_host_enr(shared_ptr<const ENRV4Identity>(nullptr))
+    , m_udp_server(shared_ptr<DiscV4Server>(nullptr))
+{ }
+
+
 Network& Network::GetInstance()
 {
     if (m_sInstancePtr == NULL)
@@ -189,7 +235,7 @@ Network& Network::GetInstance()
 
 void Network::start(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, const uint64_t seq)
 {
-    m_host_enr = new ENRV4Identity(ip, tcp_port, udp_port, secret);
+    m_host_enr = make_shared<const ENRV4Identity>(ip, tcp_port, udp_port, secret);
 
     m_udp_server = make_shared<DiscV4Server>(m_host_enr->getUDPPort(), IPPROTO_UDP);
     if( m_udp_server )
@@ -219,11 +265,12 @@ void Network::onNewNodeCandidates(const RLPByteStream &node_list)
         uint32_t node_ip = node_i.pop_front(is_list).as_uint64();
         uint16_t node_udp_port = node_i.pop_front(is_list).as_uint64();
         uint16_t node_tcp_port = node_i.pop_front(is_list).as_uint64();
-        ByteStream node_pub_key = node_i.pop_front(is_list);
+        Pubkey node_pub_key(node_i.pop_front(is_list), Pubkey::Format::XY);
         
         // Is it a real peer and not me?
-        // Does this peer need a ping?
-        if( node_ip != getHostENR()->getIP() )
+        if( node_ip != getHostENR()->getIP() &&
+            node_udp_port != getHostENR()->getUDPPort() &&
+            node_pub_key != getHostENR()->getPubKey() )
         {
             //Get the master UDP socket
             if(m_udp_server)
@@ -232,21 +279,12 @@ void Network::onNewNodeCandidates(const RLPByteStream &node_list)
                 peer_address.sin_family = AF_INET;
                 peer_address.sin_addr.s_addr = htonl(node_ip);
                 peer_address.sin_port = htons(node_udp_port); 
-                
-                Pubkey pub_key(node_pub_key, Pubkey::Format::XY);
 
-                //Is there already a existing session (IP/Port) for this peer?
-                auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(peer_address));
-                if(!session)
-                {
-                    //Creates a new session for this new peer
-                    session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
-                    //Sets the pubkey according to what was advertised
-                    const_pointer_cast<DiscV4Session>(session)->initPublicKey(pub_key);
-                }
+                //Gets the existing session  / Creates a new session
+                auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
                 
                 //Has this peer recently responded to a ping?
-                if( !session->isVerified() )
+                if( session && !session->isVerified() )
                     // Pings the peer
                     const_pointer_cast<DiscV4Session>(session)->sendPing();
             }

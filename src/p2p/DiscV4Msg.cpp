@@ -14,18 +14,20 @@ using std::dynamic_pointer_cast;
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : SocketMessage(signed_msg->getSessionHandler())
     , m_vect(signed_msg->m_vect)
+    , m_timestamp(getUnixTimeStamp())
 { }
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler)
     : SocketMessage(session_handler)
+    , m_timestamp(getUnixTimeStamp())
 { }
 
-ByteStream DiscV4SignedMessage::getHash() const
+const ByteStream DiscV4SignedMessage::getHash() const
 {
     return ByteStream(&(*this)[0], 32);
 }
 
-Pubkey DiscV4SignedMessage::getPubKey() const
+const Pubkey DiscV4SignedMessage::getPubKey() const
 {
     Pubkey pub_key;
     Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), ByteStream(&(*this)[96], 1));
@@ -33,17 +35,17 @@ Pubkey DiscV4SignedMessage::getPubKey() const
     return pub_key;
 }
 
-uint8_t DiscV4SignedMessage::getType() const
+const uint8_t DiscV4SignedMessage::getType() const
 {
     return ByteStream(&(*this)[97], 1).as_uint8();
 }
 
-ByteStream DiscV4SignedMessage::getSignedPayload() const
+const ByteStream DiscV4SignedMessage::getSignedPayload() const
 {
     return ByteStream(&(*this)[97], size() - 97);
 }
 
-RLPByteStream DiscV4SignedMessage::getRLPPayload() const
+const RLPByteStream DiscV4SignedMessage::getRLPPayload() const
 {
     return RLPByteStream(&(*this)[98], size() - 98);
 }
@@ -56,11 +58,6 @@ bool DiscV4SignedMessage::hasValidSize() const
 bool DiscV4SignedMessage::hasValidHash() const
 {
     return getHash() == ByteStream(&(*this)[32], size() - 32).keccak256(); 
-}
-
-bool DiscV4SignedMessage::hasValidPubKey(Pubkey &session_recorded_key) const
-{
-    return (session_recorded_key == getPubKey());
 }
 
 bool DiscV4SignedMessage::hasValidType(uint8_t &type) const
@@ -405,7 +402,11 @@ void DiscV4ENRRequestMessage::print() const
 DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &ack_hash)
     : DiscV4SignedMessage(session_handler)
     , m_enr_request_hash(ack_hash)
-    , m_sender_enr(0)
+    , m_sender_enr(Network::GetInstance().getHostENR())
+/*    , m_sender_enr(new ENRV4Identity( Network::GetInstance().getHostENR()->getIP(),
+                                      Network::GetInstance().getHostENR()->getTCPPort(),
+                                      Network::GetInstance().getHostENR()->getUDPPort(),
+                                      "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168815") )*/
 {
     RLPByteStream rlp;
     rlp.push_back(ack_hash);
@@ -415,32 +416,46 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const Sessio
 
 DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscV4SignedMessage(signed_msg)
+     , m_sender_enr(shared_ptr<const ENRV4Identity>(nullptr))
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    if( auto ping_msg = dynamic_pointer_cast<const DiscV4PingMessage>(signed_msg) )
+    {
+        // DiscV4ENRResponseMessage emulated from DiscV4PingMessage
+        m_sender_enr = make_shared<const ENRV4Identity>( ping_msg->getENRSeq(),
+                                                         ntohl(ping_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
+                                                         ping_msg->getSenderTCPPort(),
+                                                         ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
+                                                         ping_msg->getPubKey()
+                                                       );
+    }
+    else if( auto pong_msg = dynamic_pointer_cast<const DiscV4PongMessage>(signed_msg) )
+    {
+        // DiscV4ENRResponseMessage emulated from DiscV4PongMessage
+        m_sender_enr = make_shared<const ENRV4Identity>( pong_msg->getENRSeq(),
+                                                         ntohl(pong_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
+                                                         0,    // we know nothing about the sender tcp port in the pong msg
+                                                         ntohs(pong_msg->getSessionHandler()->getPeerAddress().sin_port),
+                                                         pong_msg->getPubKey()
+                                                       );
+    }
+    else
+    {
+        //True DiscV4ENRResponseMessage
+        RLPByteStream msg = RLPByteStream(&(*signed_msg)[0], signed_msg->size());
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
+        //Drops the header:
+        // - 32 bytes hash,
+        // - 65 bytes signature,
+        // - 1 byte type
+        msg.ByteStream::pop_front(98);
 
-    m_enr_request_hash = msg.pop_front(is_list);
+        m_enr_request_hash = msg.pop_front(is_list);
 
-    auto session = dynamic_pointer_cast<const DiscV4Session>(getSessionHandler());
-    if(session)
-        m_sender_enr = new ENRV4Identity(session->getPubKey(), msg.pop_front(is_list));
-}
-
-DiscV4ENRResponseMessage::~DiscV4ENRResponseMessage()
-{
-    if(m_sender_enr)
-        delete m_sender_enr;
-}
-
-ENRV4Identity *DiscV4ENRResponseMessage::getPeerENR() const
-{
-    return m_sender_enr;
+        auto session = dynamic_pointer_cast<const DiscV4Session>(getSessionHandler());
+        if(session)
+            m_sender_enr = make_shared<const ENRV4Identity>(getPubKey(), msg.pop_front(is_list));
+    }
 }
 
 void DiscV4ENRResponseMessage::print() const

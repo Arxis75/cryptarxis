@@ -41,12 +41,36 @@ const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr
 
 DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
     : SessionHandler(socket_handler, peer_address)
-    , m_last_verified_pong(0)   // 00:00, Jan 1 1970 UTC Posix time
+    , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
 { }
 
-bool DiscV4Session::isVerified() const
+void DiscV4Session::setENRFromMessage(const shared_ptr<const DiscV4ENRResponseMessage> msg)
 {
-    return getUnixTimeStamp() - getUnixTimeStamp(&m_last_verified_pong) < 43200;    // 43200s = 12 Hours
+    if( msg && msg->getPeerENR() && (!getENR() || !msg->getPeerENR()->equals(getENR())) )
+    {
+        removeENR();
+        m_ENR = msg->getPeerENR();
+        Network::GetInstance().registerENRSession(dynamic_pointer_cast<DiscV4Session>(shared_from_this()));
+    }
+}
+
+void DiscV4Session::removeENR()
+{
+    if( getENR() )
+    {
+        //Unregister this ENRsession from the Network
+        Network::GetInstance().removeENRSession(getENR()->getPubKey());
+        m_ENR.reset();
+    }
+}
+
+void DiscV4Session::close()
+{
+    //removes from the Network ENRsession list
+    removeENR();
+
+    //removes from the server session list => deletes the peer session (session solely owned by the server)
+    SessionHandler::close();
 }
 
 void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
@@ -58,27 +82,31 @@ void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
         signed_msg->hasValidSize() &&
         signed_msg->hasValidHash() &&
         signed_msg->hasValidType(msg_type) &&
-        (signed_msg->hasValidPubKey(m_pubkey) || msg_type == 0x01) )
+        signed_msg->getPubKey() != Pubkey() )
     {
+        // Dispatch the node ID to the Network to check if there was already a session for this node ID
+        // but with different IP/Port (Roaming).
+        Network::GetInstance().handleRoaming(signed_msg->getPubKey(), dynamic_pointer_cast<const DiscV4Session>(shared_from_this()));
+
         switch( msg_type )
         {
         case 0x01:
-            onNewPing(make_shared<DiscV4PingMessage>(signed_msg));
+            onNewPing(make_shared<const DiscV4PingMessage>(signed_msg));
             break;
         case 0x02:
-            onNewPong(make_shared<DiscV4PongMessage>(signed_msg));
+            onNewPong(make_shared<const DiscV4PongMessage>(signed_msg));
             break;
         case 0x03:
-            onNewFindNode(make_shared<DiscV4FindNodeMessage>(signed_msg));
+            onNewFindNode(make_shared<const DiscV4FindNodeMessage>(signed_msg));
             break;
         case 0x04:
-            onNewNeighbors(make_shared<DiscV4NeighborsMessage>(signed_msg));
+            onNewNeighbors(make_shared<const DiscV4NeighborsMessage>(signed_msg));
             break;
         case 0x05:
-            onNewENRRequest(make_shared<DiscV4ENRRequestMessage>(signed_msg));
+            onNewENRRequest(make_shared<const DiscV4ENRRequestMessage>(signed_msg));
             break;
         case 0x06:
-            onNewENRResponse(make_shared<DiscV4ENRResponseMessage>(signed_msg));
+            onNewENRResponse(make_shared<const DiscV4ENRResponseMessage>(signed_msg));
             break;
         default:
             break;
@@ -86,52 +114,67 @@ void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
         cout << "--------------------------------------------------------------- SESSION COUNT = " << getSocketHandler()->getSessionsCount() << endl;
     }
     else
-        //Something's fishy with this peer...
+        //Invalid message => close
         close();
 }
 
-void DiscV4Session::onNewPing(shared_ptr<DiscV4PingMessage> msg)
+bool DiscV4Session::isVerified() const
 {
-        //const_pointer_cast<DiscV4Server>(server)->sendMsg(signed_msg);     // echo
-    //if( msg && msg->hasValidVersion() && msg->hasNotExpired() )
-    if( msg && msg->hasNotExpired() )
+    return getUnixTimeStamp() - m_last_verified_pong_timestamp < 43200;  // 43200s = 12 Hours
+}
+
+void DiscV4Session::onNewPing(const shared_ptr<const DiscV4PingMessage> msg)
+{
+    if( msg && msg->hasNotExpired() && 
+        msg->getSenderIP() == ntohl(getPeerAddress().sin_addr.s_addr) &&
+        msg->getSenderUDPPort() == ntohs(getPeerAddress().sin_port) )
     {
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
-        m_pubkey = msg->getPubKey();
         msg->print();
+
         sendPong(msg->getHash());
-
-        if(!isVerified())
+        
+        if( !isVerified() )
             sendPing();
+        else
+            setENRFromMessage(make_shared<const DiscV4ENRResponseMessage>(msg));     // creates/updates the Peer ENR
     }
 }
 
-void DiscV4Session::onNewPong(shared_ptr<DiscV4PongMessage> msg)
-{
-    if( msg && msg->hasValidPingHash(m_last_sent_ping_hash) && msg->hasNotExpired() )
-    {
-        m_last_verified_pong = getUnixTimeStamp();
-        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
-        msg->print();
-
-        sendFindNode();
-    }
-}
-
-void DiscV4Session::onNewFindNode(shared_ptr<DiscV4FindNodeMessage> msg)
+void DiscV4Session::onNewPong(const shared_ptr<const DiscV4PongMessage> msg)
 {
     if( msg && msg->hasNotExpired() )
     {
-        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
-        msg->print();
+        if( msg->hasValidPingHash(m_last_sent_ping_hash) )
+        {
+            cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+            msg->print();
 
-        sendNeighbors();  
+            m_last_verified_pong_timestamp = getUnixTimeStamp();
+            setENRFromMessage(make_shared<const DiscV4ENRResponseMessage>(msg));     // creates/updates the Peer ENR
+
+            sendFindNode();
+        }
+        else
+            //Invalid hash => close
+            close();        
     }
 }
 
-void DiscV4Session::onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg)
+void DiscV4Session::onNewFindNode(const shared_ptr<const DiscV4FindNodeMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && msg->hasNotExpired() && isVerified() )
+    {
+        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        msg->print();
+
+        sendNeighbors();
+    }
+}
+
+void DiscV4Session::onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage> msg)
+{
+    if( msg && msg->hasNotExpired() && isVerified() )
     {
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg->print();
@@ -142,9 +185,9 @@ void DiscV4Session::onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg)
     }
 }
 
-void DiscV4Session::onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg)
+void DiscV4Session::onNewENRRequest(const shared_ptr<const DiscV4ENRRequestMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && msg->hasNotExpired() && isVerified() )
     {
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg->print();
@@ -153,12 +196,20 @@ void DiscV4Session::onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg)
     }
 }
 
-void DiscV4Session::onNewENRResponse(shared_ptr<DiscV4ENRResponseMessage> msg)
+void DiscV4Session::onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMessage> msg)
 {
-    if( msg && msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) )
+    if( msg && isVerified() )
     {
-        cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
-        msg->print();
+        if( msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) )
+        {
+            cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+            msg->print();
+
+            setENRFromMessage(msg); // updates the ENR
+        }
+        else
+            //Invalid hash => close
+            close();    
     }
 }
 
@@ -222,7 +273,7 @@ void DiscV4Session::sendENRRequest()
     if(server)
     {
         auto msg_out = make_shared<const DiscV4ENRRequestMessage>(shared_from_this());
-        m_last_sent_enr_request_hash = ByteStream(&(*msg_out)[0], msg_out->size()).keccak256();
+        m_last_sent_enr_request_hash = msg_out->getHash(); //ByteStream(&(*msg_out)[0], msg_out->size()).keccak256();
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
         cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;

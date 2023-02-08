@@ -17,14 +17,14 @@ class DiscV4SignedMessage: public SocketMessage
 
         void addTypeSignAndHash(const RLPByteStream &rlp_payload);
 
-        ByteStream getHash() const;
-        Pubkey getPubKey() const;
-        virtual uint8_t getType() const;
-        RLPByteStream getRLPPayload() const;
+        inline const uint64_t getTimeStamp() const { return m_timestamp; }
+        const ByteStream getHash() const;
+        const Pubkey getPubKey() const;
+        virtual const uint8_t getType() const;
+        const RLPByteStream getRLPPayload() const;
 
         bool hasValidSize() const;
         bool hasValidHash() const;
-        bool hasValidPubKey(Pubkey &pubkey) const;
         bool hasValidType(uint8_t &type) const;
 
         virtual uint64_t size() const;
@@ -35,9 +35,10 @@ class DiscV4SignedMessage: public SocketMessage
     
     protected:
         // Type + RLPPayload
-        ByteStream getSignedPayload() const;
+        const ByteStream getSignedPayload() const;
 
     private:
+        uint64_t m_timestamp;
         vector<uint8_t> m_vect;
 };
 
@@ -50,9 +51,9 @@ class DiscV4PingMessage : public DiscV4SignedMessage
         DiscV4PingMessage(const shared_ptr<const SessionHandler> session_handler);
 
         inline bool hasValidVersion() const { return m_version == 4; }
-        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+        inline bool hasNotExpired() const { return m_expiration > getTimeStamp(); }
 
-        inline virtual uint8_t getType() const {return 0x01; }
+        inline virtual const uint8_t getType() const {return 0x01; }
 
         inline uint8_t getVersion() const { return m_version; }
         inline uint32_t getSenderIP() const { return m_sender_ip; }
@@ -86,10 +87,10 @@ class DiscV4PongMessage : public DiscV4SignedMessage
         //Constructor for building msg to send
         DiscV4PongMessage(const shared_ptr<const SessionHandler> session_handlerc, const ByteStream &ack_hash);
 
-        inline virtual uint8_t getType() const {return 0x02; }
+        inline virtual const uint8_t getType() const {return 0x02; }
 
         inline bool hasValidPingHash(const ByteStream ping_hash) const { return ping_hash == getPingHash(); };
-        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+        inline bool hasNotExpired() const { return m_expiration > getTimeStamp(); }
 
         inline const ByteStream &getPingHash() const { return m_ping_hash; }
         inline uint32_t getRecipientIP() const { return m_recipient_ip; }
@@ -117,7 +118,7 @@ class DiscV4FindNodeMessage : public DiscV4SignedMessage
         //Constructor for building msg to send
         DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &pub_key);
 
-        inline virtual uint8_t getType() const {return 0x03; }
+        inline virtual const uint8_t getType() const {return 0x03; }
         inline const ByteStream &getTarget() const { return m_target; }
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
@@ -137,7 +138,7 @@ class DiscV4NeighborsMessage : public DiscV4SignedMessage
         //Constructor for building msg to send
         DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler);
 
-        inline virtual uint8_t getType() const {return 0x04; }
+        inline virtual const uint8_t getType() const {return 0x04; }
         inline const RLPByteStream &getRLPNodes() const { return m_nodes; } //FIXME!!!!
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
@@ -157,7 +158,7 @@ class DiscV4ENRRequestMessage : public DiscV4SignedMessage
         //Constructor for building msg to send
         DiscV4ENRRequestMessage(const shared_ptr<const SessionHandler> session_handler);
 
-        inline virtual uint8_t getType() const {return 0x05; }
+        inline virtual const uint8_t getType() const {return 0x05; }
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
 
@@ -175,18 +176,20 @@ class DiscV4ENRResponseMessage : public DiscV4SignedMessage
         //Constructor for received msg
         DiscV4ENRResponseMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
         DiscV4ENRResponseMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &ack_hash);
-        ~DiscV4ENRResponseMessage();
 
-        inline virtual uint8_t getType() const {return 0x06; }
+        inline virtual const uint8_t getType() const {return 0x06; }
 
         inline bool hasValidENRRequestHash(const ByteStream &enr_request_hash) const { return enr_request_hash == m_enr_request_hash; }
 
         inline const ByteStream &getENRRequestHash() const { return m_enr_request_hash; }
-        ENRV4Identity *getPeerENR() const;
+        inline const shared_ptr<const ENRV4Identity> getPeerENR() const { return m_sender_enr; }
+
+        const shared_ptr<const DiscV4ENRResponseMessage> buildFromPingMessage(const shared_ptr<const DiscV4PingMessage> msg) const;
+        const shared_ptr<const DiscV4ENRResponseMessage> buildFromPongMessage(const shared_ptr<const DiscV4PongMessage> msg) const ;
 
         void print() const;
 
     private:
         ByteStream m_enr_request_hash;
-        ENRV4Identity *m_sender_enr;
+        shared_ptr<const ENRV4Identity> m_sender_enr;
 };

@@ -95,11 +95,11 @@ class Signature: public EllipticCurve
 class Privkey
 {
     public:
-        Privkey(const Privkey& privkey);
-        Privkey(const BIP39::Mnemonic& mnc, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
-        Privkey(const ByteStream &seed, const char *path, const int32_t account_i = 0, const EllipticCurve& curve = Secp256k1::GetInstance());
-        Privkey(const Privkey& parent_extprivkey, const int32_t index, const bool hardened);
-        Privkey(const ByteStream &k, const EllipticCurve& curve = Secp256k1::GetInstance());
+        Privkey(const Privkey &privkey);
+        Privkey(const BIP39::Mnemonic &mnc, const char *path, const int32_t account_i = 0, const EllipticCurve &curve = Secp256k1::GetInstance());
+        Privkey(const ByteStream &seed, const char *path, const int32_t account_i = 0, const EllipticCurve &curve = Secp256k1::GetInstance());
+        Privkey(const Privkey &parent_extprivkey, const int32_t index, const bool hardened);
+        Privkey(const ByteStream &k, const EllipticCurve &curve = Secp256k1::GetInstance());
 
         const EllipticCurve& getCurve() const { return m_pubkey.getCurve(); }
         const ByteStream &getChainCode() const { return m_pubkey.getChainCode(); }
@@ -110,7 +110,7 @@ class Privkey
 
         const Signature sign(const ByteStream &h, const bool enforce_eip2 = true) const;
 
-        inline bool operator==(const Privkey& k) const { return m_secret == k.getSecret(); }
+        inline bool operator==(const Privkey &k) const { return m_secret == k.getSecret(); }
 
     private:
         Pubkey m_pubkey;
@@ -121,7 +121,7 @@ class DerivationPath
 {
     public:
         DerivationPath(string path);
-        Privkey deriveRootKey(const Privkey& root_key, const int32_t account_i = 0) const;
+        Privkey deriveRootKey(const Privkey &root_key, const int32_t account_i = 0) const;
     private:
         vector<uint32_t> m_path;
         uint8_t m_account_depth;

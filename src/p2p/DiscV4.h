@@ -7,6 +7,7 @@
 
 using std::vector;
 
+class DiscV4SignedMessage;
 class DiscV4PingMessage;
 class DiscV4PongMessage;
 class DiscV4FindNodeMessage;
@@ -29,20 +30,22 @@ class DiscV4Server: public SocketHandler
 };
 
 class Network;
+class ENRV4Identity;
 
 class DiscV4Session: public SessionHandler
 {
     public:
         DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
 
+        virtual void close();
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 
-        void onNewPing(shared_ptr<DiscV4PingMessage> msg);
-        void onNewPong(shared_ptr<DiscV4PongMessage> msg);
-        void onNewFindNode(shared_ptr<DiscV4FindNodeMessage> msg);
-        void onNewNeighbors(shared_ptr<DiscV4NeighborsMessage> msg);
-        void onNewENRRequest(shared_ptr<DiscV4ENRRequestMessage> msg);
-        void onNewENRResponse(shared_ptr<DiscV4ENRResponseMessage> msg);
+        void onNewPing(const shared_ptr<const DiscV4PingMessage> msg);
+        void onNewPong(const shared_ptr<const DiscV4PongMessage> msg);
+        void onNewFindNode(const shared_ptr<const DiscV4FindNodeMessage> msg);
+        void onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage> msg);
+        void onNewENRRequest(const shared_ptr<const DiscV4ENRRequestMessage> msg);
+        void onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMessage> msg);
     
         void sendPing();
         void sendPong(const ByteStream &ack_hash) const;      
@@ -51,19 +54,21 @@ class DiscV4Session: public SessionHandler
         void sendENRRequest();
         void sendENRResponse(const ByteStream &ack_hash) const;
 
-        inline const Pubkey &getPubKey() const { return m_pubkey; }
         inline const ByteStream &getLastSentPingHash() const { return m_last_sent_ping_hash; }
         inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }
 
+        inline const shared_ptr<const ENRV4Identity> getENR() const { return m_ENR; };
         bool isVerified() const;
 
     protected:
         friend class Network;   // Network::onNewNodeCandidates() calls initPublicKey
-        void initPublicKey(Pubkey &advertised_key) { m_pubkey = advertised_key; }
+
+        void setENRFromMessage(const shared_ptr<const DiscV4ENRResponseMessage> msg);
+        void removeENR();
 
     private:
-        Pubkey m_pubkey;
+        shared_ptr<const ENRV4Identity> m_ENR;
         ByteStream m_last_sent_ping_hash;
         ByteStream m_last_sent_enr_request_hash;
-        time_t m_last_verified_pong;
+        uint64_t m_last_verified_pong_timestamp;
 };
