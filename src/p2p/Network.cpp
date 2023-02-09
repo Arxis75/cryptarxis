@@ -286,43 +286,6 @@ void Network::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identi
     }
 }
 
-/*void Network::onNewNodeCandidates(const RLPByteStream &node_list) const
-{
-    bool is_list;
-    RLPByteStream nodes(node_list);
-    while( nodes.byteSize() > 1 )
-    {
-        RLPByteStream node_i = nodes.pop_front(is_list);
-        uint32_t node_ip = node_i.pop_front(is_list).as_uint64();
-        uint16_t node_udp_port = node_i.pop_front(is_list).as_uint64();
-        uint16_t node_tcp_port = node_i.pop_front(is_list).as_uint64();
-        Pubkey node_pub_key(node_i.pop_front(is_list), Pubkey::Format::XY);
-        
-        // Is it a real peer and not me?
-        if( node_ip != getHostENR()->getIP() &&
-            node_udp_port != getHostENR()->getUDPPort() &&
-            node_pub_key != getHostENR()->getPubKey() )
-        {
-            //Get the master UDP socket
-            if(m_udp_server)
-            {
-                struct sockaddr_in peer_address;
-                peer_address.sin_family = AF_INET;
-                peer_address.sin_addr.s_addr = htonl(node_ip);
-                peer_address.sin_port = htons(node_udp_port); 
-
-                //Gets the existing session  / Creates a new session
-                auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
-                
-                //Has this peer recently responded to a ping?
-                if( session && !session->isVerified() )
-                    // Pings the peer
-                    const_pointer_cast<DiscV4Session>(session)->sendPing();
-            }
-        }
-    }
-}*/
-
 bool Network::handleRoaming(const Pubkey &pub_key, const shared_ptr<const DiscV4Session> session) const
 {
     bool roaming = false;
@@ -358,8 +321,11 @@ const shared_ptr<const DiscV4Session> Network::findSessionByAddress(const struct
 void Network::registerENRSession(const shared_ptr<const DiscV4Session> session)
 {
     if( session && session->getENR() )
+    {
         //Insert the session indexed by its Public key
-        m_enr_session_list.insert(make_pair(session->getENR()->getPubKey().getKey(Pubkey::Format::XY), session));   
+        m_enr_session_list.insert(make_pair(session->getENR()->getPubKey().getKey(Pubkey::Format::XY), session)); 
+        cout << "--------------------------------------------------------------- SESSION COUNT = " << m_enr_session_list.size() << endl;  
+    }
 }
 
 void Network::removeENRSession(const Pubkey &pub_key)

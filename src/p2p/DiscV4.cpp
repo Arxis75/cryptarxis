@@ -111,7 +111,6 @@ void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
         default:
             break;
         }
-        cout << "--------------------------------------------------------------- SESSION COUNT = " << getSocketHandler()->getSessionsCount() << endl;
     }
     else
         //Invalid message => close
@@ -222,7 +221,7 @@ void DiscV4Session::sendPing()
         m_last_sent_ping_hash = msg_out->getHash();
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
@@ -235,7 +234,7 @@ void DiscV4Session::sendPong(const ByteStream &ack_hash) const
         auto msg_out = make_shared<const DiscV4PongMessage>(shared_from_this(), ack_hash);
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
@@ -249,7 +248,7 @@ void DiscV4Session::sendFindNode() const
         auto msg_out = make_shared<const DiscV4FindNodeMessage>(shared_from_this(), target);
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
@@ -262,7 +261,7 @@ void DiscV4Session::sendNeighbors(const Pubkey &target) const
         auto msg_out = make_shared<const DiscV4NeighborsMessage>(shared_from_this(), Network::GetInstance().findNeighbors(target));
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
@@ -276,7 +275,7 @@ void DiscV4Session::sendENRRequest()
         m_last_sent_enr_request_hash = msg_out->getHash(); //ByteStream(&(*msg_out)[0], msg_out->size()).keccak256();
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
@@ -289,7 +288,7 @@ void DiscV4Session::sendENRResponse(const ByteStream &ack_hash) const
         auto msg_out = make_shared<const DiscV4ENRResponseMessage>(shared_from_this(), ack_hash);
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
-        cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
+        cout << "SENDING TO @" << dec << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg_out->print();
     }
 }
