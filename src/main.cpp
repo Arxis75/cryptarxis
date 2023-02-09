@@ -1,5 +1,6 @@
 
 #include <p2p/Network.h>
+#include "Common.h"
 
 #define NODE_IP 0x51430B52      //81.67.11.82
 #define NODE_UDP_PORT 40404
@@ -15,6 +16,11 @@
 
 int main(int argc , char *argv[])  
 {   
+    RLPByteStream node_i;
+    uint64_t x = 0;
+    //ByteStream y = ByteStream(x);
+    uint8_t y = sizeInBytes64(x);
+
     Network::GetInstance().start(NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
 
     return 0;  

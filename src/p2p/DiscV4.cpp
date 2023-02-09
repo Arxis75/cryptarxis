@@ -168,7 +168,7 @@ void DiscV4Session::onNewFindNode(const shared_ptr<const DiscV4FindNodeMessage> 
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg->print();
 
-        sendNeighbors();
+        sendNeighbors(msg->getTarget());
     }
 }
 
@@ -179,7 +179,7 @@ void DiscV4Session::onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage
         cout << "RECEIVING FROM @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;
         msg->print();
         
-        Network::GetInstance().onNewNodeCandidates(msg->getRLPNodes());
+        Network::GetInstance().onNewNodeCandidates(msg->getNodes());
 
         sendENRRequest();
     }
@@ -245,7 +245,7 @@ void DiscV4Session::sendFindNode() const
     auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
     if(server)
     {
-        ByteStream target = Network::GetInstance().getHostENR()->getPubKey().getKey(Pubkey::Format::XY);
+        Pubkey target = Network::GetInstance().getHostENR()->getPubKey();
         auto msg_out = make_shared<const DiscV4FindNodeMessage>(shared_from_this(), target);
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
@@ -254,12 +254,12 @@ void DiscV4Session::sendFindNode() const
     }
 }
 
-void DiscV4Session::sendNeighbors() const
+void DiscV4Session::sendNeighbors(const Pubkey &target) const
 {
     auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler());
     if(server)
     {
-        auto msg_out = make_shared<const DiscV4NeighborsMessage>(shared_from_this());
+        auto msg_out = make_shared<const DiscV4NeighborsMessage>(shared_from_this(), Network::GetInstance().findNeighbors(target));
         const_pointer_cast<DiscV4Server>(server)->sendMsg(msg_out);
 
         cout << "SENDING TO @" << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port) << endl;

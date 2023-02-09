@@ -20,25 +20,25 @@ class ENRV4Identity
         //Peer-sent ENR
         ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &rlp);
         //This node ENR
-        ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const char *secret);
+        ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret);
         //Peer ENR
-        ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const Pubkey & pub_key);
+        ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey & pub_key);
 
-        const uint64_t getTimeStamp() const { return m_timestamp; }
-        const uint64_t getSeq() const { return m_seq; }
-        const string &getScheme() const { return m_scheme; }
-        const uint32_t getIP() const { return m_ip; }
-        const uint16_t getTCPPort() const { return m_tcp_port; }
-        const uint16_t getUDPPort() const { return m_udp_port; }
-        const Integer &getIP6() const { return m_ip6; }
-        const uint16_t getTCP6Port() const { return m_tcp6_port; }
-        const uint16_t getUDP6Port() const { return m_udp6_port; }
-        const shared_ptr<const Privkey> getSecret() const { return m_secret; }
-        const Pubkey &getPubKey() const { return m_pubkey; }
-        const ByteStream &getID() const { return m_ID; }
-        const bool isSigned() const { return m_is_signed; };
-
-        const RLPByteStream getSignedRLP() const { return m_is_signed ? m_signed_rlp : RLPByteStream(); }
+        inline const uint64_t getTimeStamp() const { return m_timestamp; }
+        inline const uint64_t getSeq() const { return m_seq; }
+        inline const string &getScheme() const { return m_scheme; }
+        inline const uint32_t getIP() const { return m_ip; }
+        inline const uint16_t getUDPPort() const { return m_udp_port; }
+        inline const uint16_t getTCPPort() const { return m_tcp_port; }
+        inline const Integer &getIP6() const { return m_ip6; }
+        inline const uint16_t getUDP6Port() const { return m_udp6_port; }
+        inline const uint16_t getTCP6Port() const { return m_tcp6_port; }
+        inline const shared_ptr<const Privkey> getSecret() const { return m_secret; }
+        inline const Pubkey &getPubKey() const { return m_pubkey; }
+        inline const ByteStream &getID() const { return m_ID; }
+        inline const bool isSigned() const { return m_is_signed; };
+        inline const RLPByteStream getSignedRLP() const { return m_is_signed ? m_signed_rlp : RLPByteStream(); }
+        
         const string getName() const { return base64_url_encode(getSignedRLP()); }
 
         bool validatePubKey(const Pubkey &key) const { return key == m_pubkey; };
@@ -53,11 +53,11 @@ class ENRV4Identity
         uint64_t m_seq;
         string m_scheme;
         uint32_t m_ip;
-        uint16_t m_tcp_port;
         uint16_t m_udp_port;
+        uint16_t m_tcp_port;
         Integer m_ip6;
-        uint16_t m_tcp6_port;
         uint16_t m_udp6_port;
+        uint16_t m_tcp6_port;
         const shared_ptr<const Privkey> m_secret;
         const Pubkey m_pubkey;
         const ByteStream m_ID;
@@ -79,53 +79,17 @@ class Network
         const shared_ptr<const ENRV4Identity> getHostENR() const { return m_host_enr; }
         shared_ptr<const DiscV4Server> getDiscV4Server() { return m_udp_server; }
 
-        void onNewNodeCandidates(const RLPByteStream &node_list);
+        void onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identity>> &node_list) const;
 
-        //const vector<const std::weak_ptr<const DiscV4Session> findNeighbors(ByteStream) const;
-        const shared_ptr<const DiscV4Session> findSessionByID(const Pubkey &node_pub_key) const
-        {
-            auto it = m_enr_session_list.find(node_pub_key.getKey(Pubkey::Format::XY));
-            if( it != std::end(m_enr_session_list) ) 
-            {
-                auto weak_ptr = it->second;
-                if( auto session = weak_ptr.lock() )
-                    return session;
-            }
-            return shared_ptr<const DiscV4Session>(nullptr); 
-        }
-
-        const shared_ptr<const DiscV4Session> findSessionByAddress(const struct sockaddr_in &node_address) const
-        {
-            return std::dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(node_address));
-        }
-
-        void registerENRSession(const shared_ptr<const DiscV4Session> session)
-        {
-            if( session && session->getENR() )
-                //Insert the session indexed by its Public key
-                m_enr_session_list.insert(make_pair(session->getENR()->getPubKey().getKey(Pubkey::Format::XY), session));   
-        }
+        vector<std::weak_ptr<const ENRV4Identity>> findNeighbors(const Pubkey &target) const;
         
-        void removeENRSession(const Pubkey &pub_key)
-        {
-            //removes from the ENR session list
-            m_enr_session_list.erase(pub_key.getKey(Pubkey::Format::XY));
-        }
+        const shared_ptr<const DiscV4Session> findSessionByID(const Pubkey &node_pub_key) const;
+        const shared_ptr<const DiscV4Session> findSessionByAddress(const struct sockaddr_in &node_address) const;
 
-        bool handleRoaming(const Pubkey &pub_key, const shared_ptr<const DiscV4Session> session)
-        {
-            bool roaming = false;
-            auto roaming_session = findSessionByID(pub_key);
-            if( roaming_session && roaming_session != session )
-            {
-                //We have a previous session with different IP/Port
-                //but same nodeID => this is Peer roaming, close the previous session
-                //and send ping to ensure ENR re-creation
-                const_pointer_cast<DiscV4Session>(roaming_session)->close();
-                roaming = true;
-            }
-            return roaming;
-        }
+        void registerENRSession(const shared_ptr<const DiscV4Session> session);
+        void removeENRSession(const Pubkey &pub_key);
+
+        bool handleRoaming(const Pubkey &pub_key, const shared_ptr<const DiscV4Session> session) const;
 
     private:
         static Network *m_sInstancePtr;

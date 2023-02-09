@@ -19,7 +19,7 @@ class DiscV4Server: public SocketHandler
 {
     public:
         DiscV4Server(const uint16_t binding_port, const int protocol,
-                              const int read_buffer_size = 1280, const int write_buffer_size = 1280,
+                              const int read_buffer_size = 1374, const int write_buffer_size = 1374,
                               const int tcp_connection_backlog_size = 10);
         DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler);
 
@@ -50,7 +50,7 @@ class DiscV4Session: public SessionHandler
         void sendPing();
         void sendPong(const ByteStream &ack_hash) const;      
         void sendFindNode() const;
-        void sendNeighbors() const;
+        void sendNeighbors(const Pubkey &target) const;
         void sendENRRequest();
         void sendENRResponse(const ByteStream &ack_hash) const;
 

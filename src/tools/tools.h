@@ -52,7 +52,7 @@ static const int log2_tab64[64] = {
     56, 45, 25, 31, 35, 16,  9, 12,
     44, 24, 15,  8, 23,  7,  6,  5};
 
-static inline int log2_64 (uint64_t value)
+/*static inline int log2_64 (uint64_t value)
 {
     value |= value >> 1;
     value |= value >> 2;
@@ -61,6 +61,16 @@ static inline int log2_64 (uint64_t value)
     value |= value >> 16;
     value |= value >> 32;
     return log2_tab64[((uint64_t)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
+}*/
+
+static inline uint64_t log2_64(const uint64_t x)
+{
+  uint64_t y;
+  asm ( "\tbsr %1, %0\n"
+      : "=r"(y)
+      : "r" (x)
+  );
+  return y;
 }
 
 static inline uint64_t sizeInBytes64(const uint64_t& value)

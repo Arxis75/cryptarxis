@@ -139,13 +139,19 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
 
     m_version = msg.pop_front(is_list).as_uint8();
     RLPByteStream from = msg.pop_front(is_list);
-    m_sender_ip = from.pop_front(is_list).as_uint64();
-    m_sender_udp_port = from.pop_front(is_list).as_uint64(); 
-    m_sender_tcp_port = from.pop_front(is_list).as_uint64(); 
+    if( from.byteSize() > 1 )   //non-empty list
+    {
+        m_sender_ip = from.pop_front(is_list).as_uint64();
+        m_sender_udp_port = from.pop_front(is_list).as_uint64(); 
+        m_sender_tcp_port = from.pop_front(is_list).as_uint64(); 
+    }
     RLPByteStream to = msg.pop_front(is_list);
-    m_recipient_ip = to.pop_front(is_list).as_uint64();
-    m_recipient_udp_port = to.pop_front(is_list).as_uint64(); 
-    m_recipient_tcp_port = to.pop_front(is_list).as_uint64(); 
+    if( to.byteSize() > 1 )     //non-empty list
+    {
+        m_recipient_ip = to.pop_front(is_list).as_uint64();
+        m_recipient_udp_port = to.pop_front(is_list).as_uint64(); 
+        m_recipient_tcp_port = to.pop_front(is_list).as_uint64(); 
+    }
     m_expiration = msg.pop_front(is_list).as_uint64();
     m_enr_seq = msg.pop_front(is_list).as_uint64();
 }
@@ -246,13 +252,13 @@ void DiscV4PongMessage::print() const
 
 //-----------------------------------------------------------------------------------------------------
 
-DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &target)
+DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const Pubkey &target)
     : DiscV4SignedMessage(session_handler)
     , m_target(target)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
     RLPByteStream rlp;
-    rlp.push_back(m_target);
+    rlp.push_back(m_target.getKey(Pubkey::Format::XY));
     rlp.push_back(ByteStream(m_expiration));
     addTypeSignAndHash(rlp);
 }
@@ -269,7 +275,7 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
     // - 1 byte type
     msg.ByteStream::pop_front(98);
 
-    m_target = msg.pop_front(is_list);
+    m_target = Pubkey(msg.pop_front(is_list), Pubkey::Format::XY);
     m_expiration = msg.pop_front(is_list).as_uint64();
 }
 
@@ -285,7 +291,7 @@ void DiscV4FindNodeMessage::print() const
                 cout << dec << "   @UDP DiscV4 EXPIRED FINDNODE" << endl;
             else
                 cout << dec << "   @UDP DiscV4 FINDNODE" << endl;
-            cout << "   Target = 0x" << hex << m_target << endl;
+            cout << "   Target = 0x" << hex << m_target.getKey(Pubkey::Format::XY) << endl;
             cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
         }
     }
@@ -293,15 +299,30 @@ void DiscV4FindNodeMessage::print() const
 
 //-----------------------------------------------------------------------------------------------------
 
-DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler)
+DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const vector<std::weak_ptr<const ENRV4Identity>> &neighbors_enr)
     : DiscV4SignedMessage(session_handler)
-    , m_nodes(RLPByteStream(true))  //empty, FIXME!!!!
+    //, m_nodes(neighbors_enr) FIXME
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
-    RLPByteStream rlp;
-    rlp.push_back(m_nodes);
+    RLPByteStream rlp(ByteStream(), true);
+    
+    for(auto it = begin(neighbors_enr); it != end(neighbors_enr); it++)
+    {
+        RLPByteStream node_i;
+        if( auto enr = it->lock() )
+        {
+            node_i.push_back(enr->getIP() ? ByteStream(enr->getIP()) : ByteStream());           //Transmit empty instead of 0
+            node_i.push_back(enr->getUDPPort() ? ByteStream(enr->getUDPPort()) : ByteStream()); //Transmit empty instead of 0
+            node_i.push_back(enr->getTCPPort() ? ByteStream(enr->getTCPPort()) : ByteStream()); //Transmit empty instead of 0
+            node_i.push_back(enr->getPubKey().getKey(Pubkey::Format::XY));
+            rlp.push_back(node_i);
+        }
+    }
+
     rlp.push_back(ByteStream(m_expiration));
     addTypeSignAndHash(rlp);
+    if( rlp.byteSize()+32+65+1 > 1280 )
+        cout << hex << rlp.as_Integer() << endl;
 }
 
 DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
@@ -316,7 +337,21 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
     // - 1 byte type
     msg.ByteStream::pop_front(98);
 
-    m_nodes = msg.pop_front(is_list);
+    RLPByteStream node_list = msg.pop_front(is_list);
+    while( node_list.byteSize() )
+    {
+        RLPByteStream node_i = node_list.pop_front(is_list);
+        if( node_i.byteSize() > 1 )     // if list is not empty
+        {
+            uint32_t node_ip = node_i.pop_front(is_list).as_uint64();
+            uint16_t node_udp_port = node_i.pop_front(is_list).as_uint64();
+            uint16_t node_tcp_port = node_i.pop_front(is_list).as_uint64();
+            Pubkey node_pub_key(node_i.pop_front(is_list), Pubkey::Format::XY);
+        
+            m_nodes.push_back(make_shared<const ENRV4Identity>(0, node_ip, node_udp_port, node_tcp_port, node_pub_key));
+        }
+    }
+
     m_expiration = msg.pop_front(is_list).as_uint64();
 }
 
@@ -328,25 +363,24 @@ void DiscV4NeighborsMessage::print() const
         auto server = dynamic_pointer_cast<const DiscV4Server>(session->getSocketHandler());
         if( server )
         {
-            bool is_list;
-            RLPByteStream nodes(m_nodes);
-
             if( !hasNotExpired() )
                 cout << dec << "   @UDP DiscV4 EXPIRED NEIGHBORS" << endl;
             else
                 cout << dec << "   @UDP DiscV4 NEIGHBORS" << endl;
-            while( nodes.byteSize() > 1 )
+            auto nodes(m_nodes);
+            while( nodes.size() )
             {
-                RLPByteStream node_i = nodes.pop_front(is_list);
-                uint32_t node_ip = node_i.pop_front(is_list).as_uint64();
+                auto node_i = nodes.back();
                 cout << "   ----------------------------------------" << endl;
-                cout << "   Node IP = " << dec << ((node_ip >> 24) & 0xFF) << "."
-                                                    << ((node_ip >> 16) & 0xFF) << "." 
-                                                    << ((node_ip >> 8) & 0xFF) << "." 
-                                                    << (node_ip & 0xFF) << endl;
-                cout << "   Node UDP PORT = " << dec << node_i.pop_front(is_list).as_uint64() << endl;
-                cout << "   Node TCP PORT = " << dec << node_i.pop_front(is_list).as_uint64() << endl;
-                cout << "   Node PUBLIC KEY = 0x" << hex << node_i.pop_front(is_list) << endl;
+                cout << "   Node IP = " << dec << ((node_i->getIP() >> 24) & 0xFF) << "."
+                                                << ((node_i->getIP() >> 16) & 0xFF) << "." 
+                                                << ((node_i->getIP() >> 8) & 0xFF) << "." 
+                                                << (node_i->getIP() & 0xFF) << endl;
+                cout << "   Node UDP PORT = " << dec << node_i->getUDPPort() << endl;
+                cout << "   Node TCP PORT = " << dec << node_i->getTCPPort() << endl;
+                cout << "   Node PUBLIC KEY = 0x" << hex << node_i->getPubKey().getKey(Pubkey::Format::XY) << endl;
+
+                nodes.pop_back();    // => next node
             }
             cout << "   ----------------------------------------" << endl;
             cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
@@ -403,10 +437,6 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const Sessio
     : DiscV4SignedMessage(session_handler)
     , m_enr_request_hash(ack_hash)
     , m_sender_enr(Network::GetInstance().getHostENR())
-/*    , m_sender_enr(new ENRV4Identity( Network::GetInstance().getHostENR()->getIP(),
-                                      Network::GetInstance().getHostENR()->getTCPPort(),
-                                      Network::GetInstance().getHostENR()->getUDPPort(),
-                                      "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168815") )*/
 {
     RLPByteStream rlp;
     rlp.push_back(ack_hash);
@@ -424,8 +454,8 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
         // DiscV4ENRResponseMessage emulated from DiscV4PingMessage
         m_sender_enr = make_shared<const ENRV4Identity>( ping_msg->getENRSeq(),
                                                          ntohl(ping_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
-                                                         ping_msg->getSenderTCPPort(),
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
+                                                         ping_msg->getSenderTCPPort(),
                                                          ping_msg->getPubKey()
                                                        );
     }
@@ -434,8 +464,8 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
         // DiscV4ENRResponseMessage emulated from DiscV4PongMessage
         m_sender_enr = make_shared<const ENRV4Identity>( pong_msg->getENRSeq(),
                                                          ntohl(pong_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
-                                                         0,    // we know nothing about the sender tcp port in the pong msg
                                                          ntohs(pong_msg->getSessionHandler()->getPeerAddress().sin_port),
+                                                         0,    // we know nothing about the sender tcp port in the pong msg
                                                          pong_msg->getPubKey()
                                                        );
     }

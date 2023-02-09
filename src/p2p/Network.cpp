@@ -109,15 +109,15 @@ ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_
     }
 }
 
-ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const char *secret)
+ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret)
     : m_timestamp(getUnixTimeStamp())
     , m_scheme(ByteStream("v4"))
     , m_ip(ip)
-    , m_tcp_port(tcp_port)
     , m_udp_port(udp_port)
+    , m_tcp_port(tcp_port)
     , m_ip6(Integer::zero)
-    , m_tcp6_port(0)
     , m_udp6_port(0)
+    , m_tcp6_port(0)
     , m_secret(make_shared<const Privkey>(ByteStream(secret, 32, 16)))
     , m_pubkey(m_secret->getPubKey())
     , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
@@ -133,10 +133,10 @@ ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const u
     m_signed_rlp.push_back(ByteStream(m_ip));                //assumes 4-bytes ip here (ip cannot start with 0)
     m_signed_rlp.push_back(ByteStream("secp256k1"));
     m_signed_rlp.push_back(m_pubkey.getKey(Pubkey::Format::PREFIXED_X));
-    m_signed_rlp.push_back(ByteStream("tcp"));
-    m_signed_rlp.push_back(ByteStream(m_tcp_port, 2));
     m_signed_rlp.push_back(ByteStream("udp"));
     m_signed_rlp.push_back(ByteStream(m_udp_port, 2));
+    m_signed_rlp.push_back(ByteStream("tcp"));
+    m_signed_rlp.push_back(ByteStream(m_tcp_port, 2));
 
     Signature sig = m_secret->sign(m_signed_rlp.keccak256());
 
@@ -147,16 +147,16 @@ ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t tcp_port, const u
     m_signed_rlp.push_front(signature_field);
 }
 
-ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t tcp_port, const uint16_t udp_port, const Pubkey & pub_key)
+ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey & pub_key)
     : m_timestamp(getUnixTimeStamp())
     , m_seq(seq)
     , m_scheme(ByteStream("v4"))
     , m_ip(ip)
-    , m_tcp_port(tcp_port)
     , m_udp_port(udp_port)
+    , m_tcp_port(tcp_port)
     , m_ip6(Integer::zero)
-    , m_tcp6_port(0)
     , m_udp6_port(0)
+    , m_tcp6_port(0)
     , m_secret(0)
     , m_pubkey(pub_key)
     , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
@@ -235,7 +235,7 @@ Network& Network::GetInstance()
 
 void Network::start(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, const uint64_t seq)
 {
-    m_host_enr = make_shared<const ENRV4Identity>(ip, tcp_port, udp_port, secret);
+    m_host_enr = make_shared<const ENRV4Identity>(ip, udp_port, tcp_port, secret);
 
     m_udp_server = make_shared<DiscV4Server>(m_host_enr->getUDPPort(), IPPROTO_UDP);
     if( m_udp_server )
@@ -254,8 +254,39 @@ void Network::start(const uint32_t ip, const uint16_t udp_port, const uint16_t t
         //}
     }
 }
+void Network::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identity>> &node_list) const
+{
+    for(auto it = begin(node_list);it!=end(node_list);it++)
+    {
+        if( auto node_i = *it )
+        {
+            // Is it a real peer and not me?
+            if( node_i->getIP() != getHostENR()->getIP() &&
+                node_i->getUDPPort() != getHostENR()->getUDPPort() &&
+                node_i->getPubKey() != getHostENR()->getPubKey() )
+            {
+                //Get the master UDP socket
+                if(m_udp_server)
+                {
+                    struct sockaddr_in peer_address;
+                    peer_address.sin_family = AF_INET;
+                    peer_address.sin_addr.s_addr = htonl(node_i->getIP());
+                    peer_address.sin_port = htons(node_i->getUDPPort()); 
 
-void Network::onNewNodeCandidates(const RLPByteStream &node_list)
+                    //Gets the existing session  / Creates a new session
+                    auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
+                    
+                    //Has this peer recently responded to a ping?
+                    if( session && !session->isVerified() )
+                        // Pings the peer
+                        const_pointer_cast<DiscV4Session>(session)->sendPing();
+                }
+            }
+        }
+    }
+}
+
+/*void Network::onNewNodeCandidates(const RLPByteStream &node_list) const
 {
     bool is_list;
     RLPByteStream nodes(node_list);
@@ -290,6 +321,80 @@ void Network::onNewNodeCandidates(const RLPByteStream &node_list)
             }
         }
     }
+}*/
+
+bool Network::handleRoaming(const Pubkey &pub_key, const shared_ptr<const DiscV4Session> session) const
+{
+    bool roaming = false;
+    auto roaming_session = findSessionByID(pub_key);
+    if( roaming_session && roaming_session != session )
+    {
+        //We have a previous session with different IP/Port
+        //but same nodeID => this is Peer roaming, close the previous session
+        //and send ping to ensure ENR re-creation
+        const_pointer_cast<DiscV4Session>(roaming_session)->close();
+        roaming = true;
+    }
+    return roaming;
+}
+
+const shared_ptr<const DiscV4Session> Network::findSessionByID(const Pubkey &node_pub_key) const
+{
+    auto it = m_enr_session_list.find(node_pub_key.getKey(Pubkey::Format::XY));
+    if( it != std::end(m_enr_session_list) ) 
+    {
+        auto weak_ptr = it->second;
+        if( auto session = weak_ptr.lock() )
+            return session;
+    }
+    return shared_ptr<const DiscV4Session>(nullptr); 
+}
+
+const shared_ptr<const DiscV4Session> Network::findSessionByAddress(const struct sockaddr_in &node_address) const
+{
+    return std::dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(node_address));
+}
+
+void Network::registerENRSession(const shared_ptr<const DiscV4Session> session)
+{
+    if( session && session->getENR() )
+        //Insert the session indexed by its Public key
+        m_enr_session_list.insert(make_pair(session->getENR()->getPubKey().getKey(Pubkey::Format::XY), session));   
+}
+
+void Network::removeENRSession(const Pubkey &pub_key)
+{
+    //removes from the ENR session list
+    m_enr_session_list.erase(pub_key.getKey(Pubkey::Format::XY));
+}
+
+vector<std::weak_ptr<const ENRV4Identity>> Network::findNeighbors(const Pubkey &target) const
+{
+    vector<std::weak_ptr<const ENRV4Identity>> neighbors_vector;
+
+    map<Integer, std::weak_ptr<const ENRV4Identity>> neighbors_map;
+    auto it1 = begin(m_enr_session_list);
+    while( it1!= end(m_enr_session_list) )
+    {
+        if(auto session = it1->second.lock() )
+        {
+            Integer distance = it1->first.keccak256().as_Integer() ^ target.getKey(Pubkey::Format::XY).keccak256().as_Integer();
+            neighbors_map.insert(std::make_pair(distance, session->getENR()));
+        }
+        it1++;
+    }
+
+    auto it2 = begin(neighbors_map);
+    while( it2!= end(neighbors_map) && neighbors_vector.size() < 16 ) 
+    {
+        if(auto enr = it2->second.lock() )
+        {
+            //cout << dec << it2->first << endl;
+            neighbors_vector.push_back(enr);
+        }
+        it2++;
+    }
+    return neighbors_vector;
 }
 
 Network *Network::m_sInstancePtr = NULL;

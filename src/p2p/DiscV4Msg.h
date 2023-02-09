@@ -116,17 +116,17 @@ class DiscV4FindNodeMessage : public DiscV4SignedMessage
         //Constructor for received msg
         DiscV4FindNodeMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
         //Constructor for building msg to send
-        DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &pub_key);
+        DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const Pubkey &pub_key);
 
         inline virtual const uint8_t getType() const {return 0x03; }
-        inline const ByteStream &getTarget() const { return m_target; }
+        inline const Pubkey &getTarget() const { return m_target; }
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
 
         void print() const;
 
     private:
-        ByteStream m_target;
+        Pubkey m_target;
         uint64_t m_expiration;
 };
 
@@ -136,17 +136,17 @@ class DiscV4NeighborsMessage : public DiscV4SignedMessage
         //Constructor for received msg
         DiscV4NeighborsMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
         //Constructor for building msg to send
-        DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler);
+        DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const vector<std::weak_ptr<const ENRV4Identity>> &neighbors_enr);
 
         inline virtual const uint8_t getType() const {return 0x04; }
-        inline const RLPByteStream &getRLPNodes() const { return m_nodes; } //FIXME!!!!
+        inline const vector<std::shared_ptr<const ENRV4Identity>> &getNodes() const { return m_nodes; }
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
 
         void print() const;
 
     private:
-        RLPByteStream m_nodes;  //FIXME!!!!
+        vector<std::shared_ptr<const ENRV4Identity>> m_nodes;
         uint64_t m_expiration;
 };
 
