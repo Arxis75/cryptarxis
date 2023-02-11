@@ -127,6 +127,7 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const SessionHandler> sess
 
 DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscV4SignedMessage(signed_msg)
+    , m_enr_seq(0)
 {
     bool is_list;
     RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
@@ -153,7 +154,8 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
         m_recipient_tcp_port = to.pop_front(is_list).as_uint64(); 
     }
     m_expiration = msg.pop_front(is_list).as_uint64();
-    m_enr_seq = msg.pop_front(is_list).as_uint64();
+    if( msg.byteSize() > 0 )
+        m_enr_seq = msg.pop_front(is_list).as_uint64();
 }
 
 void DiscV4PingMessage::print() const
@@ -205,6 +207,7 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const SessionHandler> sess
 
 DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscV4SignedMessage(signed_msg)
+    , m_enr_seq(0)
 {
     bool is_list;
     RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
@@ -216,12 +219,16 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
     msg.ByteStream::pop_front(98);
 
     RLPByteStream to = msg.pop_front(is_list);
-    m_recipient_ip = to.pop_front(is_list).as_uint64();
-    m_recipient_udp_port = to.pop_front(is_list).as_uint64(); 
-    m_recipient_tcp_port = to.pop_front(is_list).as_uint64(); 
+    if( to.byteSize() > 1 )     //non-empty list
+    {
+        m_recipient_ip = to.pop_front(is_list).as_uint64();
+        m_recipient_udp_port = to.pop_front(is_list).as_uint64();
+        m_recipient_tcp_port = to.pop_front(is_list).as_uint64();
+    }
     m_ping_hash = msg.pop_front(is_list);
     m_expiration = msg.pop_front(is_list).as_uint64();
-    m_enr_seq = msg.pop_front(is_list).as_uint64();
+    if( msg.byteSize() > 0 )
+        m_enr_seq = msg.pop_front(is_list).as_uint64();
 }
 
 void DiscV4PongMessage::print() const

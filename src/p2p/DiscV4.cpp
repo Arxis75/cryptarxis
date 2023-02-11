@@ -42,12 +42,17 @@ const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr
 DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
     : SessionHandler(socket_handler, peer_address)
     , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
+    , m_last_verified_pong_timestamp(0)
 { }
 
 void DiscV4Session::setENRFromMessage(const shared_ptr<const DiscV4ENRResponseMessage> msg)
 {
-    if( msg && msg->getPeerENR() && (!getENR() || !msg->getPeerENR()->equals(getENR())) )
+    if( msg && msg->getPeerENR() && 
+       (!getENR() || (!msg->getPeerENR()->equals(getENR()) && msg->getPeerENR()->getSeq() >= getENR()->getSeq())) 
+      )
     {
+        // If incoming msg with new/different && more recent ENR:
+        // => remove the old one (unregister the session), add the new one, and (re-)registers the session
         removeENR();
         m_ENR = msg->getPeerENR();
         Network::GetInstance().registerENRSession(dynamic_pointer_cast<DiscV4Session>(shared_from_this()));
@@ -58,7 +63,7 @@ void DiscV4Session::removeENR()
 {
     if( getENR() )
     {
-        //Unregister this ENRsession from the Network
+        //Unregister this ENR-Session from the Network
         Network::GetInstance().removeENRSession(getENR()->getPubKey());
         m_ENR.reset();
     }
@@ -66,7 +71,7 @@ void DiscV4Session::removeENR()
 
 void DiscV4Session::close()
 {
-    //removes from the Network ENRsession list
+    //removes from the Network ENR-Session list
     removeENR();
 
     //removes from the server session list => deletes the peer session (session solely owned by the server)

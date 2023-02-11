@@ -294,7 +294,6 @@ bool Network::handleRoaming(const Pubkey &pub_key, const shared_ptr<const DiscV4
     {
         //We have a previous session with different IP/Port
         //but same nodeID => this is Peer roaming, close the previous session
-        //and send ping to ensure ENR re-creation
         const_pointer_cast<DiscV4Session>(roaming_session)->close();
         roaming = true;
     }
