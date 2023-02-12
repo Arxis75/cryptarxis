@@ -273,13 +273,15 @@ void Network::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identi
                     peer_address.sin_addr.s_addr = htonl(node_i->getIP());
                     peer_address.sin_port = htons(node_i->getUDPPort()); 
 
-                    //Gets the existing session  / Creates a new session
-                    auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
-                    
-                    //Has this peer recently responded to a ping?
-                    if( session && !session->isVerified() )
+                    auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(peer_address));
+                    if(!session)
+                    {
+                        // Creates a new session
+                        session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
+
                         // Pings the peer
                         const_pointer_cast<DiscV4Session>(session)->sendPing();
+                    }
                 }
             }
         }

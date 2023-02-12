@@ -87,7 +87,7 @@ void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
         signed_msg->hasValidSize() &&
         signed_msg->hasValidHash() &&
         signed_msg->hasValidType(msg_type) &&
-        signed_msg->getPubKey() != Pubkey() )
+        (!getENR() || signed_msg->getPubKey() == getENR()->getPubKey()) )
     {
         // Dispatch the node ID to the Network to check if there was already a session for this node ID
         // but with different IP/Port (Roaming).
