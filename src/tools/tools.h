@@ -88,3 +88,4 @@ static inline uint64_t sizeInBytes(const Integer& value)
 // The strict sequence (n x "1 word / 1 separator") is not verified (several consecutive separators
 // are not interpreted as empty word(s); they are just removed)
 vector<string> split(const string& list, const string& separator);
+

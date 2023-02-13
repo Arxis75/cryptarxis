@@ -22,6 +22,7 @@ ENRV4Identity::ENRV4Identity(const ENRV4Identity& id)
     , m_secret(id.m_secret)
     , m_pubkey(id.m_pubkey)
     , m_ID(id.m_ID)
+    , m_unsigned_rlp(id.m_unsigned_rlp)
     , m_signed_rlp(id.m_signed_rlp)
     , m_is_signed(id.m_is_signed)
 { }
@@ -46,6 +47,8 @@ ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_
     
     // Removes the signature: it is saved in m_signed_rlp though.
     ByteStream field = tmp.pop_front(is_list);
+
+    m_unsigned_rlp = tmp;
 
     // Pops the seq counter
     field = tmp.pop_front(is_list);
@@ -126,28 +129,29 @@ ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const u
     //TODO: retrieve it from a config file
     m_seq = 1;
 
-    m_signed_rlp.push_back(ByteStream(m_seq));
-    m_signed_rlp.push_back(ByteStream("id"));
-    m_signed_rlp.push_back(ByteStream(m_scheme.c_str()));
-    m_signed_rlp.push_back(ByteStream("ip"));
-    m_signed_rlp.push_back(ByteStream(m_ip));                //assumes 4-bytes ip here (ip cannot start with 0)
-    m_signed_rlp.push_back(ByteStream("secp256k1"));
-    m_signed_rlp.push_back(m_pubkey.getKey(Pubkey::Format::PREFIXED_X));
-    m_signed_rlp.push_back(ByteStream("udp"));
-    m_signed_rlp.push_back(ByteStream(m_udp_port, 2));
-    m_signed_rlp.push_back(ByteStream("tcp"));
-    m_signed_rlp.push_back(ByteStream(m_tcp_port, 2));
+    m_unsigned_rlp.push_back(ByteStream(m_seq));
+    m_unsigned_rlp.push_back(ByteStream("id"));
+    m_unsigned_rlp.push_back(ByteStream(m_scheme.c_str()));
+    m_unsigned_rlp.push_back(ByteStream("ip"));
+    m_unsigned_rlp.push_back(ByteStream(m_ip));                //assumes 4-bytes ip here (ip cannot start with 0)
+    m_unsigned_rlp.push_back(ByteStream("secp256k1"));
+    m_unsigned_rlp.push_back(m_pubkey.getKey(Pubkey::Format::PREFIXED_X));
+    m_unsigned_rlp.push_back(ByteStream("udp"));
+    m_unsigned_rlp.push_back(ByteStream(m_udp_port, 2));
+    m_unsigned_rlp.push_back(ByteStream("tcp"));
+    m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
 
-    Signature sig = m_secret->sign(m_signed_rlp.keccak256());
+    Signature sig = m_secret->sign(m_unsigned_rlp.keccak256());
 
     ByteStream signature_field;    
     signature_field.push_front(ByteStream(sig.get_r(), 32));
     signature_field.push_back(ByteStream(sig.get_s(), 32));
     
+    m_signed_rlp = m_unsigned_rlp;
     m_signed_rlp.push_front(signature_field);
 }
 
-ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey & pub_key)
+ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey &pub_key)
     : m_timestamp(getUnixTimeStamp())
     , m_seq(seq)
     , m_scheme(ByteStream("v4"))
@@ -178,6 +182,33 @@ const Signature ENRV4Identity::sign(const ByteStream &hash) const
     if(m_secret)
         retval = m_secret->sign(hash);
     return retval;
+}
+
+bool ENRV4Identity::hasValidSignature() const
+{
+    bool retval = false;
+    if( m_signed_rlp.byteSize() >= 64 )
+    {
+        bool is_list;
+        Pubkey key_0, key_1;
+
+        // Retrieves the incomplete Signature
+        // of the ENR record (64 bytes only)
+        RLPByteStream tmp = m_signed_rlp;
+        ByteStream incomp_sig = tmp.pop_front(is_list);
+
+        //Builds 2 complete candidate signatures
+        Signature sig_0(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), false);
+        Signature sig_1(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), true);
+
+        sig_0.ecrecover(key_0, m_unsigned_rlp.keccak256());
+        sig_1.ecrecover(key_1, m_unsigned_rlp.keccak256());
+
+        // Verifies that the pubkey who built the ENR is
+        // matching one of the ENR signature ecrecover candidates
+        retval = (m_pubkey == key_0 || m_pubkey == key_1);
+    }
+    return retval; 
 }
 
 void ENRV4Identity::print() const
@@ -260,8 +291,9 @@ void Network::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identi
     {
         if( auto node_i = *it )
         {
-            // Is it a real peer and not me?
-            if( node_i->getIP() != getHostENR()->getIP() &&
+            // Is it a real peer (not 0.0.0.0:0000) and not me?
+            if( (node_i->getIP() && node_i->getUDPPort()) &&
+                node_i->getIP() != getHostENR()->getIP() &&
                 node_i->getUDPPort() != getHostENR()->getUDPPort() &&
                 node_i->getPubKey() != getHostENR()->getPubKey() )
             {
@@ -273,14 +305,17 @@ void Network::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identi
                     peer_address.sin_addr.s_addr = htonl(node_i->getIP());
                     peer_address.sin_port = htons(node_i->getUDPPort()); 
 
-                    auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(peer_address));
-                    if(!session)
+                    if( !m_udp_server->isBlacklisted(peer_address) )
                     {
-                        // Creates a new session
-                        session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
+                        auto session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->getSessionHandler(peer_address));
+                        if(!session)
+                        {
+                            // Creates a new session
+                            session = dynamic_pointer_cast<const DiscV4Session>(m_udp_server->registerSessionHandler(peer_address));
 
-                        // Pings the peer
-                        const_pointer_cast<DiscV4Session>(session)->sendPing();
+                            // Pings the peer
+                            const_pointer_cast<DiscV4Session>(session)->sendPing();
+                        }
                     }
                 }
             }
@@ -325,7 +360,7 @@ void Network::registerENRSession(const shared_ptr<const DiscV4Session> session)
     {
         //Insert the session indexed by its Public key
         m_enr_session_list.insert(make_pair(session->getENR()->getPubKey().getKey(Pubkey::Format::XY), session)); 
-        cout << "--------------------------------------------------------------- SESSION COUNT = " << m_enr_session_list.size() << endl;  
+        cout << "--------------------------------------------------------------- registerENRSession ENR SESSION COUNT = " << dec << m_enr_session_list.size() << endl;  
     }
 }
 
@@ -333,6 +368,7 @@ void Network::removeENRSession(const Pubkey &pub_key)
 {
     //removes from the ENR session list
     m_enr_session_list.erase(pub_key.getKey(Pubkey::Format::XY));
+    cout << "--------------------------------------------------------------- removeENRSession ENR SESSION COUNT = " << dec << m_enr_session_list.size() << endl;  
 }
 
 vector<std::weak_ptr<const ENRV4Identity>> Network::findNeighbors(const Pubkey &target) const

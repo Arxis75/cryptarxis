@@ -22,7 +22,7 @@ class ENRV4Identity
         //This node ENR
         ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret);
         //Peer ENR
-        ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey & pub_key);
+        ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey &pub_key);
 
         inline const uint64_t getTimeStamp() const { return m_timestamp; }
         inline const uint64_t getSeq() const { return m_seq; }
@@ -41,7 +41,7 @@ class ENRV4Identity
         
         const string getName() const { return base64_url_encode(getSignedRLP()); }
 
-        bool validatePubKey(const Pubkey &key) const { return key == m_pubkey; };
+        bool hasValidSignature() const;
         bool equals(const shared_ptr<const ENRV4Identity> enr) const;
         void print() const;
 
@@ -58,9 +58,10 @@ class ENRV4Identity
         Integer m_ip6;
         uint16_t m_udp6_port;
         uint16_t m_tcp6_port;
-        const shared_ptr<const Privkey> m_secret;
+        const shared_ptr<const Privkey> m_secret;   //pointer to test nullity (when peer)
         const Pubkey m_pubkey;
         const ByteStream m_ID;
+        RLPByteStream m_unsigned_rlp;
         RLPByteStream m_signed_rlp;
         bool m_is_signed;
 };

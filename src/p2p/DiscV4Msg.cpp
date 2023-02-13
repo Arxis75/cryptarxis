@@ -30,7 +30,7 @@ const ByteStream DiscV4SignedMessage::getHash() const
 const Pubkey DiscV4SignedMessage::getPubKey() const
 {
     Pubkey pub_key;
-    Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), ByteStream(&(*this)[96], 1));
+    Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), bool(ByteStream(&(*this)[96], 1)));
     sig.ecrecover(pub_key, getSignedPayload().keccak256());
     return pub_key;
 }
@@ -453,7 +453,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const Sessio
 
 DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscV4SignedMessage(signed_msg)
-     , m_sender_enr(shared_ptr<const ENRV4Identity>(nullptr))
+    , m_sender_enr(shared_ptr<const ENRV4Identity>(nullptr))
 {
     bool is_list;
     if( auto ping_msg = dynamic_pointer_cast<const DiscV4PingMessage>(signed_msg) )
@@ -464,16 +464,6 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
                                                          ping_msg->getSenderTCPPort(),
                                                          ping_msg->getPubKey()
-                                                       );
-    }
-    else if( auto pong_msg = dynamic_pointer_cast<const DiscV4PongMessage>(signed_msg) )
-    {
-        // DiscV4ENRResponseMessage emulated from DiscV4PongMessage
-        m_sender_enr = make_shared<const ENRV4Identity>( pong_msg->getENRSeq(),
-                                                         ntohl(pong_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
-                                                         ntohs(pong_msg->getSessionHandler()->getPeerAddress().sin_port),
-                                                         0,    // we know nothing about the sender tcp port in the pong msg
-                                                         pong_msg->getPubKey()
                                                        );
     }
     else

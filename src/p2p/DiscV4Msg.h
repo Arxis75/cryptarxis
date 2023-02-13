@@ -183,10 +183,7 @@ class DiscV4ENRResponseMessage : public DiscV4SignedMessage
 
         inline const ByteStream &getENRRequestHash() const { return m_enr_request_hash; }
         inline const shared_ptr<const ENRV4Identity> getPeerENR() const { return m_sender_enr; }
-
-        const shared_ptr<const DiscV4ENRResponseMessage> buildFromPingMessage(const shared_ptr<const DiscV4PingMessage> msg) const;
-        const shared_ptr<const DiscV4ENRResponseMessage> buildFromPongMessage(const shared_ptr<const DiscV4PongMessage> msg) const ;
-
+        
         void print() const;
 
     private:

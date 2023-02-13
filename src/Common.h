@@ -104,10 +104,10 @@ class ByteStream
 
         inline bool operator==(const ByteStream &b) const { return vvalue == b.vvalue; }
         inline bool operator!=(const ByteStream &b) const { return vvalue != b.vvalue; }
-        //inline bool operator< (const ByteStream &b) const { return Integer(*this) <  Integer(b); }
-        //inline bool operator> (const ByteStream &b) const { return Integer(*this) >  Integer(b); }
-        //inline bool operator<=(const ByteStream &b) const { return Integer(*this) <= Integer(b); }
-        //inline bool operator>=(const ByteStream &b) const { return Integer(*this) >= Integer(b); }
+        inline bool operator< (const ByteStream &b) const { return Integer(*this) <  Integer(b); }
+        inline bool operator> (const ByteStream &b) const { return Integer(*this) >  Integer(b); }
+        inline bool operator<=(const ByteStream &b) const { return Integer(*this) <= Integer(b); }
+        inline bool operator>=(const ByteStream &b) const { return Integer(*this) >= Integer(b); }
 
         //Unaligned operators
         //inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue.data()[offset], size); };
