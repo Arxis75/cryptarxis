@@ -19,8 +19,8 @@ class DiscV4Server: public SocketHandler
 {
     public:
         DiscV4Server(const uint16_t binding_port, const int protocol,
-                              const int read_buffer_size = 1374, const int write_buffer_size = 1374,
-                              const int tcp_connection_backlog_size = 10);
+                              const int read_buffer_size = 1374, const int write_buffer_size = 1374);
+        //Connected constructor: for inheritance compliance only:
         DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler);
 
     protected:

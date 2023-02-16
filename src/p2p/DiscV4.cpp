@@ -13,14 +13,13 @@ using std::endl;
 using std::dynamic_pointer_cast;
 
 DiscV4Server::DiscV4Server(const uint16_t binding_port, const int protocol,
-                                             const int read_buffer_size, const int write_buffer_size,
-                                             const int tcp_connection_backlog_size)
-    : SocketHandler(binding_port, protocol, read_buffer_size, write_buffer_size, tcp_connection_backlog_size)
+                                             const int read_buffer_size, const int write_buffer_size)
+    : SocketHandler(binding_port, protocol, read_buffer_size, write_buffer_size)
 { }
 
 DiscV4Server::DiscV4Server(const int socket, const shared_ptr<const SocketHandler> master_handler)
     : SocketHandler(socket, master_handler)
-{ }
+{ /*NOT USED WITH UDP*/ }
 
 const shared_ptr<SocketHandler> DiscV4Server::makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const
 { 
