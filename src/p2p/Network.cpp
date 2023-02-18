@@ -27,7 +27,7 @@ ENRV4Identity::ENRV4Identity(const ENRV4Identity& id)
     , m_is_signed(id.m_is_signed)
 { }
 
-ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_rlp)
+ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp, const Pubkey &pub_key)
     : m_timestamp(getUnixTimeStamp())
     , m_scheme("unknown")
     , m_ip(0)
@@ -67,8 +67,10 @@ ENRV4Identity::ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &signed_
         }
         else if( field == "secp256k1" )
         {
-            //useless
             field = tmp.pop_front(is_list);
+            assert(field.byteSize() == 33);
+            m_pubkey = Pubkey(field, Pubkey::Format::PREFIXED_X);
+            m_ID = ByteStream(m_pubkey.getKey(Pubkey::Format::XY).keccak256());
         }
         else if( field == "ip" )
         {

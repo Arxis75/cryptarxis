@@ -115,6 +115,8 @@ class ByteStream
         const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
         
+        static const ByteStream generateRandom(const uint32_t size);
+
     protected:
         const Integer a2Integer(const uint8_t *input, const int32_t size) const;
 

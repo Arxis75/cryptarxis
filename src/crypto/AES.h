@@ -7,36 +7,31 @@
 
 void handleErrors(void);
 
-int ctr_encrypt(unsigned char *plaintext, int plaintext_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int ctr_encrypt(const unsigned char *plaintext, int plaintext_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *ciphertext);
 
-int ctr_decrypt(unsigned char *ciphertext, int ciphertext_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int ctr_decrypt(const unsigned char *ciphertext, int ciphertext_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *plaintext);
 
-int gcm_encrypt(unsigned char *plaintext, int plaintext_len,
-                unsigned char *aad, int aad_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int gcm_encrypt(const unsigned char *plaintext, int plaintext_len,
+                const unsigned char *aad, int aad_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *ciphertext,
                 unsigned char *tag);
 
-int gcm_decrypt(unsigned char *ciphertext, int ciphertext_len,
-                unsigned char *aad, int aad_len,
-                unsigned char *tag,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int gcm_decrypt(const unsigned char *ciphertext, int ciphertext_len,
+                const unsigned char *aad, int aad_len,
+                const unsigned char *tag,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *plaintext);
 
-/*static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
-                                   const unsigned char *salt, size_t salt_len,
-                                   const unsigned char *key, size_t key_len,
-                                   unsigned char *prk, size_t *prk_len);
-
-static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
-                                  const unsigned char *prk, size_t prk_len,
-                                  const unsigned char *info, size_t info_len,
-                                  unsigned char *okm, size_t okm_len);*/
+int hkdf_derive(const unsigned char *key, int key_len,
+                const unsigned char *salt, int salt_len,
+                const unsigned char *info, int info_len,
+                unsigned char *new_key);

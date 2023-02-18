@@ -481,7 +481,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
 
         auto session = dynamic_pointer_cast<const DiscV4Session>(getSessionHandler());
         if(session)
-            m_sender_enr = make_shared<const ENRV4Identity>(getPubKey(), msg.pop_front(is_list));
+            m_sender_enr = make_shared<const ENRV4Identity>(msg.pop_front(is_list), getPubKey());
     }
 }
 

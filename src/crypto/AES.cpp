@@ -6,16 +6,20 @@
 #include <openssl/hmac.h>
 #include <openssl/err.h>
 
+#include <openssl/params.h>
+#include <openssl/core_names.h>
+#include <string.h>
+
 void handleErrors(void)
 {
     ERR_print_errors_fp(stderr);
     abort();
 }
 
-int gcm_encrypt(unsigned char *plaintext, int plaintext_len,
-                unsigned char *aad, int aad_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int gcm_encrypt(const unsigned char *plaintext, int plaintext_len,
+                const unsigned char *aad, int aad_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *ciphertext,
                 unsigned char *tag)
 {
@@ -77,11 +81,11 @@ int gcm_encrypt(unsigned char *plaintext, int plaintext_len,
     return ciphertext_len;
 }
 
-int gcm_decrypt(unsigned char *ciphertext, int ciphertext_len,
-                unsigned char *aad, int aad_len,
-                unsigned char *tag,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int gcm_decrypt(const unsigned char *ciphertext, int ciphertext_len,
+                const unsigned char *aad, int aad_len,
+                const unsigned char *tag,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *plaintext)
 {
     EVP_CIPHER_CTX *ctx;
@@ -121,7 +125,7 @@ int gcm_decrypt(unsigned char *ciphertext, int ciphertext_len,
     plaintext_len = len;
 
     /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
-    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag))
+    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void*)tag))
         handleErrors();
 
     /*
@@ -143,9 +147,9 @@ int gcm_decrypt(unsigned char *ciphertext, int ciphertext_len,
     }
 }
 
-int ctr_encrypt(unsigned char *plaintext, int plaintext_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int ctr_encrypt(const unsigned char *plaintext, int plaintext_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *ciphertext)
 {
    EVP_CIPHER_CTX *ctx;
@@ -195,88 +199,104 @@ int ctr_encrypt(unsigned char *plaintext, int plaintext_len,
     return ciphertext_len;
 }
 
-int ctr_decrypt(unsigned char *ciphertext, int ciphertext_len,
-                unsigned char *key,
-                unsigned char *iv, int iv_len,
+int ctr_decrypt(const unsigned char *ciphertext, int ciphertext_len,
+                const unsigned char *key,
+                const unsigned char *iv, int iv_len,
                 unsigned char *plaintext)
 {
     return ctr_encrypt(ciphertext, ciphertext_len, key, iv, iv_len, plaintext);
 }
 
-/*static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
-                                   const unsigned char *salt, size_t salt_len,
-                                   const unsigned char *key, size_t key_len,
-                                   unsigned char *prk, size_t *prk_len)
+int hkdf_derive(const unsigned char *key, int key_len,
+                const unsigned char *salt, int salt_len,
+                const unsigned char *info, int info_len,
+                unsigned char *new_key)
 {
-    unsigned int tmp_len;
+    int retval = -1;
+    EVP_KDF *kdf = 0;
+    EVP_KDF_CTX *kctx = 0;
+    unsigned char key_data[32];
+    OSSL_PARAM params[5], *p = params;
 
-    if (!HMAC(evp_md, salt, salt_len, key, key_len, prk, &tmp_len))
-        return NULL;
+    kdf = EVP_KDF_fetch(NULL, "HKDF", NULL);
 
-    *prk_len = tmp_len;
-    return prk;
+    if (kdf)
+    {
+        kctx = EVP_KDF_CTX_new(kdf);
+
+        EVP_KDF_free(kdf);
+
+        if (kctx)
+        {
+            memset(params, 0, sizeof(params));
+            memset(key_data, 0, sizeof(key_data));
+
+            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, SN_sha256, 0);
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, (unsigned char*)key, key_len);
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, (unsigned char*)salt, salt_len);
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, (unsigned char*)info, info_len);
+            *p = OSSL_PARAM_construct_end();
+
+            retval = EVP_KDF_derive(kctx, key_data, sizeof(key_data), params);
+
+            if( retval > 0)
+                memcpy(new_key, &key_data[0], 32);
+
+            EVP_KDF_CTX_free(kctx);
+        }
+    }
+    return retval;
 }
 
-static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
-                                  const unsigned char *prk, size_t prk_len,
-                                  const unsigned char *info, size_t info_len,
-                                  unsigned char *okm, size_t okm_len)
+/*int HKDF_DERIVE(const Pubkey &peer_pub_key, const Privkey &ephemeral_key, const Pubkey &shared_secret, const ByteStream &challenge_data, )
 {
-    HMAC_CTX *hmac;
-    unsigned char *ret = NULL;
+    EVP_KDF *kdf = 0;
+    EVP_KDF_CTX *kctx = 0;
+    unsigned char key_data[32];
+    OSSL_PARAM params[5], *p = params;
 
-    unsigned int i;
+    Pubkey ecdh(Secp256k1::GetInstance().p_scalar(node_b_secret.getPubKey().getPoint(), ephemeral_key.getSecret()));
+    ByteStream shared_secret = ecdh.getKey(Pubkey::Format::PREFIXED_X);
 
-    unsigned char prev[EVP_MAX_MD_SIZE];
+    ByteStream kdf_info("discovery v5 key agreement");
+    kdf_info.push_back(node_id_a);
+    kdf_info.push_back(node_id_b);
 
-    size_t done_len = 0, dig_len = EVP_MD_size(evp_md);
+    kdf = EVP_KDF_fetch(NULL, "HKDF", NULL);
 
-    size_t n = okm_len / dig_len;
-    if (okm_len % dig_len)
-        n++;
+    if (kdf)
+    {
+        kctx = EVP_KDF_CTX_new(kdf);
 
-    if (n > 255 || okm == NULL)
-        return NULL;
+        EVP_KDF_free(kdf);
 
-    if ((hmac = HMAC_CTX_new()) == NULL)
-        return NULL;
+        if (kctx)
+        {
+            const char *mdname = SN_sha256;
 
-    if (!HMAC_Init_ex(hmac, prk, prk_len, evp_md, NULL))
-        goto err;
+            memset(params, 0, sizeof(params));
+            memset(key_data, 0, sizeof(key_data));
 
-    for (i = 1; i <= n; i++) {
-        size_t copy_len;
-        const unsigned char ctr = i;
+            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, SN_sha256, 0);
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, shared_secret, shared_secret.byteSize());
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, challenge_data, challenge_data.byteSize());
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, kdf_info, kdf_info.byteSize());
 
-        if (i > 1) {
-            if (!HMAC_Init_ex(hmac, NULL, 0, NULL, NULL))
-                goto err;
+            *p = OSSL_PARAM_construct_end();
 
-            if (!HMAC_Update(hmac, prev, dig_len))
-                goto err;
+            if (EVP_KDF_derive(kctx, key_data, sizeof(key_data), params) <= 0)
+            {
+                perror("EVP_KDF_derive Error!");
+            }
+            else
+
+            ByteStream initiator_key(&key_data[0], 16);
+            ByteStream recipient_key(&key_data[16], 16);
+
+            std::cout << "initiator-key = 0x" << std::hex << initiator_key << std::endl;
+            std::cout << "recipient-key = 0x" << std::hex << recipient_key << std::endl;
+
+            EVP_KDF_CTX_free(kctx);
         }
-
-        if (!HMAC_Update(hmac, info, info_len))
-            goto err;
-
-        if (!HMAC_Update(hmac, &ctr, 1))
-            goto err;
-
-        if (!HMAC_Final(hmac, prev, NULL))
-            goto err;
-
-        copy_len = (done_len + dig_len > okm_len) ?
-                       okm_len - done_len :
-                       dig_len;
-
-        memcpy(okm + done_len, prev, copy_len);
-
-        done_len += copy_len;
     }
-    ret = okm;
-
- err:
-    OPENSSL_cleanse(prev, sizeof(prev));
-    HMAC_CTX_free(hmac);
-    return ret;
 }*/

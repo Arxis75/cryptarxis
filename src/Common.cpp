@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+#include <openssl/rand.h>
 
 #include <ethash/keccak.hpp>
 
@@ -316,6 +317,20 @@ const ByteStream ByteStream::address() const
     ethash::hash256 h = ethash::keccak256(*this, byteSize());
     ByteStream digest(&h.bytes[32-20], 20);
     return digest;
+}
+
+const ByteStream ByteStream::generateRandom(const uint32_t size)
+{
+    int retval = -1;
+    ByteStream random_stream;
+    uint8_t random_buffer[size];
+    memset(&random_buffer, 0, size);
+    
+    retval = RAND_bytes(&random_buffer[0], size);
+
+    if( retval > 0 )
+        random_stream = ByteStream(&random_buffer[0], size);
+    return random_stream;
 }
 
 const Integer ByteStream::a2Integer(const uint8_t *input, const int32_t size) const

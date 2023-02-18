@@ -1,7 +1,8 @@
-
+#include <p2p/Network.h>
 #include "Common.h"
 #include <crypto/bips.h>
 #include <crypto/AES.h>
+
 /*#include <p2p/Network.h>
 #include "Common.h"
 
@@ -17,8 +18,8 @@
 //#define NODE_SECRET "0xb71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291"
 
 
-int main(int argc , char *argv[])  
-{   
+int main(int argc , char *argv[])
+{
     RLPByteStream node_i;
     uint64_t x = 0;
     //ByteStream y = ByteStream(x);
@@ -26,82 +27,23 @@ int main(int argc , char *argv[])
 
     Network::GetInstance().start(NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
 
-    return 0;  
+    return 0;
 }*/
 
-#include <openssl/evp.h>
-#include <openssl/kdf.h>
-#include <openssl/params.h>
-#include <openssl/core_names.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <reactor/SocketHandler.h>
+#include <p2p/DiscV5Msg.h>
 
-int main (void)
+int main(void)
 {
-    Privkey node_a_secret(ByteStream("0xeef77acb6c6a6eebc5b363a475ac583ec7eccdb42b6481424c60f59aa326547f", 32, 16));
-    Privkey node_b_secret(ByteStream("0x66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628", 32, 16));
-
-    ByteStream node_id_a(node_a_secret.getPubKey().getKey(Pubkey::Format::XY).keccak256());
-    ByteStream node_id_b(node_b_secret.getPubKey().getKey(Pubkey::Format::XY).keccak256());
-
-    Privkey ephemeral_key(ByteStream("0xfb757dc581730490a1d7a00deea65e9b1936924caaea8f44d476014856b68736", 32, 16));
-    Pubkey ephemeral_pubkey = ephemeral_key.getPubKey();
-
-    ByteStream challenge_data("0x000000000000000000000000000000006469736376350001010102030405060708090a0b0c00180102030405060708090a0b0c0d0e0f100000000000000000", 63, 16);
-
-    //node_b_pub_key = 0x0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91
-    Pubkey secret(Secp256k1::GetInstance().p_scalar(node_b_secret.getPubKey().getPoint(), ephemeral_key.getSecret()));
-    
-    ByteStream kdf_info("discovery v5 key agreement");
-    kdf_info.push_back(node_id_a);
-    kdf_info.push_back(node_id_b);
-
-    EVP_KDF *kdf = 0;
-    EVP_KDF_CTX *kctx = 0;
-    unsigned char prk[64], key_data[64];
-    OSSL_PARAM params[5], *p = params;
-    
-    kdf = EVP_KDF_fetch(NULL, "HKDF", NULL);
-
-    if(kdf)
-    {
-        kctx = EVP_KDF_CTX_new(kdf);
-        
-        EVP_KDF_free(kdf);
-
-        if(kctx)
-        {
-            const char *mode = "EXTRACT_ONLY";
-            memset(params, 0, sizeof(params));
-            memset(prk, 0, sizeof(prk));
-            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256));
-            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, (ByteStream)secret.getKey(Pubkey::Format::XY), 64);
-            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, challenge_data, challenge_data.byteSize());
-            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MODE, (char*)mode, strlen(mode));
-            *p = OSSL_PARAM_construct_end();
-
-            if (EVP_KDF_derive(kctx, prk, sizeof(prk), params) <= 0) {
-                perror("EVP_KDF_derive");
-            }
-
-            memset(params, 0, sizeof(params));
-            memset(key_data, 0, sizeof(key_data));
-            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256));
-            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, prk, sizeof(prk));
-            *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, kdf_info, kdf_info.byteSize());
-            //*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, (char*)"salt", (size_t)4);
-            *p = OSSL_PARAM_construct_end();
-
-            if (EVP_KDF_derive(kctx, prk, sizeof(prk), params) <= 0) {
-                perror("EVP_KDF_derive");
-            }
-            
-            EVP_KDF_CTX_free(kctx);
-        }
-    }
+    ByteStream challenge_data;
+    DiscV5MaskedMessage m( shared_ptr<const SessionHandler>(nullptr),
+                           ByteStream("0xbbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9", 32, 16),
+                           ByteStream("0x0102030405060708090a0b0c", 12, 16),
+                           challenge_data,
+                           0);
 
     ByteStream ping("00000000000000000000000000000000088b3d4342774649325f313964a39e55ea96c005ad52be8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d34c4f53245d08dab84102ed931f66d1492acb308fa1c6715b9d139b81acbdcc", 95, 16);
-    ByteStream ping_session_key("0x00000000000000000000000000000000", 16 ,16);
+    ByteStream ping_session_key("0x00000000000000000000000000000000", 16, 16);
     ByteStream who_are_you("00000000000000000000000000000000088b3d434277464933a1ccc59f5967ad1d6035f15e528627dde75cd68292f9e6c27d6b66c8100a873fcbaed4e16b8d", 63, 16);
     ByteStream ping_handshake("00000000000000000000000000000000088b3d4342774649305f313964a39e55ea96c005ad521d8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d34c4f53245d08da4bb252012b2cba3f4f374a90a75cff91f142fa9be3e0a5f3ef268ccb9065aeecfd67a999e7fdc137e062b2ec4a0eb92947f0d9a74bfbf44dfba776b21301f8b65efd5796706adff216ab862a9186875f9494150c4ae06fa4d1f0396c93f215fa4ef524f1eadf5f0f4126b79336671cbcf7a885b1f8bd2a5d839cf8", 194, 16);
     ByteStream ping_handshake_session_key("0x4f9fac6de7567d1e3b1241dffe90f662", 16, 16);
@@ -118,13 +60,13 @@ int main (void)
     ByteStream dest_node_id("0xbbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9", 32, 16);
     ByteStream masking_key(&dest_node_id[0], 16);
 
-    ctr_decrypt( masked_header, masked_header.byteSize(),
-                 masking_key,
-                 masking_iv, masking_iv.byteSize(),
-                 header);
+    ctr_decrypt(masked_header, masked_header.byteSize(),
+                masking_key,
+                masking_iv, masking_iv.byteSize(),
+                header);
 
     //-------------------------------------------------------------------
-    //header = ByteStream("646973637635000100ffffffffffffffffffffffff0020aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb", 55, 16);
+    // header = ByteStream("646973637635000100ffffffffffffffffffffffff0020aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb", 55, 16);
 
     ByteStream protocol_id(&header[0], 6);
     ByteStream version(&header[6], 2);
@@ -132,17 +74,17 @@ int main (void)
     ByteStream nonce(&header[9], 12);
     ByteStream authdata_size(&header[21], 2);
     ByteStream authdata(&header[23], authdata_size.as_uint64());
-    
+
     assert(flag.as_uint8() < 3);
-    
-    if(flag.as_uint8() == 0)
+
+    if (flag.as_uint8() == 0)
         ByteStream src_id(&authdata[0], 32);
-    if(flag.as_uint8() == 1)
+    if (flag.as_uint8() == 1)
     {
         ByteStream id_nonce(&authdata[0], 16);
         ByteStream enr_seq(&authdata[16], 8);
     }
-    else if(flag.as_uint8() == 2)
+    else if (flag.as_uint8() == 2)
     {
         ByteStream src_id(&authdata[0], 32);
         ByteStream sig_size(&authdata[32], 1);
@@ -151,15 +93,14 @@ int main (void)
         ByteStream id_signature(&authdata[34], sig_size.as_uint8());
         // eph_pubkey = x || y
         ByteStream eph_pubkey(&authdata[98], eph_key_size.as_uint8());
-        if( authdata.byteSize() > 131 )
+        if (authdata.byteSize() > 131)
         {
             ByteStream enr(&authdata[131], authdata.byteSize() - 131);
             std::cout << std::hex << enr.as_Integer() << std::endl;
         }
-
     }
 
-    if(flag.as_uint8() == 0 || flag.as_uint8() == 2)
+    if (flag.as_uint8() == 0 || flag.as_uint8() == 2)
     {
         // Resize the header according to the header description,
         // i.e. remove message data.
@@ -171,12 +112,12 @@ int main (void)
 
         ByteStream ciphertext(&masked_header[header.byteSize()], masked_header.byteSize() - header.byteSize() - 16);
         ByteStream tag(&masked_header[masked_header.byteSize() - 16], 16);
-        
+
         //-------------------------------------------------------------------
 
         ByteStream pt(Integer::zero, ciphertext.byteSize());
 
-        gcm_decrypt( ciphertext, ciphertext.byteSize(),
+        gcm_decrypt(ciphertext, ciphertext.byteSize(),
                     aad, aad.byteSize(),
                     tag,
                     session_key,
@@ -186,10 +127,10 @@ int main (void)
         ciphertext = ByteStream("0x00", ciphertext.byteSize(), 16);
         tag = ByteStream("0x00", 16, 16);
 
-        gcm_encrypt( pt, pt.byteSize(),
+        gcm_encrypt(pt, pt.byteSize(),
                     aad, aad.byteSize(),
                     session_key, nonce, nonce.byteSize(),
-                    ciphertext, tag );
+                    ciphertext, tag);
     }
 
     return 0;

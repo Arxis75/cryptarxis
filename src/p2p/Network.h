@@ -18,7 +18,7 @@ class ENRV4Identity
     public:
         ENRV4Identity(const ENRV4Identity&);
         //Peer-sent ENR
-        ENRV4Identity(const Pubkey &pub_key, const RLPByteStream &rlp);
+        ENRV4Identity(const RLPByteStream &rlp, const Pubkey &pub_key = Pubkey());
         //This node ENR
         ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret);
         //Peer ENR
@@ -59,8 +59,8 @@ class ENRV4Identity
         uint16_t m_udp6_port;
         uint16_t m_tcp6_port;
         const shared_ptr<const Privkey> m_secret;   //pointer to test nullity (when peer)
-        const Pubkey m_pubkey;
-        const ByteStream m_ID;
+        Pubkey m_pubkey;
+        ByteStream m_ID;
         RLPByteStream m_unsigned_rlp;
         RLPByteStream m_signed_rlp;
         bool m_is_signed;

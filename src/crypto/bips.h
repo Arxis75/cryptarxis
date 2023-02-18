@@ -112,6 +112,8 @@ class Privkey
 
         inline bool operator==(const Privkey &k) const { return m_secret == k.getSecret(); }
 
+        static const Privkey generateRandom(const EllipticCurve &curve = Secp256k1::GetInstance());
+
     private:
         Pubkey m_pubkey;
         Integer m_secret;
