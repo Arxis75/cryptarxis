@@ -3,7 +3,7 @@
 #include <Common.h>
 
 #include <crypto/bips.h>
-#include <reactor/SocketHandler.h>
+#include <p2p/Discovery.h>
 
 #include <memory>
 #include <map>
@@ -70,6 +70,8 @@ class ENRV4Identity
         bool m_is_signed;
 };
 
+class DiscoveryServer;
+
 class Network
 {
     private:
@@ -79,17 +81,17 @@ class Network
         static Network &GetInstance();
         Network(const Network& obj) = delete;
 
-        shared_ptr<const SocketHandler> getUDPServer() { return m_udp_server; }
-        //shared_ptr<const SocketHandler> getTCPServer() { return m_tcp_server; }
+        shared_ptr<const DiscoveryServer> getUDPServer() { return m_udp_server; }
+        //shared_ptr<const DiscoveryServer> getTCPServer() { return m_tcp_server; }
       
         void start( const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, 
-                    const string &udp_protocol = "discv4", const string &tcp_protocol = "eth67", const uint64_t seq = 1);
+                    const string &udp_protocol = "discv5", const string &tcp_protocol = "eth67", const uint64_t seq = 1);
         
         const shared_ptr<const ENRV4Identity> getHostENR() const { return m_host_enr; }
 
     private:
         shared_ptr<const ENRV4Identity> m_host_enr;
         static Network *m_sInstancePtr;
-        shared_ptr<SocketHandler> m_udp_server;
-        //shared_ptr<SocketHandler> m_tcp_server;
+        shared_ptr<DiscoveryServer> m_udp_server;
+        //shared_ptr<DiscoveryServer> m_tcp_server;
 };

@@ -12,7 +12,7 @@ using std::endl;
 using std::dynamic_pointer_cast;
 
 DiscV4Server::DiscV4Server( const shared_ptr<const ENRV4Identity> host_enr,
-                            const int read_buffer_size, const int write_buffer_size)
+                            const int read_buffer_size, const int write_buffer_size )
     : DiscoveryServer(host_enr, read_buffer_size, write_buffer_size)
 { }
 

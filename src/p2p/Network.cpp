@@ -1,6 +1,6 @@
 #include "Network.h"
 #include "DiscV4.h"
-//#include "DiscV5.h"
+#include "DiscV5.h"
 
 #include <arpa/inet.h>      // IPPROTO_TCP
 #include <iostream>         // cout, EXIT_FAILURE, NULL
@@ -271,8 +271,8 @@ void ENRV4Identity::print() const
 
 Network::Network()
     : m_host_enr(shared_ptr<const ENRV4Identity>(nullptr))
-    , m_udp_server(shared_ptr<SocketHandler>(nullptr))
-    //, m_tcp_server(shared_ptr<SocketHandler>(nullptr))
+    , m_udp_server(shared_ptr<DiscoveryServer>(nullptr))
+    //, m_tcp_server(shared_ptr<DiscoveryServer>(nullptr))
 { }
 
 
@@ -291,8 +291,8 @@ void Network::start( const uint32_t ip, const uint16_t udp_port, const uint16_t 
 
     if(udp_protocol == "discv4")
         m_udp_server = make_shared<DiscV4Server>(m_host_enr);
-    //else if(udp_protocol == "discv5")
-    //    m_udp_server = make_shared<DiscV5Server>(m_host_enr);
+    else if(udp_protocol == "discv5")
+        m_udp_server = make_shared<DiscV5Server>(m_host_enr);
 
     if( m_udp_server )
     {

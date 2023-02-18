@@ -30,14 +30,18 @@ class DiscV4Session: public DiscoverySession
 
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 
+        virtual void sendPing();
+
+        bool isVerified() const;    
+
+    protected:
         void onNewPing(const shared_ptr<const DiscV4PingMessage> msg);
         void onNewPong(const shared_ptr<const DiscV4PongMessage> msg);
         void onNewFindNode(const shared_ptr<const DiscV4FindNodeMessage> msg);
         void onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage> msg);
         void onNewENRRequest(const shared_ptr<const DiscV4ENRRequestMessage> msg);
         void onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMessage> msg);
-    
-        void sendPing();
+
         void sendPong(const ByteStream &ack_hash) const;      
         void sendFindNode() const;
         void sendNeighbors(const ByteStream &target_id) const;
@@ -46,8 +50,6 @@ class DiscV4Session: public DiscoverySession
 
         inline const ByteStream &getLastSentPingHash() const { return m_last_sent_ping_hash; }
         inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }
-
-        bool isVerified() const;
 
     private:
         ByteStream m_last_sent_ping_hash;

@@ -9,6 +9,7 @@
 using std::shared_ptr;
 
 class DiscoveryServer;
+class ENRV4Identity;
 
 class DiscoverySession: public SessionHandler
 {
@@ -16,8 +17,8 @@ class DiscoverySession: public SessionHandler
         DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
 
         virtual void sendPing() = 0;
-        virtual void close();
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in) = 0;
+        virtual void close();
 
         inline const shared_ptr<const ENRV4Identity> getENR() const { return m_ENR; };
         const shared_ptr<const ENRV4Identity> getHostENR() const;
