@@ -1,13 +1,13 @@
 #pragma once
 
 #include <Common.h>
+#include <p2p/Discovery.h>
 #include <crypto/bips.h>
-#include <reactor/SocketHandler.h>
 #include <vector>
 
 using std::vector;
 
-class DiscV4SignedMessage: public SocketMessage
+class DiscV4SignedMessage: public DiscoveryMessage
 {
     public:
         //Copy Constructor
@@ -17,7 +17,6 @@ class DiscV4SignedMessage: public SocketMessage
 
         void addTypeSignAndHash(const RLPByteStream &rlp_payload);
 
-        inline const uint64_t getTimeStamp() const { return m_timestamp; }
         const ByteStream getHash() const;
         const Pubkey getPubKey() const;
         virtual const uint8_t getType() const;
@@ -27,19 +26,9 @@ class DiscV4SignedMessage: public SocketMessage
         bool hasValidHash() const;
         bool hasValidType(uint8_t &type) const;
 
-        virtual uint64_t size() const;
-
-        virtual operator const uint8_t*() const;
-
-        virtual void push_back(const uint8_t value);
-    
     protected:
         // Type + RLPPayload
         const ByteStream getSignedPayload() const;
-
-    private:
-        uint64_t m_timestamp;
-        vector<uint8_t> m_vect;
 };
 
 class DiscV4PingMessage : public DiscV4SignedMessage

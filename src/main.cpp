@@ -3,7 +3,7 @@
 #include <crypto/bips.h>
 #include <crypto/AES.h>
 
-/*#include <p2p/Network.h>
+#include <p2p/Network.h>
 #include "Common.h"
 
 #define NODE_IP 0x51430B52      //81.67.11.82
@@ -17,25 +17,11 @@
 //#define NODE_IP 0x7F000001      //127.0.0.1
 //#define NODE_SECRET "0xb71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291"
 
-
-int main(int argc , char *argv[])
-{
-    RLPByteStream node_i;
-    uint64_t x = 0;
-    //ByteStream y = ByteStream(x);
-    uint8_t y = sizeInBytes64(x);
-
-    Network::GetInstance().start(NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
-
-    return 0;
-}*/
-
-#include <reactor/SocketHandler.h>
-#include <p2p/DiscV5Msg.h>
-
 int main(void)
 {
-    ByteStream challenge_data;
+    Network::GetInstance().start(NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
+
+    /*ByteStream challenge_data;
     DiscV5MaskedMessage m( shared_ptr<const SessionHandler>(nullptr),
                            ByteStream("0xbbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9", 32, 16),
                            ByteStream("0x0102030405060708090a0b0c", 12, 16),
@@ -131,7 +117,7 @@ int main(void)
                     aad, aad.byteSize(),
                     session_key, nonce, nonce.byteSize(),
                     ciphertext, tag);
-    }
+    }*/
 
     return 0;
 }
