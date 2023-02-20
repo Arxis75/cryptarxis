@@ -114,8 +114,8 @@ TEST(AES_tests, HKDF_DiscV5_vectors)
     Privkey node_b_secret(ByteStream("0x66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628", 32, 16));
     Pubkey node_b_pub_key(node_b_secret.getPubKey());
     
-    ByteStream node_id_a(node_a_secret.getPubKey().getKey(Pubkey::Format::XY).keccak256());
-    ByteStream node_id_b(node_b_secret.getPubKey().getKey(Pubkey::Format::XY).keccak256());
+    ByteStream node_id_a(node_a_secret.getPubKey().getID());
+    ByteStream node_id_b(node_b_secret.getPubKey().getID());
     
     Privkey ephemeral_secret(ByteStream("0xfb757dc581730490a1d7a00deea65e9b1936924caaea8f44d476014856b68736", 32, 16));
 

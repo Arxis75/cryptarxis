@@ -85,7 +85,7 @@ class Network
         //shared_ptr<const DiscoveryServer> getTCPServer() { return m_tcp_server; }
       
         void start( const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret, 
-                    const string &udp_protocol = "discv5", const string &tcp_protocol = "eth67", const uint64_t seq = 1);
+                    const string &udp_protocol = "discv4", const string &tcp_protocol = "eth67", const uint64_t seq = 1);
         
         const shared_ptr<const ENRV4Identity> getHostENR() const { return m_host_enr; }
 

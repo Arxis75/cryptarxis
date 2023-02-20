@@ -1,8 +1,9 @@
 #pragma once
 
-#include <Common.h>
 #include <p2p/Discovery.h>
+
 #include <crypto/bips.h>
+#include <Common.h>
 #include <vector>
 
 using std::vector;
@@ -17,18 +18,32 @@ class DiscV4SignedMessage: public DiscoveryMessage
 
         void addTypeSignAndHash(const RLPByteStream &rlp_payload);
 
-        const ByteStream getHash() const;
-        const Pubkey getPubKey() const;
-        virtual const uint8_t getType() const;
-        const RLPByteStream getRLPPayload() const;
+        inline const ByteStream &getHash() const { return m_hash; }
+        inline const Pubkey &getPubKey() const { return m_pub_key; }
+        virtual inline const uint8_t getType() const { return m_type; }
 
-        bool hasValidSize() const;
-        bool hasValidHash() const;
-        bool hasValidType(uint8_t &type) const;
+        inline bool hasValidSize() const { return size() > 98; }
+        inline bool hasValidHash() const { return getHash() == getHashedPayload().keccak256(); }
+        
+        virtual inline bool isValid() const { return hasValidSize() && hasValidHash() && getType() && getType() < 7; }
+        virtual inline const ByteStream &getNodeID() const { return m_ID; }
 
     protected:
-        // Type + RLPPayload
-        const ByteStream getSignedPayload() const;
+        // Signature || Type || RLP
+        inline const ByteStream getHashedPayload() const { return m_hashed_payload; }
+        // Type || RLP
+        inline const ByteStream getSignedPayload() const { return m_signed_payload; }
+        // RLP
+        inline const RLPByteStream &getRLPPayload() const { return m_rlp_payload; }
+
+    private:
+        ByteStream m_hash;
+        Pubkey m_pub_key;
+        ByteStream m_ID;
+        ByteStream m_hashed_payload;
+        ByteStream m_signed_payload;
+        uint8_t m_type;
+        RLPByteStream m_rlp_payload;
 };
 
 class DiscV4PingMessage : public DiscV4SignedMessage
@@ -42,7 +57,7 @@ class DiscV4PingMessage : public DiscV4SignedMessage
         inline bool hasValidVersion() const { return m_version == 4; }
         inline bool hasNotExpired() const { return m_expiration > getTimeStamp(); }
 
-        inline virtual const uint8_t getType() const {return 0x01; }
+        virtual inline const uint8_t getType() const {return 0x01; }
 
         inline uint8_t getVersion() const { return m_version; }
         inline uint32_t getSenderIP() const { return m_sender_ip; }
@@ -109,6 +124,7 @@ class DiscV4FindNodeMessage : public DiscV4SignedMessage
 
         inline virtual const uint8_t getType() const {return 0x03; }
         inline const Pubkey &getTarget() const { return m_target; }
+        inline const ByteStream getTargetID() const { return getTarget().getKey(Pubkey::Format::XY).keccak256(); }
 
         inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
 

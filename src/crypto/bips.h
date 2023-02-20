@@ -52,6 +52,7 @@ class Pubkey
         const Point& getPoint() const { return m_point; }
         const EllipticCurve& getCurve() const { return m_ecc; }
         const ByteStream getKey(const Format f) const;
+        inline const ByteStream getID() const { return getKey(Pubkey::Format::XY).keccak256(); }
         const ByteStream getAddress() const;
 
         uint32_t getFormatByteSize(const Pubkey::Format f) const;

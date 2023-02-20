@@ -1,6 +1,5 @@
 #include "Network.h"
 #include "DiscV4.h"
-#include "DiscV5.h"
 
 #include <arpa/inet.h>      // IPPROTO_TCP
 #include <iostream>         // cout, EXIT_FAILURE, NULL
@@ -74,7 +73,7 @@ ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
             field = tmp.pop_front(is_list);
             assert(field.byteSize() == 33);
             m_pubkey = Pubkey(field, Pubkey::Format::PREFIXED_X);
-            m_ID = ByteStream(m_pubkey.getKey(Pubkey::Format::XY).keccak256());
+            m_ID = ByteStream(m_pubkey.getID());
         }
         else if( field == "ip" )
         {
@@ -131,7 +130,7 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     , m_tcp6_port(0)
     , m_secret(make_shared<const Privkey>(ByteStream(secret, 32, 16)))
     , m_pubkey(m_secret->getPubKey())
-    , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
+    , m_ID(m_pubkey.getID())
     , m_is_signed(true)
 { 
     m_unsigned_rlp.push_back(ByteStream(m_seq));
@@ -169,7 +168,7 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     , m_tcp6_port(0)
     , m_secret(0)
     , m_pubkey(pub_key)
-    , m_ID(m_pubkey.getKey(Pubkey::Format::XY).keccak256())
+    , m_ID(m_pubkey.getID())
     , m_signed_rlp(RLPByteStream())
     , m_is_signed(false)
 { 
@@ -291,8 +290,8 @@ void Network::start( const uint32_t ip, const uint16_t udp_port, const uint16_t 
 
     if(udp_protocol == "discv4")
         m_udp_server = make_shared<DiscV4Server>(m_host_enr);
-    else if(udp_protocol == "discv5")
-        m_udp_server = make_shared<DiscV5Server>(m_host_enr);
+    //else if(udp_protocol == "discv5")
+    //    m_udp_server = make_shared<DiscV5Server>(m_host_enr);
 
     if( m_udp_server )
     {

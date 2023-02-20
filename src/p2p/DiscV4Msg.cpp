@@ -1,5 +1,4 @@
-#include "DiscV4.h"
-#include "DiscV4Msg.h"
+#include <p2p/DiscV4Msg.h>
 
 #include <iostream>         //cout
 
@@ -13,68 +12,44 @@ using std::dynamic_pointer_cast;
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscoveryMessage(signed_msg)
-{ }
+{
+    if( hasValidSize() )
+    {
+        m_hash = ByteStream(&(*this)[0], 32);
+        m_hashed_payload = ByteStream(&(*this)[32], size() - 32);
+        m_signed_payload = ByteStream(&(*this)[97], size() - 97);
+        Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), bool(ByteStream(&(*this)[96], 1)));
+        sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
+        m_ID = m_pub_key.getKey(Pubkey::Format::XY).keccak256();
+        m_type = ByteStream(&(*this)[97], 1).as_uint8();
+        m_rlp_payload = ByteStream(&(*this)[98], size() - 98);
+    }
+}
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler)
     : DiscoveryMessage(session_handler)
-{ }
-
-const ByteStream DiscV4SignedMessage::getHash() const
 {
-    return ByteStream(&(*this)[0], 32);
-}
-
-const Pubkey DiscV4SignedMessage::getPubKey() const
-{
-    Pubkey pub_key;
-    Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), bool(ByteStream(&(*this)[96], 1)));
-    sig.ecrecover(pub_key, getSignedPayload().keccak256());
-    return pub_key;
-}
-
-const uint8_t DiscV4SignedMessage::getType() const
-{
-    return ByteStream(&(*this)[97], 1).as_uint8();
-}
-
-const ByteStream DiscV4SignedMessage::getSignedPayload() const
-{
-    return ByteStream(&(*this)[97], size() - 97);
-}
-
-const RLPByteStream DiscV4SignedMessage::getRLPPayload() const
-{
-    return RLPByteStream(&(*this)[98], size() - 98);
-}
-
-bool DiscV4SignedMessage::hasValidSize() const
-{
-    return size() > 98;
-}
-
-bool DiscV4SignedMessage::hasValidHash() const
-{
-    return getHash() == ByteStream(&(*this)[32], size() - 32).keccak256(); 
-}
-
-bool DiscV4SignedMessage::hasValidType(uint8_t &type) const
-{
-    type = getType();
-    return type > 0 && type < 7;
 }
 
 void DiscV4SignedMessage::addTypeSignAndHash(const RLPByteStream &rlp_payload)
 {
-    ByteStream signed_msg = rlp_payload;
-    signed_msg.push_front(getType(), 1); //no RLP-encoding for the type
+    m_rlp_payload = rlp_payload;
+    m_type = getType();
+    ByteStream signed_msg = m_rlp_payload;
+    signed_msg.push_front(m_type, 1); //no RLP-encoding for the type
+    m_signed_payload = signed_msg;
+    m_pub_key = getHostENR()->getSecret()->getPubKey();
+    m_ID = m_pub_key.getID();
     Signature sig = getHostENR()->getSecret()->sign(signed_msg.keccak256());
     signed_msg.push_front(ByteStream(sig.get_imparity(), 1));
     signed_msg.push_front(ByteStream(sig.get_s(), 32));
     signed_msg.push_front(ByteStream(sig.get_r(), 32));
-    signed_msg.push_front(signed_msg.keccak256());
+    m_hashed_payload = signed_msg;
+    m_hash = m_hashed_payload.keccak256();
+    signed_msg.push_front(m_hash);
 
-    for(int i=0;i<signed_msg.byteSize();i++)
-        push_back(signed_msg[i]);
+    resize(signed_msg.byteSize());
+    memcpy(this[0], signed_msg, signed_msg.byteSize());
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -262,7 +237,7 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
 
 void DiscV4FindNodeMessage::print() const
 {
-    if( auto server = getServer() )
+    if( auto server = getConstServer() )
     {
         if( !hasNotExpired() )
             cout << dec << "   @UDP DiscV4 EXPIRED FINDNODE" << endl;
@@ -333,7 +308,7 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
 
 void DiscV4NeighborsMessage::print() const
 {
-    if( auto server = getServer() )
+    if( auto server = getConstServer() )
     {
         if( !hasNotExpired() )
             cout << dec << "   @UDP DiscV4 EXPIRED NEIGHBORS" << endl;
@@ -387,7 +362,7 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
 
 void DiscV4ENRRequestMessage::print() const
 {
-    if( auto server = getServer() )
+    if( auto server = getConstServer() )
     {
         if( !hasNotExpired() )
             cout << dec << "   @UDP DiscV4 EXPIRED ENRREQUEST" << endl;
@@ -438,15 +413,13 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
 
         m_enr_request_hash = msg.pop_front(is_list);
 
-        auto session = dynamic_pointer_cast<const DiscV4Session>(getSessionHandler());
-        if(session)
-            m_sender_enr = make_shared<const ENRV4Identity>(msg.pop_front(is_list));
+        m_sender_enr = make_shared<const ENRV4Identity>(msg.pop_front(is_list));
     }
 }
 
 void DiscV4ENRResponseMessage::print() const
 {
-    if( auto server = getServer() )
+    if( auto server = getConstServer() )
     {
         cout << dec << "   @UDP DiscV4 ENRRESPONSE:" << endl;
         cout << "   ENR Request hash = 0x" << hex << m_enr_request_hash.as_Integer() << endl;

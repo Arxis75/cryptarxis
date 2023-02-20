@@ -1,4 +1,4 @@
-#include "Discovery.h"
+#include <p2p/Discovery.h>
 
 using std::cout;
 using std::hex;
@@ -8,47 +8,46 @@ using std::min;
 
 DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
     : SessionHandler(socket_handler, peer_address)
+    , m_ID(ByteStream())
+    , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
 { }
 
-const shared_ptr<const ENRV4Identity> DiscoverySession::getHostENR() const
+const shared_ptr<const DiscoveryServer> DiscoverySession::getConstServer() const
 {
-    if( auto server = dynamic_pointer_cast<const DiscoveryServer>(getSocketHandler()) )
-        return server->getHostENR();
-    else
-        return shared_ptr<const ENRV4Identity>(nullptr);
+    return dynamic_pointer_cast<const DiscoveryServer>(getSocketHandler());
+}
+const shared_ptr<DiscoveryServer> DiscoverySession::getServer() const
+{
+    return const_pointer_cast<DiscoveryServer>(getConstServer());
 }
 
-void DiscoverySession::setENR(const shared_ptr<const ENRV4Identity> new_enr)
+void DiscoverySession::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
 {
-    if( !getENR() || getENR()->getSeq() < new_enr->getSeq() )
-    {
-        // If incoming msg with new/different && more recent ENR:
-        // => remove the old one (unregister the session), add the new one, and (re-)registers the session
-        removeENR();
-        m_ENR = new_enr;
-        if( auto server = getServer() )
-            server->registerENRSession(dynamic_pointer_cast<const DiscoverySession>(shared_from_this()));
+    if( auto msg = dynamic_pointer_cast<const DiscoveryMessage>(msg_in) )
+    {          
+        if( getID().byteSize() && msg->getNodeID() != getID() )
+            if( auto server = getServer() )
+                //Unregister the out-of-date session ID from the server
+                server->removeSessionID(getID());
+        // Set/Update the session ID
+        m_ID = msg->getNodeID();
     }
 }
 
-void DiscoverySession::removeENR()
+void DiscoverySession::updateENR(const shared_ptr<const ENRV4Identity> new_enr)
 {
-    if( getENR() )
+    // If same ID, allow the update
+    if( new_enr->getID() == getID() )
     {
-        //Unregister this ENR-Session
-        if( auto server = getServer() )
-            server->removeENRSession(getENR()->getID());
-        m_ENR.reset();
+        // update on new or more recent ENR only
+        if(( !m_ENR || m_ENR->getSeq() <= new_enr->getSeq()) )
+            m_ENR = new_enr;
     }
-}
-
-void DiscoverySession::close()
-{
-    //removes from the ENR-Session list
-    removeENR();
-
-    //removes from the server session list => deletes the peer session (session solely owned by the server)
-    SessionHandler::close();
+    else if( auto server = getServer() )
+    {
+        // If ENR has an invalid signature, notify the server
+        server->onInvalidSignature(dynamic_pointer_cast<DiscoverySession>(shared_from_this()));
+    }
 }
 
 //--------------------------------------------------------------------------------------------------------------------------
@@ -61,12 +60,60 @@ DiscoveryServer::DiscoveryServer( const shared_ptr<const ENRV4Identity> host_enr
 
 DiscoveryServer::DiscoveryServer(const int socket, const shared_ptr<const SocketHandler> master_handler)
     : SocketHandler(socket, master_handler)
-{ /*TCP INTERFACE, NOT USED WITH UDP*/ }
+{   /*TCP INTERFACE, NOT USED WITH UDP*/    }
 
 const shared_ptr<SocketHandler> DiscoveryServer::makeSocketHandler(const int socket, const shared_ptr<const SocketHandler> master_handler) const
-{ 
-    /*TCP INTERFACE, NOT USED WITH UDP*/ 
+{   /*TCP INTERFACE, NOT USED WITH UDP*/ 
     return shared_ptr<SocketHandler>(nullptr);
+}
+
+void DiscoveryServer::dispatchMessage(const shared_ptr<const SocketMessage> msg)
+{
+    auto disc_msg = dynamic_pointer_cast<const DiscoveryMessage>(msg);
+    auto session = disc_msg->getConstSession();
+
+    if( disc_msg && session )
+    {
+        if( !disc_msg->isValid() )
+        {
+            // Invalid message format => blacklist this peer
+            // and close the session
+            blacklist(true, session->getPeerAddress());
+            closeSession(session);
+        }
+         else 
+        {
+            auto previous_session = getSessionFromID(disc_msg->getNodeID());
+            if( !previous_session )
+                //Registers a new <NodeID, Session>
+                registerSessionID(disc_msg->getNodeID(), session);
+            // Check if there was already a recorded ENR session for this node ID
+            // but with different IP/Port (Roaming).
+            else if( session != previous_session )
+                closeSession(previous_session);
+
+            // Dispatch the message to the session:
+            // - the session will be responsible for checking
+            // the consistency of the msg NodeID with its own
+            SocketHandler::dispatchMessage(msg);
+        }
+    }   
+    cout << "--------------------------------------------------------------- SESSION COUNT = " << dec << getSessionsCount() << endl;  
+}
+
+void DiscoveryServer::onInvalidSignature(const shared_ptr<DiscoverySession> session)
+{
+    // Upon invalid signature detection:
+    // - close the session,
+    // - blacklist the peer
+    closeSession(session);
+    blacklist(true, session->getPeerAddress());
+}
+
+void DiscoveryServer::closeSession(const shared_ptr<const DiscoverySession> session)
+{
+    removeSessionID(session->getID());
+    session->close();
 }
 
 void DiscoveryServer::onNewNodeCandidates(const vector<std::shared_ptr<const ENRV4Identity>> &node_list)
@@ -91,7 +138,6 @@ void DiscoveryServer::onNewNodeCandidates(const vector<std::shared_ptr<const ENR
                     {
                         // Creates a new session
                         session = dynamic_pointer_cast<const DiscoverySession>(registerSessionHandler(peer_address));
-
                         // Pings the peer
                         const_pointer_cast<DiscoverySession>(session)->sendPing();
                     }
@@ -101,61 +147,40 @@ void DiscoveryServer::onNewNodeCandidates(const vector<std::shared_ptr<const ENR
     }
 }
 
-bool DiscoveryServer::handleRoaming(const ByteStream &node_id, const shared_ptr<const DiscoverySession> session) const
+const shared_ptr<const DiscoverySession> DiscoveryServer::getSessionFromID(const ByteStream &node_id) const
 {
-    bool roaming = false;
-    auto roaming_session = getENRSession(node_id);
-    if( roaming_session && roaming_session != session )
-    {
-        //We have a previous session with different IP/Port
-        //but same nodeID => this is Peer roaming, close the previous session
-        const_pointer_cast<DiscoverySession>(roaming_session)->close();
-        roaming = true;
-    }
-    return roaming;
-}
-
-const shared_ptr<const DiscoverySession> DiscoveryServer::getENRSession(const ByteStream &node_id) const
-{
-    auto it = m_enr_session_list.find(node_id);
-    if( it != std::end(m_enr_session_list) ) 
-        return it->second.lock();
+    auto it = m_session_id_list.find(node_id);
+    if( it != m_session_id_list.end() ) 
+        return it->second;
     return shared_ptr<const DiscoverySession>(nullptr); 
 }
 
-void DiscoveryServer::registerENRSession(const shared_ptr<const DiscoverySession> session)
+void DiscoveryServer::registerSessionID(const ByteStream &node_id, shared_ptr<const DiscoverySession> session)
 {
-    if( session && session->getENR() )
-    {
-        //Insert the session indexed by its Public key
-        m_enr_session_list.insert(make_pair(session->getENR()->getID(), session)); 
-        cout << "--------------------------------------------------------------- registerENRSession ENR SESSION COUNT = " << dec << m_enr_session_list.size() << endl;  
-    }
+    m_session_id_list.insert(make_pair(node_id, session));
+    cout << "--------------------------------------------------------------- registerSessionID ENR SESSION COUNT = " << dec << m_session_id_list.size() << endl;
 }
 
-void DiscoveryServer::removeENRSession(const ByteStream &node_id)
+void DiscoveryServer::removeSessionID(const ByteStream &node_id)
 {
     //removes from the ENR session list
-    m_enr_session_list.erase(node_id);
-    cout << "--------------------------------------------------------------- removeENRSession ENR SESSION COUNT = " << dec << m_enr_session_list.size() << endl;  
+    m_session_id_list.erase(node_id);
+    cout << "--------------------------------------------------------------- removeSessionID ENR SESSION COUNT = " << dec << m_session_id_list.size() << endl;  
 }
 
 vector<std::weak_ptr<const ENRV4Identity>> DiscoveryServer::findNeighbors(const ByteStream &target_id) const
 {
-    vector<std::weak_ptr<const ENRV4Identity>> neighbors_vector;
-
     map<Integer, std::weak_ptr<const ENRV4Identity>> neighbors_map;
-    auto it1 = begin(m_enr_session_list);
-    while( it1!= end(m_enr_session_list) )
+    auto it1 = m_session_id_list.begin();
+    while( it1!= m_session_id_list.end() )
     {
-        if(auto session = it1->second.lock() )
-        {
-            Integer distance = it1->first.as_Integer() ^ target_id.as_Integer();
-            neighbors_map.insert(std::make_pair(distance, session->getENR()));
-        }
+        auto session = it1->second;
+        Integer distance = it1->first.as_Integer() ^ target_id.as_Integer();
+        neighbors_map.insert(std::make_pair(distance, session->getENR()));
         it1++;
     }
 
+    vector<std::weak_ptr<const ENRV4Identity>> neighbors_vector;
     auto it2 = begin(neighbors_map);
     while( it2!= end(neighbors_map) && neighbors_vector.size() < 16 ) 
     {
@@ -172,10 +197,10 @@ vector<std::weak_ptr<const ENRV4Identity>> DiscoveryServer::findNeighbors(const 
 
 //-----------------------------------------------------------------------------------------------------------
 
-DiscoveryMessage::DiscoveryMessage(const shared_ptr<const DiscoveryMessage> signed_msg)
-    : SocketMessage(signed_msg->getSessionHandler())
+DiscoveryMessage::DiscoveryMessage(const shared_ptr<const DiscoveryMessage> msg)
+    : SocketMessage(msg->getSessionHandler())
     , m_timestamp(getUnixTimeStamp())
-    , m_vect(signed_msg->m_vect)
+    , m_vect(msg->m_vect)
 { }
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler)
@@ -190,26 +215,23 @@ const shared_ptr<const DiscoveryServer> DiscoveryMessage::getConstServer() const
     else
         return shared_ptr<const DiscoveryServer>(nullptr);
 }
+const shared_ptr<DiscoveryServer> DiscoveryMessage::getServer()
+{
+    return const_pointer_cast<DiscoveryServer>(getConstServer());
+}
+const shared_ptr<const DiscoverySession> DiscoveryMessage::getConstSession() const
+{
+    return dynamic_pointer_cast<const DiscoverySession>(getSessionHandler());
+}
+const shared_ptr<DiscoverySession> DiscoveryMessage::getSession()
+{
+    return const_pointer_cast<DiscoverySession>(getConstSession());
+}
 
 const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
 {
-    if( auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler()) )
-        return session->getHostENR();
+    if( auto server = getConstServer() )
+        return server->getHostENR();
     else
         return shared_ptr<const ENRV4Identity>(nullptr);
-}
-
-uint64_t DiscoveryMessage::size() const
-{
-    return m_vect.size();
-}
-
-DiscoveryMessage::operator const uint8_t*() const
-{
-    return m_vect.data();
-}
-
-void DiscoveryMessage::push_back(const uint8_t value)
-{ 
-    m_vect.push_back(value);
 }

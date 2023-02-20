@@ -1,17 +1,18 @@
 #pragma once
 
-#include "Discovery.h"
+#include <p2p/Discovery.h>
 
 #include <Common.h>
 #include <crypto/bips.h>
 
-class DiscV4SignedMessage;
 class DiscV4PingMessage;
 class DiscV4PongMessage;
 class DiscV4FindNodeMessage;
 class DiscV4NeighborsMessage;
 class DiscV4ENRRequestMessage;
 class DiscV4ENRResponseMessage;
+
+class ENRV4Identity;
 
 class DiscV4Server: public DiscoveryServer
 {
@@ -21,6 +22,7 @@ class DiscV4Server: public DiscoveryServer
     protected:
         virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketMessage> msg) const;
 };
 
 class DiscV4Session: public DiscoverySession
