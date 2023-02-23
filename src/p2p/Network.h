@@ -25,8 +25,10 @@ class ENRV4Identity
         ENRV4Identity(const RLPByteStream &rlp);
         //This node ENR
         ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const char *secret);
-        //Peer ENR
+        //ENR From PING (DiscV4 only)
         ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey &pub_key);
+        //ENR From Message
+        ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const ByteStream &node_ID);
 
         inline const uint64_t getTimeStamp() const { return m_timestamp; }
         inline const uint64_t getSeq() const { return m_seq; }
@@ -40,6 +42,7 @@ class ENRV4Identity
         inline const shared_ptr<const Privkey> getSecret() const { return m_secret; }
         inline const Pubkey &getPubKey() const { return m_pubkey; }
         inline const ByteStream &getID() const { return m_ID; }
+        inline const vector<uint8_t> getPeerID() const { return  (const vector<uint8_t>)m_ID; }
         inline const bool isSigned() const { return m_is_signed; };
         inline const RLPByteStream getSignedRLP() const { return m_is_signed ? m_signed_rlp : RLPByteStream(); }
         

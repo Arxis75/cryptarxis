@@ -11,6 +11,12 @@
 #define NODE_TCP_PORT 40404
 #define NODE_SECRET "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168815"    //some random privkey
 
+#include <p2p/DiscV4.h>
+#define CLIENT_IP 0x51430B52      //81.67.11.82
+#define CLIENT_UDP_PORT 50505
+#define CLIENT_TCP_PORT 50505
+#define CLIENT_SECRET "0x3bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168815"    //some random privkey
+
 // ENR TEST VECTOR
 //#define NODE_TCP_PORT 30303
 //#define NODE_UDP_PORT 30303
@@ -20,6 +26,23 @@
 int main(void)
 {
     Network::GetInstance().start(NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
+
+    /*auto host_enr = make_shared<const ENRV4Identity>(1, NODE_IP, NODE_UDP_PORT, NODE_TCP_PORT, NODE_SECRET);
+    auto udp_server = make_shared<DiscV4Server>(host_enr);
+    udp_server->start();
+
+    auto client_enr = make_shared<const ENRV4Identity>(1, CLIENT_IP, CLIENT_UDP_PORT, CLIENT_TCP_PORT, CLIENT_SECRET);
+    auto udp_client = make_shared<DiscV4Server>(client_enr);
+    udp_client->start();
+
+    std::cout << "Server ID = " << host_enr->getID() << std::endl;
+    std::cout << "Client ID = " << client_enr->getID() << std::endl;
+
+    udp_client->onNewNodeCandidates({{host_enr}});
+
+    while(true)
+        Initiation_Dispatcher::GetInstance().handle_events();*/
+
 
     /*ByteStream challenge_data;
     DiscV5MaskedMessage m( shared_ptr<const SessionHandler>(nullptr),

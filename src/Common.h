@@ -99,6 +99,7 @@ class ByteStream
 
         inline operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
         inline operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
+        inline operator const vector<uint8_t>() const { return vvalue; }     
         inline operator const Integer() const { return as_Integer(); }
         operator const string() const;  // inline in the .cpp does not compile!?!
 
@@ -110,10 +111,11 @@ class ByteStream
         inline bool operator>=(const ByteStream &b) const { return Integer(*this) >= Integer(b); }
 
         //Unaligned operators
-        //inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue.data()[offset], size); };
+        //inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue[offset], size); };
         inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
         const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }
+        const bool as_bool() const { return (as_uint8() ? true : false); }
         
         static const ByteStream generateRandom(const uint32_t size);
 

@@ -5,6 +5,7 @@
 #include <Common.h>
 #include <crypto/bips.h>
 
+class DiscV4SignedMessage;
 class DiscV4PingMessage;
 class DiscV4PongMessage;
 class DiscV4FindNodeMessage;
@@ -20,21 +21,21 @@ class DiscV4Server: public DiscoveryServer
         DiscV4Server( const shared_ptr<const ENRV4Identity> host_enr,
                       const int read_buffer_size = 1374, const int write_buffer_size = 1374 );
     protected:
-        virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
+        virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const vector<uint8_t> &buffer) const;
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
-        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketMessage> msg) const;
 };
 
 class DiscV4Session: public DiscoverySession
 {
     public:
-        DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
+        DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
 
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 
         virtual void sendPing();
 
-        bool isVerified() const;    
+        bool isVerified() const;
 
     protected:
         void onNewPing(const shared_ptr<const DiscV4PingMessage> msg);

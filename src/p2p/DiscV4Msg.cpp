@@ -1,3 +1,6 @@
+#include "Network.h"
+
+#include <p2p/DiscV4.h>
 #include <p2p/DiscV4Msg.h>
 
 #include <iostream>         //cout
@@ -12,17 +15,28 @@ using std::dynamic_pointer_cast;
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscoveryMessage(signed_msg)
+    , m_hash(signed_msg->m_hash)
+    , m_pub_key(signed_msg->m_pub_key)
+    , m_hashed_payload(signed_msg->m_hashed_payload)
+    , m_signed_payload(signed_msg->m_signed_payload)
+    , m_ID(signed_msg->m_ID)
+    , m_type(signed_msg->m_type)
+    , m_rlp_payload(signed_msg->m_rlp_payload)
+{ }
+
+DiscV4SignedMessage::DiscV4SignedMessage(const vector<uint8_t> &buffer)
+    : DiscoveryMessage(buffer)
 {
     if( hasValidSize() )
     {
-        m_hash = ByteStream(&(*this)[0], 32);
-        m_hashed_payload = ByteStream(&(*this)[32], size() - 32);
-        m_signed_payload = ByteStream(&(*this)[97], size() - 97);
-        Signature sig(ByteStream(&(*this)[32], 32).as_Integer(), ByteStream(&(*this)[64], 32).as_Integer(), bool(ByteStream(&(*this)[96], 1)));
+        m_hash = ByteStream(&buffer[0], 32);
+        m_hashed_payload = ByteStream(&buffer[32], size() - 32);
+        m_signed_payload = ByteStream(&buffer[97], size() - 97);
+        Signature sig(ByteStream(&buffer[32], 32).as_Integer(), ByteStream(&buffer[64], 32).as_Integer(), ByteStream(&buffer[96], 1).as_bool());
         sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
         m_ID = m_pub_key.getKey(Pubkey::Format::XY).keccak256();
-        m_type = ByteStream(&(*this)[97], 1).as_uint8();
-        m_rlp_payload = ByteStream(&(*this)[98], size() - 98);
+        m_type = ByteStream(&buffer[97], 1).as_uint8();
+        m_rlp_payload = ByteStream(&buffer[98], size() - 98);
     }
 }
 
@@ -52,6 +66,39 @@ void DiscV4SignedMessage::addTypeSignAndHash(const RLPByteStream &rlp_payload)
     memcpy(this[0], signed_msg, signed_msg.byteSize());
 }
 
+const string DiscV4SignedMessage::getName() const
+{
+    string retval;
+    switch( getType() )
+    {
+    case 0x01:
+        return "PING";
+    case 0x02:
+        return "PONG";
+    case 0x03:
+        return "FINDNODE";
+    case 0x04:
+        return "NEIGHBORS";
+    case 0x05:
+        return "ENRREQUEST";
+    case 0x06:
+        return "ENRRESPONSE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void DiscV4SignedMessage::print() const
+{
+    cout << dec << "   @UDP DiscV4 " << getName() << " MESSAGE:" <<endl;
+    //SocketMessage::print();
+    //cout << "   Size : " << dec << size() << endl;
+    //cout << "   Hash = " << hex << getHash().as_Integer() << endl;
+    //cout << "   Public key = " << hex << getPubKey().getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
+    //cout << "   ID = " << hex << ByteStream(getPeerID().data(), getPeerID().size()) << endl;
+    //cout << "   Type = " << dec << int(getType()) << endl;
+};
+
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const SessionHandler> session_handler)
@@ -60,8 +107,8 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const SessionHandler> sess
     , m_sender_ip(getHostENR()->getIP())
     , m_sender_udp_port(getHostENR()->getUDPPort())
     , m_sender_tcp_port(getHostENR()->getTCPPort())
-    , m_recipient_ip(htonl(session_handler->getPeerAddress().sin_addr.s_addr))
-    , m_recipient_udp_port(htons(session_handler->getPeerAddress().sin_port)) 
+    , m_recipient_ip(ntohl(session_handler->getPeerAddress().sin_addr.s_addr))
+    , m_recipient_udp_port(ntohs(session_handler->getPeerAddress().sin_port)) 
     , m_recipient_tcp_port(0) 
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
     , m_enr_seq(getHostENR()->getSeq())
@@ -87,7 +134,7 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -117,35 +164,37 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
 
 void DiscV4PingMessage::print() const
 {
-    if( !hasNotExpired() )
-        cout << dec << "   @UDP DiscV4 EXPIRED PING" << endl;
+    DiscV4SignedMessage::print();
+    /*if( !hasNotExpired() )
+        cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
-        cout << dec << "   @UDP DiscV4 PING" << endl;
-    cout << "   Ping Hash = " << hex << getHash().as_Integer() << endl;
-    cout << "   Version = " << dec << uint16_t(m_version) << endl;
-    cout << "   Sender_ip = " << dec << ((m_sender_ip >> 24) & 0xFF) << "."
-                                    << ((m_sender_ip >> 16) & 0xFF) << "." 
-                                    << ((m_sender_ip >> 8) & 0xFF) << "." 
-                                    << (m_sender_ip & 0xFF) << endl;
-    cout << "   Sender_udp_port = " << dec << m_sender_udp_port << endl;
-    cout << "   Sender_tcp_port = " << dec << m_sender_tcp_port << endl;
-    cout << "   Recipient_ip = " << dec << ((m_recipient_ip >> 24) & 0xFF) << "."
-                                        << ((m_recipient_ip >> 16) & 0xFF) << "." 
-                                        << ((m_recipient_ip >> 8) & 0xFF) << "." 
-                                        << (m_recipient_ip & 0xFF) << endl;
-    cout << "   Recipient_udp_port = " << dec << m_recipient_udp_port << endl;
-    cout << "   Recipient_tcp_port = " << dec << m_recipient_tcp_port << endl;
-    cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    if( m_enr_seq )
-        cout << "   ENR-seq = " << dec << m_enr_seq << endl;
+    {
+        cout << "   Ping Hash = " << hex << getHash().as_Integer() << endl;
+        cout << "   Version = " << dec << uint16_t(m_version) << endl;
+        cout << "   Sender_ip = " << dec << ((m_sender_ip >> 24) & 0xFF) << "."
+                                        << ((m_sender_ip >> 16) & 0xFF) << "." 
+                                        << ((m_sender_ip >> 8) & 0xFF) << "." 
+                                        << (m_sender_ip & 0xFF) << endl;
+        cout << "   Sender_udp_port = " << dec << m_sender_udp_port << endl;
+        cout << "   Sender_tcp_port = " << dec << m_sender_tcp_port << endl;
+        cout << "   Recipient_ip = " << dec << ((m_recipient_ip >> 24) & 0xFF) << "."
+                                            << ((m_recipient_ip >> 16) & 0xFF) << "." 
+                                            << ((m_recipient_ip >> 8) & 0xFF) << "." 
+                                            << (m_recipient_ip & 0xFF) << endl;
+        cout << "   Recipient_udp_port = " << dec << m_recipient_udp_port << endl;
+        cout << "   Recipient_tcp_port = " << dec << m_recipient_tcp_port << endl;
+        cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
+        if( m_enr_seq )
+            cout << "   ENR-seq = " << dec << m_enr_seq << endl;
+    }*/
 }
 
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &ack_hash)
     : DiscV4SignedMessage(session_handler)
-    , m_recipient_ip(htonl(session_handler->getPeerAddress().sin_addr.s_addr))
-    , m_recipient_udp_port(htons(session_handler->getPeerAddress().sin_port)) 
+    , m_recipient_ip(ntohl(session_handler->getPeerAddress().sin_addr.s_addr))
+    , m_recipient_udp_port(ntohs(session_handler->getPeerAddress().sin_port)) 
     , m_recipient_tcp_port(0) 
     , m_ping_hash(ack_hash)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
@@ -167,7 +216,7 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -190,27 +239,29 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
 
 void DiscV4PongMessage::print() const
 {
-    if( !hasNotExpired() )
-        cout << dec << "   @UDP DiscV4 EXPIRED PONG" << endl;
+    DiscV4SignedMessage::print();
+    /*if( !hasNotExpired() )
+        cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
-        cout << dec << "   @UDP DiscV4 PONG" << endl;
-    cout << "   Recipient_ip = " << dec << ((m_recipient_ip >> 24) & 0xFF) << "."
-                                        << ((m_recipient_ip >> 16) & 0xFF) << "." 
-                                        << ((m_recipient_ip >> 8) & 0xFF) << "." 
-                                        << (m_recipient_ip & 0xFF) << endl;
-    cout << "   Recipient_udp_port = " << dec << m_recipient_udp_port << endl;
-    cout << "   Recipient_tcp_port = " << dec << m_recipient_tcp_port << endl;
-    cout << "   Ping Hash = " << hex << m_ping_hash.as_Integer() << endl;
-    cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    if( m_enr_seq )
-        cout << "   ENR-seq = " << dec << m_enr_seq << endl;
+    {
+        cout << "   Recipient_ip = " << dec << ((m_recipient_ip >> 24) & 0xFF) << "."
+                                            << ((m_recipient_ip >> 16) & 0xFF) << "." 
+                                            << ((m_recipient_ip >> 8) & 0xFF) << "." 
+                                            << (m_recipient_ip & 0xFF) << endl;
+        cout << "   Recipient_udp_port = " << dec << m_recipient_udp_port << endl;
+        cout << "   Recipient_tcp_port = " << dec << m_recipient_tcp_port << endl;
+        cout << "   Ping Hash = " << hex << m_ping_hash.as_Integer() << endl;
+        cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
+        if( m_enr_seq )
+            cout << "   ENR-seq = " << dec << m_enr_seq << endl;
+    }*/
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const Pubkey &target)
+DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler)
     : DiscV4SignedMessage(session_handler)
-    , m_target(target)
+    , m_target(getHostENR()->getPubKey())
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
     RLPByteStream rlp;
@@ -223,7 +274,7 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -237,50 +288,48 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
 
 void DiscV4FindNodeMessage::print() const
 {
-    if( auto server = getConstServer() )
+    DiscV4SignedMessage::print();
+    /*if( !hasNotExpired() )
+        cout << dec << "   EXPIRED MESSAGE!" << endl;
+    else
     {
-        if( !hasNotExpired() )
-            cout << dec << "   @UDP DiscV4 EXPIRED FINDNODE" << endl;
-        else
-            cout << dec << "   @UDP DiscV4 FINDNODE" << endl;
         cout << "   Target = 0x" << hex << m_target.getKey(Pubkey::Format::XY) << endl;
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }
+    }*/
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const vector<std::weak_ptr<const ENRV4Identity>> &neighbors_enr)
+DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const vector<shared_ptr<const ENRV4Identity>> &neighbors_enr)
     : DiscV4SignedMessage(session_handler)
-    //, m_nodes(neighbors_enr) FIXME
+    , m_nodes(neighbors_enr)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
     RLPByteStream rlp(ByteStream(), true);
     
-    for(auto it = begin(neighbors_enr); it != end(neighbors_enr); it++)
+    for(auto it = neighbors_enr.begin(); it != neighbors_enr.end(); it++)
     {
         RLPByteStream node_i;
-        if( auto enr = it->lock() )
+        if( auto node = it->get() )
         {
-            node_i.push_back(enr->getIP() ? ByteStream(enr->getIP()) : ByteStream());           //Transmit empty instead of 0
-            node_i.push_back(enr->getUDPPort() ? ByteStream(enr->getUDPPort()) : ByteStream()); //Transmit empty instead of 0
-            node_i.push_back(enr->getTCPPort() ? ByteStream(enr->getTCPPort()) : ByteStream()); //Transmit empty instead of 0
-            node_i.push_back(enr->getPubKey().getKey(Pubkey::Format::XY));
-            rlp.push_back(node_i);
+            node_i.push_back(node->getIP() ? ByteStream(node->getIP()) : ByteStream());           //Transmit empty instead of 0
+            node_i.push_back(node->getUDPPort() ? ByteStream(node->getUDPPort()) : ByteStream()); //Transmit empty instead of 0
+            node_i.push_back(node->getTCPPort() ? ByteStream(node->getTCPPort()) : ByteStream()); //Transmit empty instead of 0
+            node_i.push_back(node->getPubKey().getKey(Pubkey::Format::XY));
         }
+        rlp.push_back(node_i);
     }
 
-    rlp.push_back(ByteStream(m_expiration));
+    rlp.push_back(ByteStream(m_expiration), true);
     addTypeSignAndHash(rlp);
-    if( rlp.byteSize()+32+65+1 > 1280 )
-        cout << hex << rlp.as_Integer() << endl;
+    //cout << hex << rlp.as_Integer() << endl;
 }
 
 DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -308,30 +357,33 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
 
 void DiscV4NeighborsMessage::print() const
 {
-    if( auto server = getConstServer() )
+    DiscV4SignedMessage::print();
+    /*if( !hasNotExpired() )
+        cout << dec << "   EXPIRED MESSAGE!" << endl;
+    else
     {
-        if( !hasNotExpired() )
-            cout << dec << "   @UDP DiscV4 EXPIRED NEIGHBORS" << endl;
-        else
-            cout << dec << "   @UDP DiscV4 NEIGHBORS" << endl;
+        SocketMessage::print();
         auto nodes(m_nodes);
         while( nodes.size() )
         {
-            auto node_i = nodes.back();
-            cout << "   ----------------------------------------" << endl;
-            cout << "   Node IP = " << dec << ((node_i->getIP() >> 24) & 0xFF) << "."
-                                            << ((node_i->getIP() >> 16) & 0xFF) << "." 
-                                            << ((node_i->getIP() >> 8) & 0xFF) << "." 
-                                            << (node_i->getIP() & 0xFF) << endl;
-            cout << "   Node UDP PORT = " << dec << node_i->getUDPPort() << endl;
-            cout << "   Node TCP PORT = " << dec << node_i->getTCPPort() << endl;
-            cout << "   Node PUBLIC KEY = 0x" << hex << node_i->getPubKey().getKey(Pubkey::Format::XY) << endl;
+            if( auto node_i = nodes.back() ) 
+            {
+                cout << "   ----------------------------------------" << endl;
+                cout << "   Node IP = " << dec << ((node_i->getIP() >> 24) & 0xFF) << "."
+                                                << ((node_i->getIP() >> 16) & 0xFF) << "." 
+                                                << ((node_i->getIP() >> 8) & 0xFF) << "." 
+                                                << (node_i->getIP() & 0xFF) << endl;
+                cout << "   Node UDP PORT = " << dec << node_i->getUDPPort() << endl;
+                cout << "   Node TCP PORT = " << dec << node_i->getTCPPort() << endl;
+                cout << "   Node PUBLIC KEY = 0x" << hex << node_i->getPubKey().getKey(Pubkey::Format::PREFIXED_X) << endl;
+                cout << "   Node ID = 0x" << hex << node_i->getPubKey().getKey(Pubkey::Format::XY).keccak256() << endl;
+            }
 
             nodes.pop_back();    // => next node
         }
         cout << "   ----------------------------------------" << endl;
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }
+    }*/
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -349,7 +401,7 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(&(*signed_msg)[0], signed_msg->size());
+    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -362,14 +414,13 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
 
 void DiscV4ENRRequestMessage::print() const
 {
-    if( auto server = getConstServer() )
+    DiscV4SignedMessage::print();
+    /*if( !hasNotExpired() )
+        cout << dec << "   EXPIRED MESSAGE!" << endl;
+    else
     {
-        if( !hasNotExpired() )
-            cout << dec << "   @UDP DiscV4 EXPIRED ENRREQUEST" << endl;
-        else
-            cout << dec << "   @UDP DiscV4 ENRREQUEST" << endl;
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }
+    }*/
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -398,12 +449,11 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
                                                          ping_msg->getSenderTCPPort(),
                                                          ping_msg->getPubKey()
-                                                       );
+                                                        );
     }
     else
     {
-        //True DiscV4ENRResponseMessage
-        RLPByteStream msg = RLPByteStream(&(*signed_msg)[0], signed_msg->size());
+        RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
 
         //Drops the header:
         // - 32 bytes hash,
@@ -419,19 +469,8 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
 
 void DiscV4ENRResponseMessage::print() const
 {
-    if( auto server = getConstServer() )
-    {
-        cout << dec << "   @UDP DiscV4 ENRRESPONSE:" << endl;
-        cout << "   ENR Request hash = 0x" << hex << m_enr_request_hash.as_Integer() << endl;
-        if(m_sender_enr)
-        {
-            cout << "   Peer ENR:" << endl;
-            m_sender_enr->print();
-        }
-        else
-        {
-            cout << "   Host ENR:" << endl;
-            getHostENR()->print();
-        }
-    }
+    DiscV4SignedMessage::print();
+    /*cout << dec << "   @UDP DiscV4 ENR RECORD:" << endl;
+    cout << "   ENR Request hash = 0x" << hex << m_enr_request_hash.as_Integer() << endl;
+    getENR()->print();*/
 }

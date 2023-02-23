@@ -29,19 +29,9 @@ ENRV4Identity::ENRV4Identity(const ENRV4Identity& id)
     , m_is_signed(id.m_is_signed)
 { }
 
-//Received ENR builder
+//ENRRESPONSE message
 ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
     : m_timestamp(getUnixTimeStamp())
-    , m_scheme("unknown")
-    , m_ip(0)
-    , m_tcp_port(0)
-    , m_udp_port(0)
-    , m_ip6(Integer::zero)
-    , m_tcp6_port(0)
-    , m_udp6_port(0)
-    , m_secret(shared_ptr<const Privkey>(nullptr))
-    , m_pubkey(Pubkey())
-    , m_ID(ByteStream())
     , m_signed_rlp(signed_rlp)
     , m_is_signed(true)
 {
@@ -125,9 +115,6 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     , m_ip(ip)
     , m_udp_port(udp_port)
     , m_tcp_port(tcp_port)
-    , m_ip6(Integer::zero)
-    , m_udp6_port(0)
-    , m_tcp6_port(0)
     , m_secret(make_shared<const Privkey>(ByteStream(secret, 32, 16)))
     , m_pubkey(m_secret->getPubKey())
     , m_ID(m_pubkey.getID())
@@ -159,17 +146,11 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
 ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16_t udp_port, const uint16_t tcp_port, const Pubkey &pub_key)
     : m_timestamp(getUnixTimeStamp())
     , m_seq(seq)
-    , m_scheme(ByteStream("v4"))
     , m_ip(ip)
     , m_udp_port(udp_port)
     , m_tcp_port(tcp_port)
-    , m_ip6(Integer::zero)
-    , m_udp6_port(0)
-    , m_tcp6_port(0)
-    , m_secret(0)
     , m_pubkey(pub_key)
     , m_ID(m_pubkey.getID())
-    , m_signed_rlp(RLPByteStream())
     , m_is_signed(false)
 { 
     m_unsigned_rlp.push_back(ByteStream(m_seq));
@@ -184,6 +165,16 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     m_unsigned_rlp.push_back(ByteStream("tcp"));
     m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
 }
+
+//ENR From Message
+ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const ByteStream &node_ID)
+    : m_timestamp(getUnixTimeStamp())
+    , m_seq(0)
+    , m_ip(ip)
+    , m_udp_port(udp_port)
+    , m_ID(node_ID)
+    , m_is_signed(false)
+{ }
 
 bool ENRV4Identity::equals(const shared_ptr<const ENRV4Identity> enr) const
 {
