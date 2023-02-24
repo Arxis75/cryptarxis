@@ -166,16 +166,6 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
 }
 
-//ENR From Message
-ENRV4Identity::ENRV4Identity(const uint32_t ip, const uint16_t udp_port, const ByteStream &node_ID)
-    : m_timestamp(getUnixTimeStamp())
-    , m_seq(0)
-    , m_ip(ip)
-    , m_udp_port(udp_port)
-    , m_ID(node_ID)
-    , m_is_signed(false)
-{ }
-
 bool ENRV4Identity::equals(const shared_ptr<const ENRV4Identity> enr) const
 {
     return  //m_seq == enr->m_seq &&

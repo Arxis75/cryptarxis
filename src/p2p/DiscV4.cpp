@@ -38,8 +38,8 @@ const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr
 DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
     : DiscoverySession(socket_handler, peer_address, peer_id)
     , m_last_verified_pong_timestamp(0)
-    , m_last_sent_ping_hash(1)
-    , m_last_sent_enr_request_hash(1)
+    , m_last_sent_ping_hash()
+    , m_last_sent_enr_request_hash()
 { }
 
 void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
@@ -80,9 +80,7 @@ bool DiscV4Session::isVerified() const
 
 void DiscV4Session::onNewPing(const shared_ptr<const DiscV4PingMessage> msg)
 {
-    if( msg && msg->hasNotExpired() && 
-        msg->getSenderIP() == ntohl(getPeerAddress().sin_addr.s_addr) &&
-        msg->getSenderUDPPort() == ntohs(getPeerAddress().sin_port) )
+    if( msg && !msg->hasExpired() )
     {
         msg->print();
         sendPong(msg->getHash());
@@ -90,50 +88,62 @@ void DiscV4Session::onNewPing(const shared_ptr<const DiscV4PingMessage> msg)
         if( !isVerified() )
             sendPing();
         else
-        {
-            // Addition of the sender into the local ENR table
-            // if he passed the Endpoint Proof (Valid Pong)
-            updatePeerENR(make_shared<const DiscV4ENRResponseMessage>(msg)->getENR());
+        {   
+            if( !getENR() )
+                // If the session has no ENR, add sender infos into the local ENR table
+                // as "pseudo-ENR" as long as he passed the Endpoint Proof (Valid Pong)
+                updatePeerENR(make_shared<const DiscV4ENRResponseMessage>(msg)->getENR());
+            
+            if( getENR()->getSeq() < msg->getENRSeq() )
+                // Ask for an ENR update
+                sendENRRequest();
 
-            sendFindNode();
+            //sendFindNode();
         }
     }
 }
 
 void DiscV4Session::onNewPong(const shared_ptr<const DiscV4PongMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && !msg->hasExpired() )
     {
         if( msg->hasValidPingHash(m_last_sent_ping_hash) )
         {
             msg->print();
+            m_last_sent_ping_hash.clear();
             m_last_verified_pong_timestamp = getUnixTimeStamp();
+
+            if( getENR() && getENR()->getSeq() < msg->getENRSeq() )
+                // Ask for an ENR update
+                sendENRRequest();
+            //else
+            sendFindNode();
         }
         else
         {
             m_last_verified_pong_timestamp = 0;
-            notifyInvalidSignature();
+            //sendPing();
         }
     }
 }
 
 void DiscV4Session::onNewFindNode(const shared_ptr<const DiscV4FindNodeMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && !msg->hasExpired() )
     {
         if( isVerified() )
         {
             msg->print();
             sendNeighbors(msg->getTargetID());
         }
-        else
-            sendPing();
+        //else
+        //    sendPing();
     }
 }
 
 void DiscV4Session::onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && !msg->hasExpired() )
     {
         if( isVerified() )
         {
@@ -141,25 +151,24 @@ void DiscV4Session::onNewNeighbors(const shared_ptr<const DiscV4NeighborsMessage
             {
                 msg->print();
                 const_pointer_cast<DiscV4Server>(server)->onNewNodeCandidates(msg->getNodes());
-                sendENRRequest();
             }
         }
-        else
-            sendPing();
+        //else
+        //    sendPing();
     }
 }
 
 void DiscV4Session::onNewENRRequest(const shared_ptr<const DiscV4ENRRequestMessage> msg)
 {
-    if( msg && msg->hasNotExpired() )
+    if( msg && !msg->hasExpired() )
     {
         if( isVerified() )
         {
             msg->print();
             sendENRResponse(msg->getHash());
         }
-        else
-            sendPing();
+        //else
+        //    sendPing();
     }
 }
 
@@ -170,16 +179,23 @@ void DiscV4Session::onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMes
         if( isVerified() )
         {
             //The recipient of the packet should verify that the node record is signed by the public key which signed the response packet
-            if( msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) && msg->getENR()->hasValidSignature() )
+            auto enr = msg->getENR();
+            if( enr->hasValidSignature() )
             {
-                msg->print();
-                updatePeerENR(msg->getENR());
+                if( msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) &&
+                    enr->getIP() == ntohl(getPeerAddress().sin_addr.s_addr) && enr->getUDPPort() == ntohs(getPeerAddress().sin_port) )
+                {
+                    msg->print();
+                    updatePeerENR(msg->getENR());
+                }
             }
             else
                 notifyInvalidSignature();
         }
-        else
-            sendPing();  
+        //else
+        //    sendPing();
+
+        m_last_sent_enr_request_hash.clear();
     }
 }
 

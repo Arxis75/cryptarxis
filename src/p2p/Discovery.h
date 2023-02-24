@@ -27,7 +27,7 @@ class DiscoveryServer: public SocketHandler
 
     protected:
         virtual void dispatchMessage(const shared_ptr<const SocketMessage> msg);
-
+        
     private:
         shared_ptr<const ENRV4Identity> m_host_enr;
 

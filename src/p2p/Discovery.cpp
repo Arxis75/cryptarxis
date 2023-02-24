@@ -9,7 +9,8 @@ using std::hex;
 using std::min;
 
 DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
-    : SessionHandler(socket_handler, peer_address, peer_id), m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
+    : SessionHandler(socket_handler, peer_address, peer_id)
+    , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
 {
 }
 
@@ -95,16 +96,16 @@ void DiscoveryServer::onNewNodeCandidates(const vector<std::shared_ptr<const ENR
     {
         if (auto node_i = it->get())
         {
-            // Is it a real peer (not 0.0.0.0:0000) and not me?
-            if (node_i->getIP() && node_i->getUDPPort() &&
-                node_i->getID() != getHostENR()->getID())
+            // Is it not me?
+            if( node_i->getIP() != getHostENR()->getIP() &&
+                node_i->getUDPPort() != getHostENR()->getUDPPort() )
             {
                 struct sockaddr_in peer_address;
                 peer_address.sin_family = AF_INET;
                 peer_address.sin_addr.s_addr = htonl(node_i->getIP());
                 peer_address.sin_port = htons(node_i->getUDPPort());
 
-                if (!isBlacklisted(peer_address))
+                if( !isInternalAddress(peer_address) && !isBlacklisted(peer_address) )
                 {
                     auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler(makeSessionKey(peer_address, node_i->getID())));
                     if (!session)

@@ -24,7 +24,7 @@ class DiscV4SignedMessage: public DiscoveryMessage
         inline const ByteStream &getHash() const { return m_hash; }
         inline const Pubkey &getPubKey() const { return m_pub_key; }
         inline const string getName() const;
-        virtual inline const vector<uint8_t> getPeerID() const { return (const vector<uint8_t>)m_ID; };
+        virtual inline const vector<uint8_t> getPeerID() const { return m_ID; };
         // isSessionBootstrapper filters non-ping messages from a same IP:Port with changing ID.
         // => It forces the peer to resend a ping publishing its new ID
         virtual inline bool isSessionBootstrapper() const { return getType() == 0x01; }
@@ -63,7 +63,7 @@ class DiscV4PingMessage : public DiscV4SignedMessage
         DiscV4PingMessage(const shared_ptr<const SessionHandler> session_handler);
 
         inline bool hasValidVersion() const { return m_version == 4; }
-        inline bool hasNotExpired() const { return m_expiration > getTimeStamp(); }
+        inline bool hasExpired() const { return getTimeStamp() > m_expiration; }
 
         virtual inline const uint8_t getType() const {return 0x01; }
 
@@ -102,7 +102,7 @@ class DiscV4PongMessage : public DiscV4SignedMessage
         inline virtual const uint8_t getType() const {return 0x02; }
 
         inline bool hasValidPingHash(const ByteStream ping_hash) const { return ping_hash == getPingHash(); };
-        inline bool hasNotExpired() const { return m_expiration > getTimeStamp(); }
+        inline bool hasExpired() const { return getTimeStamp() > m_expiration; }
 
         inline const ByteStream &getPingHash() const { return m_ping_hash; }
         inline uint32_t getRecipientIP() const { return m_recipient_ip; }
@@ -135,7 +135,7 @@ class DiscV4FindNodeMessage : public DiscV4SignedMessage
         inline const Pubkey &getTarget() const { return m_target; }
         inline const ByteStream getTargetID() const { return getTarget().getKey(Pubkey::Format::XY).keccak256(); }
 
-        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+        inline bool hasExpired() const { return getTimeStamp() > m_expiration; }
 
         void print() const;
 
@@ -156,7 +156,7 @@ class DiscV4NeighborsMessage : public DiscV4SignedMessage
 
         inline const vector<std::shared_ptr<const ENRV4Identity>> &getNodes() const { return m_nodes; }
 
-        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+        inline bool hasExpired() const { return getTimeStamp() > m_expiration; }
 
         void print() const;
 
@@ -175,7 +175,7 @@ class DiscV4ENRRequestMessage : public DiscV4SignedMessage
 
         inline virtual const uint8_t getType() const {return 0x05; }
 
-        inline bool hasNotExpired() const { return m_expiration > getUnixTimeStamp(); }
+        inline bool hasExpired() const { return getTimeStamp() > m_expiration; }
 
         void print() const;
 

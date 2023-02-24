@@ -34,9 +34,9 @@ DiscV4SignedMessage::DiscV4SignedMessage(const vector<uint8_t> &buffer)
         m_signed_payload = ByteStream(&buffer[97], size() - 97);
         Signature sig(ByteStream(&buffer[32], 32).as_Integer(), ByteStream(&buffer[64], 32).as_Integer(), ByteStream(&buffer[96], 1).as_bool());
         sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
-        m_ID = m_pub_key.getKey(Pubkey::Format::XY).keccak256();
+        m_ID = m_pub_key.getID();
         m_type = ByteStream(&buffer[97], 1).as_uint8();
-        m_rlp_payload = ByteStream(&buffer[98], size() - 98);
+        m_rlp_payload = RLPByteStream(&buffer[98], size() - 98);
     }
 }
 
@@ -63,8 +63,8 @@ void DiscV4SignedMessage::addTypeSignAndHash(const RLPByteStream &rlp_payload)
     m_hash = m_hashed_payload.keccak256();
     signed_msg.push_front(m_hash);
 
-    resize(signed_msg.byteSize());
-    memcpy(this[0], signed_msg, signed_msg.byteSize());
+    clear();
+    push_back(signed_msg);
 }
 
 const string DiscV4SignedMessage::getName() const
@@ -137,38 +137,32 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(*signed_msg.get());
+    RLPByteStream rlp = getRLPPayload();
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
-
-    m_version = msg.pop_front(is_list).as_uint8();
-    RLPByteStream from = msg.pop_front(is_list);
+    m_version = rlp.pop_front(is_list).as_uint8();
+    RLPByteStream from = rlp.pop_front(is_list);
     if( from.byteSize() > 1 )   //non-empty list
     {
         m_sender_ip = from.pop_front(is_list).as_uint64();
         m_sender_udp_port = from.pop_front(is_list).as_uint64(); 
         m_sender_tcp_port = from.pop_front(is_list).as_uint64(); 
     }
-    RLPByteStream to = msg.pop_front(is_list);
+    RLPByteStream to = rlp.pop_front(is_list);
     if( to.byteSize() > 1 )     //non-empty list
     {
         m_recipient_ip = to.pop_front(is_list).as_uint64();
         m_recipient_udp_port = to.pop_front(is_list).as_uint64(); 
         m_recipient_tcp_port = to.pop_front(is_list).as_uint64(); 
     }
-    m_expiration = msg.pop_front(is_list).as_uint64();
-    if( msg.byteSize() > 0 )
-        m_enr_seq = msg.pop_front(is_list).as_uint64();
+    m_expiration = rlp.pop_front(is_list).as_uint64();
+    if( rlp.byteSize() > 0 )
+        m_enr_seq = rlp.pop_front(is_list).as_uint64();
 }
 
 void DiscV4PingMessage::print() const
 {
     DiscV4SignedMessage::print();
-    if( !hasNotExpired() )
+    if( hasExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -219,31 +213,25 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(*signed_msg.get());
+    RLPByteStream rlp = getRLPPayload();
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
-
-    RLPByteStream to = msg.pop_front(is_list);
+    RLPByteStream to = rlp.pop_front(is_list);
     if( to.byteSize() > 1 )     //non-empty list
     {
         m_recipient_ip = to.pop_front(is_list).as_uint64();
         m_recipient_udp_port = to.pop_front(is_list).as_uint64();
         m_recipient_tcp_port = to.pop_front(is_list).as_uint64();
     }
-    m_ping_hash = msg.pop_front(is_list);
-    m_expiration = msg.pop_front(is_list).as_uint64();
-    if( msg.byteSize() > 0 )
-        m_enr_seq = msg.pop_front(is_list).as_uint64();
+    m_ping_hash = rlp.pop_front(is_list);
+    m_expiration = rlp.pop_front(is_list).as_uint64();
+    if( rlp.byteSize() > 0 )
+        m_enr_seq = rlp.pop_front(is_list).as_uint64();
 }
 
 void DiscV4PongMessage::print() const
 {
     DiscV4SignedMessage::print();
-    if( !hasNotExpired() )
+    if( hasExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -277,22 +265,16 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(*signed_msg.get());
+    RLPByteStream rlp = getRLPPayload();
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
-
-    m_target = Pubkey(msg.pop_front(is_list), Pubkey::Format::XY);
-    m_expiration = msg.pop_front(is_list).as_uint64();
+    m_target = Pubkey(rlp.pop_front(is_list), Pubkey::Format::XY);
+    m_expiration = rlp.pop_front(is_list).as_uint64();
 }
 
 void DiscV4FindNodeMessage::print() const
 {
     DiscV4SignedMessage::print();
-    if( !hasNotExpired() )
+    if( hasExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -332,15 +314,9 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(*signed_msg.get());
+    RLPByteStream rlp = getRLPPayload();
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
-
-    RLPByteStream node_list = msg.pop_front(is_list);
+    RLPByteStream node_list = rlp.pop_front(is_list);
     while( node_list.byteSize() )
     {
         RLPByteStream node_i = node_list.pop_front(is_list);
@@ -355,13 +331,13 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
         }
     }
 
-    m_expiration = msg.pop_front(is_list).as_uint64();
+    m_expiration = rlp.pop_front(is_list).as_uint64();
 }
 
 void DiscV4NeighborsMessage::print() const
 {
     DiscV4SignedMessage::print();
-    if( !hasNotExpired() )
+    if( hasExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -402,21 +378,15 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(*signed_msg.get());
+    RLPByteStream rlp = getRLPPayload();
 
-    //Drops the header:
-    // - 32 bytes hash,
-    // - 65 bytes signature,
-    // - 1 byte type
-    msg.ByteStream::pop_front(98);
-
-    m_expiration = msg.pop_front(is_list).as_uint64();
+    m_expiration = rlp.pop_front(is_list).as_uint64();
 }
 
 void DiscV4ENRRequestMessage::print() const
 {
     DiscV4SignedMessage::print();
-    if( !hasNotExpired() )
+    if( hasExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -445,7 +415,8 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
     if( auto ping_msg = dynamic_pointer_cast<const DiscV4PingMessage>(signed_msg) )
     {
         // DiscV4ENRResponseMessage emulated from DiscV4PingMessage
-        m_sender_enr = make_shared<const ENRV4Identity>( ping_msg->getENRSeq(),
+        // Relying on the session IP:Port over those of the ping limits IP spoofing...
+        m_sender_enr = make_shared<const ENRV4Identity>( 0, // seq = 0 because this is not the actual record
                                                          ntohl(ping_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
                                                          ping_msg->getSenderTCPPort(),
@@ -454,17 +425,11 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
     }
     else
     {
-        RLPByteStream msg(*signed_msg.get());
+        RLPByteStream rlp = getRLPPayload();
 
-        //Drops the header:
-        // - 32 bytes hash,
-        // - 65 bytes signature,
-        // - 1 byte type
-        msg.ByteStream::pop_front(98);
+        m_enr_request_hash = rlp.pop_front(is_list);
 
-        m_enr_request_hash = msg.pop_front(is_list);
-
-        m_sender_enr = make_shared<const ENRV4Identity>(msg.pop_front(is_list));
+        m_sender_enr = make_shared<const ENRV4Identity>(rlp.pop_front(is_list));
     }
 }
 
