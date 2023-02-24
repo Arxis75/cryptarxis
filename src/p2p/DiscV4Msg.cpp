@@ -42,6 +42,7 @@ DiscV4SignedMessage::DiscV4SignedMessage(const vector<uint8_t> &buffer)
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler)
     : DiscoveryMessage(session_handler)
+    , m_ID(ByteStream(session_handler->getPeerID()))
 {
 }
 
@@ -97,7 +98,7 @@ void DiscV4SignedMessage::print() const
     cout << "   Size : " << dec << size() << endl;
     cout << "   Hash = " << hex << getHash().as_Integer() << endl;
     cout << "   Public key = " << hex << getPubKey().getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
-    cout << "   ID = " << hex << ByteStream(getPeerID().data(), getPeerID().size()) << endl;
+    cout << "   ID = " << hex << ByteStream(getPeerID()) << endl;
     cout << "   Type = " << dec << int(getType()) << endl;
 };
 
@@ -136,7 +137,7 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+    RLPByteStream msg(*signed_msg.get());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -218,7 +219,7 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
     , m_enr_seq(0)
 {
     bool is_list;
-    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+    RLPByteStream msg(*signed_msg.get());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -276,7 +277,7 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+    RLPByteStream msg(*signed_msg.get());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -331,7 +332,7 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+    RLPByteStream msg(*signed_msg.get());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -401,7 +402,7 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
     : DiscV4SignedMessage(signed_msg)
 {
     bool is_list;
-    RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+    RLPByteStream msg(*signed_msg.get());
 
     //Drops the header:
     // - 32 bytes hash,
@@ -453,7 +454,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
     }
     else
     {
-        RLPByteStream msg(signed_msg.get()[0], signed_msg->size());
+        RLPByteStream msg(*signed_msg.get());
 
         //Drops the header:
         // - 32 bytes hash,

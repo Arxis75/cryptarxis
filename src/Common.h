@@ -68,6 +68,7 @@ class ByteStream
     public:       
         ByteStream() { vvalue.reserve(32); };
         ByteStream(const uint64_t value) { vvalue.reserve(8); push_back(value, sizeInBytes64(value)); }
+        ByteStream(const vector<uint8_t> &v) { vvalue = v; }
         ByteStream(const ByteStream &b) { vvalue = b.vvalue; }
         ByteStream(const char* str) { vvalue.reserve(strlen(str)); push_back_ptr(reinterpret_cast<const uint8_t*>(str), strlen(str)); }
         ByteStream(const uint8_t *p, uint64_t size) { vvalue.reserve(size); push_back_ptr(p, size); }
@@ -99,7 +100,7 @@ class ByteStream
 
         inline operator uint8_t*() { return reinterpret_cast<uint8_t*>(vvalue.data()); }
         inline operator const unsigned char*() const { return reinterpret_cast<const unsigned char*>(vvalue.data()); }     
-        inline operator const vector<uint8_t>() const { return vvalue; }     
+        inline operator const vector<uint8_t>() const { return vvalue; }
         inline operator const Integer() const { return as_Integer(); }
         operator const string() const;  // inline in the .cpp does not compile!?!
 
@@ -131,6 +132,7 @@ class RLPByteStream: public ByteStream
     public:
         // Non-encoding constructors:
         RLPByteStream() { vvalue.reserve(1+32); }
+        RLPByteStream(const vector<uint8_t> &v) : ByteStream(v.data(), v.size()) { }
         RLPByteStream(const RLPByteStream &b) : ByteStream(b) {}
         RLPByteStream(const uint8_t *p, uint64_t size) : ByteStream(p, size) { }
         RLPByteStream(const char *str) : ByteStream(str, strlen(str)>1, 16) { } //for raw RLP init from hex string only
