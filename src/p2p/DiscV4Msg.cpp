@@ -444,7 +444,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
     if( auto ping_msg = dynamic_pointer_cast<const DiscV4PingMessage>(signed_msg) )
     {
         // DiscV4ENRResponseMessage emulated from DiscV4PingMessage
-        m_sender_enr = make_shared<const ENRV4Identity>( 0,     //Will force the update on a true ENRResponse reception
+        m_sender_enr = make_shared<const ENRV4Identity>( ping_msg->getENRSeq(),
                                                          ntohl(ping_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
                                                          ping_msg->getSenderTCPPort(),
