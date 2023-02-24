@@ -91,12 +91,14 @@ const string DiscV4SignedMessage::getName() const
 void DiscV4SignedMessage::print() const
 {
     cout << dec << "   @UDP DiscV4 " << getName() << " MESSAGE:" <<endl;
-    //SocketMessage::print();
-    //cout << "   Size : " << dec << size() << endl;
-    //cout << "   Hash = " << hex << getHash().as_Integer() << endl;
-    //cout << "   Public key = " << hex << getPubKey().getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
-    //cout << "   ID = " << hex << ByteStream(getPeerID().data(), getPeerID().size()) << endl;
-    //cout << "   Type = " << dec << int(getType()) << endl;
+    
+    //SocketMessage::print();   // Printing raw byteStream
+    
+    cout << "   Size : " << dec << size() << endl;
+    cout << "   Hash = " << hex << getHash().as_Integer() << endl;
+    cout << "   Public key = " << hex << getPubKey().getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
+    cout << "   ID = " << hex << ByteStream(getPeerID().data(), getPeerID().size()) << endl;
+    cout << "   Type = " << dec << int(getType()) << endl;
 };
 
 //-----------------------------------------------------------------------------------------------------
@@ -165,7 +167,7 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const DiscV4SignedMessage>
 void DiscV4PingMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*if( !hasNotExpired() )
+    if( !hasNotExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -186,7 +188,7 @@ void DiscV4PingMessage::print() const
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
         if( m_enr_seq )
             cout << "   ENR-seq = " << dec << m_enr_seq << endl;
-    }*/
+    }
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -240,7 +242,7 @@ DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const DiscV4SignedMessage>
 void DiscV4PongMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*if( !hasNotExpired() )
+    if( !hasNotExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
@@ -254,7 +256,7 @@ void DiscV4PongMessage::print() const
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
         if( m_enr_seq )
             cout << "   ENR-seq = " << dec << m_enr_seq << endl;
-    }*/
+    }
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -289,13 +291,13 @@ DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const DiscV4Signed
 void DiscV4FindNodeMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*if( !hasNotExpired() )
+    if( !hasNotExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
         cout << "   Target = 0x" << hex << m_target.getKey(Pubkey::Format::XY) << endl;
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }*/
+    }
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -358,11 +360,10 @@ DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const DiscV4Sign
 void DiscV4NeighborsMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*if( !hasNotExpired() )
+    if( !hasNotExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
-        SocketMessage::print();
         auto nodes(m_nodes);
         while( nodes.size() )
         {
@@ -383,7 +384,7 @@ void DiscV4NeighborsMessage::print() const
         }
         cout << "   ----------------------------------------" << endl;
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }*/
+    }
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -392,8 +393,7 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const SessionH
     : DiscV4SignedMessage(session_handler)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
-    RLPByteStream rlp;
-    rlp.push_back(ByteStream(m_expiration));
+    RLPByteStream rlp(RLPByteStream(m_expiration), true);
     addTypeSignAndHash(rlp);
 }
 
@@ -415,12 +415,12 @@ DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const DiscV4Si
 void DiscV4ENRRequestMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*if( !hasNotExpired() )
+    if( !hasNotExpired() )
         cout << dec << "   EXPIRED MESSAGE!" << endl;
     else
     {
         cout << "   Expiration = " << dec << m_expiration << ", Now is " << getUnixTimeStamp() << endl;
-    }*/
+    }
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -444,7 +444,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
     if( auto ping_msg = dynamic_pointer_cast<const DiscV4PingMessage>(signed_msg) )
     {
         // DiscV4ENRResponseMessage emulated from DiscV4PingMessage
-        m_sender_enr = make_shared<const ENRV4Identity>( ping_msg->getENRSeq(),
+        m_sender_enr = make_shared<const ENRV4Identity>( 0,     //Will force the update on a true ENRResponse reception
                                                          ntohl(ping_msg->getSessionHandler()->getPeerAddress().sin_addr.s_addr),
                                                          ntohs(ping_msg->getSessionHandler()->getPeerAddress().sin_port),
                                                          ping_msg->getSenderTCPPort(),
@@ -470,7 +470,7 @@ DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const DiscV4
 void DiscV4ENRResponseMessage::print() const
 {
     DiscV4SignedMessage::print();
-    /*cout << dec << "   @UDP DiscV4 ENR RECORD:" << endl;
+    cout << dec << "   @UDP DiscV4 ENR RECORD:" << endl;
     cout << "   ENR Request hash = 0x" << hex << m_enr_request_hash.as_Integer() << endl;
-    getENR()->print();*/
+    getENR()->print();
 }

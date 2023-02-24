@@ -13,6 +13,12 @@ DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_
     , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
 { }
 
+void DiscoverySession::sendMessage(std::shared_ptr<const SocketMessage> msg_out) const
+{
+    SessionHandler::sendMessage(msg_out);
+    msg_out->print();
+}
+
 void DiscoverySession::notifyInvalidSignature()
 {
     if( auto server = dynamic_pointer_cast<const DiscoveryServer>(getSocketHandler()) )

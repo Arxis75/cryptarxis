@@ -9,7 +9,7 @@
 #define NODE_IP 0x51430B52      //81.67.11.82
 #define NODE_UDP_PORT 40404
 #define NODE_TCP_PORT 40404
-#define NODE_SECRET "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168815"    //some random privkey
+#define NODE_SECRET "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168817"    //some random privkey
 
 #include <p2p/DiscV4.h>
 #define CLIENT_IP 0x51430B52      //81.67.11.82
