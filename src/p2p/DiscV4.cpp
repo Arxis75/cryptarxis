@@ -204,21 +204,18 @@ void DiscV4Session::sendPing()
     auto msg_out = make_shared<const DiscV4PingMessage>(shared_from_this());
     m_last_sent_ping_hash = msg_out->getHash();
     sendMessage(msg_out);
-    msg_out->print();
 }
 
 void DiscV4Session::sendPong(const ByteStream &ack_hash) const
 {
     auto msg_out = make_shared<const DiscV4PongMessage>(shared_from_this(), ack_hash);
     sendMessage(msg_out);
-    msg_out->print();
 }
 
 void DiscV4Session::sendFindNode() const
 {
     auto msg_out = make_shared<const DiscV4FindNodeMessage>(shared_from_this());
     sendMessage(msg_out);
-    msg_out->print();
 }
 
 void DiscV4Session::sendNeighbors(const ByteStream &target_id) const
@@ -227,7 +224,6 @@ void DiscV4Session::sendNeighbors(const ByteStream &target_id) const
     {
         auto msg_out = make_shared<const DiscV4NeighborsMessage>(shared_from_this(), server->findNeighbors(target_id));
         sendMessage(msg_out);
-        msg_out->print();
     }
 }
 
@@ -236,12 +232,10 @@ void DiscV4Session::sendENRRequest()
     auto msg_out = make_shared<const DiscV4ENRRequestMessage>(shared_from_this());
     m_last_sent_enr_request_hash = msg_out->getHash();
     sendMessage(msg_out);
-    msg_out->print();
 }
 
 void DiscV4Session::sendENRResponse(const ByteStream &ack_hash) const
 {
     auto msg_out = make_shared<const DiscV4ENRResponseMessage>(shared_from_this(), ack_hash);
     sendMessage(msg_out);
-    msg_out->print();
 }
