@@ -55,7 +55,7 @@ ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
         if( field == "id" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 2);
+            //assert(field.byteSize() == 2);
             m_scheme = string(field);
         }
         else if( field == "secp256k1" )
@@ -68,37 +68,37 @@ ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
         else if( field == "ip" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 4);
+            //assert(field.byteSize() == 4);
             m_ip = field.as_uint64();
         }
         else if( field == "tcp" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 2);
+            //assert(field.byteSize() == 2);
             m_tcp_port = field.as_uint64();
         }
         else if( field == "udp" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 2);
+            //assert(field.byteSize() == 2);
             m_udp_port = field.as_uint64();
         }
         else if( field == "ip6" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 16);
+            //assert(field.byteSize() == 16);
             m_ip6 = field.as_Integer();
         }
         else if( field == "tcp6" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 2);
+            //assert(field.byteSize() == 2);
             m_tcp6_port = field.as_uint64();
         }
         else if( field == "udp6" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 2);
+            //assert(field.byteSize() == 2);
             m_udp6_port = field.as_uint64();
         }
         else
@@ -186,7 +186,7 @@ const Signature ENRV4Identity::sign(const ByteStream &hash) const
 bool ENRV4Identity::hasValidSignature() const
 {
     bool retval = false;
-    if( m_signed_rlp.byteSize() >= 64 )
+    if( isSigned() )
     {
         bool is_list;
         Pubkey key_0, key_1;

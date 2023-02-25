@@ -89,12 +89,11 @@ void DiscV4Session::onNewPing(const shared_ptr<const DiscV4PingMessage> msg)
             sendPing();
         else
         {   
-            if( !getENR() )
-                // If the session has no ENR, add sender infos into the local ENR table
-                // as "pseudo-ENR" as long as he passed the Endpoint Proof (Valid Pong)
-                updatePeerENR(make_shared<const DiscV4ENRResponseMessage>(msg)->getENR());
+            // Possibly add sender infos into the local ENR table
+            // as "pseudo-ENR" as long as he passed the Endpoint Proof (Valid Pong)
+            updatePeerENR(make_shared<const DiscV4ENRResponseMessage>(msg)->getENR(), true);
             
-            if( getENR()->getSeq() < msg->getENRSeq() )
+            if( getENR() && getENR()->getSeq() < msg->getENRSeq() )
                 // Ask for an ENR update
                 sendENRRequest();
 
@@ -176,21 +175,10 @@ void DiscV4Session::onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMes
 {
     if( msg )
     {
-        if( isVerified() )
+        if( isVerified() && msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) )
         {
-            //The recipient of the packet should verify that the node record is signed by the public key which signed the response packet
-            auto enr = msg->getENR();
-            if( enr->hasValidSignature() )
-            {
-                if( msg->hasValidENRRequestHash(m_last_sent_enr_request_hash) &&
-                    enr->getIP() == ntohl(getPeerAddress().sin_addr.s_addr) && enr->getUDPPort() == ntohs(getPeerAddress().sin_port) )
-                {
-                    msg->print();
-                    updatePeerENR(msg->getENR());
-                }
-            }
-            else
-                notifyInvalidSignature();
+            msg->print();
+            updatePeerENR(msg->getENR());
         }
         //else
         //    sendPing();

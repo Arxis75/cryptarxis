@@ -26,17 +26,26 @@ void DiscoverySession::notifyInvalidSignature()
         const_pointer_cast<DiscoveryServer>(server)->onInvalidSignature(dynamic_pointer_cast<DiscoverySession>(shared_from_this()));
 }
 
-void DiscoverySession::updatePeerENR(const shared_ptr<const ENRV4Identity> new_enr)
+bool DiscoverySession::updatePeerENR(const shared_ptr<const ENRV4Identity> new_enr, bool force_valid_signature)
 {
-    if (getPeerID() == new_enr->getPeerID())
+    bool retval = false;
+
+    //The recipient of the packet should verify that the node record is signed by the public key which signed the response packet
+    if( force_valid_signature || new_enr->hasValidSignature() )
     {
-        if (!getENR() || (getENR()->getSeq() <= new_enr->getSeq()))
+        if( (!getENR() || getENR()->getSeq() < new_enr->getSeq()) &&
+            new_enr->getIP() == ntohl(getPeerAddress().sin_addr.s_addr) && 
+            new_enr->getUDPPort() == ntohs(getPeerAddress().sin_port) )
+        {
             // Set new ENR or Update on more recent ENR only
             m_ENR = new_enr;
+            retval = true;
+        }
     }
     else
-        // The record signature does not match the packet signature
         notifyInvalidSignature();
+    
+    return retval;
 }
 
 //--------------------------------------------------------------------------------------------------------------------------

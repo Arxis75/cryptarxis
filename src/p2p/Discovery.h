@@ -65,7 +65,7 @@ class DiscoverySession: public SessionHandler
 
         inline const shared_ptr<const ENRV4Identity> &getENR() const { return m_ENR; }
         
-        void updatePeerENR(const shared_ptr<const ENRV4Identity> new_enr);
+        bool updatePeerENR(const shared_ptr<const ENRV4Identity> new_enr, bool force_valid_signature = false);
         
         void notifyInvalidSignature();
         
