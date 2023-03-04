@@ -15,12 +15,11 @@ using std::dynamic_pointer_cast;
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg)
     : DiscoveryMessage(signed_msg)
+    , m_type(signed_msg->m_type)
     , m_hash(signed_msg->m_hash)
     , m_pub_key(signed_msg->m_pub_key)
     , m_hashed_payload(signed_msg->m_hashed_payload)
     , m_signed_payload(signed_msg->m_signed_payload)
-    , m_ID(signed_msg->m_ID)
-    , m_type(signed_msg->m_type)
     , m_rlp_payload(signed_msg->m_rlp_payload)
 { }
 
@@ -31,30 +30,31 @@ DiscV4SignedMessage::DiscV4SignedMessage(const vector<uint8_t> &buffer)
     {
         m_hash = ByteStream(&buffer[0], 32);
         m_hashed_payload = ByteStream(&buffer[32], size() - 32);
-        m_signed_payload = ByteStream(&buffer[97], size() - 97);
-        Signature sig(ByteStream(&buffer[32], 32).as_Integer(), ByteStream(&buffer[64], 32).as_Integer(), ByteStream(&buffer[96], 1).as_bool());
-        sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
-        m_ID = m_pub_key.getID();
         m_type = ByteStream(&buffer[97], 1).as_uint8();
-        m_rlp_payload = RLPByteStream(&buffer[98], size() - 98);
+        if( hasValidHash() && hasValidType() )
+        {
+            m_signed_payload = ByteStream(&buffer[97], size() - 97);
+            Signature sig(ByteStream(&buffer[32], 32).as_Integer(), ByteStream(&buffer[64], 32).as_Integer(), ByteStream(&buffer[96], 1).as_bool());
+            sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
+            m_sender_ID = m_pub_key.getID();
+            m_rlp_payload = RLPByteStream(&buffer[98], size() - 98);
+        }
     }
 }
 
-DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler)
+DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler, const uint8_t type)
     : DiscoveryMessage(session_handler)
-    , m_ID(ByteStream(session_handler->getPeerID()))
+    , m_type(type)
+    , m_pub_key(getHostENR()->getSecret()->getPubKey())
 {
 }
 
 void DiscV4SignedMessage::addTypeSignAndHash(const RLPByteStream &rlp_payload)
 {
     m_rlp_payload = rlp_payload;
-    m_type = getType();
     ByteStream signed_msg = m_rlp_payload;
     signed_msg.push_front(m_type, 1); //no RLP-encoding for the type
     m_signed_payload = signed_msg;
-    m_pub_key = getHostENR()->getSecret()->getPubKey();
-    m_ID = m_pub_key.getID();
     Signature sig = getHostENR()->getSecret()->sign(signed_msg.keccak256());
     signed_msg.push_front(ByteStream(sig.get_imparity(), 1));
     signed_msg.push_front(ByteStream(sig.get_s(), 32));
@@ -98,14 +98,14 @@ void DiscV4SignedMessage::print() const
     cout << "   Size : " << dec << size() << endl;
     cout << "   Hash = " << hex << getHash().as_Integer() << endl;
     cout << "   Public key = " << hex << getPubKey().getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
-    cout << "   ID = " << hex << ByteStream(getPeerID()) << endl;
+    cout << "   Sender ID = " << hex << ByteStream(getSenderID()) << endl;
     cout << "   Type = " << dec << int(getType()) << endl;
 };
 
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const SessionHandler> session_handler)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x01)
     , m_version(4)
     , m_sender_ip(getHostENR()->getIP())
     , m_sender_udp_port(getHostENR()->getUDPPort())
@@ -115,7 +115,7 @@ DiscV4PingMessage::DiscV4PingMessage(const shared_ptr<const SessionHandler> sess
     , m_recipient_tcp_port(0) 
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
     , m_enr_seq(getHostENR()->getSeq())
-{
+{  
     RLPByteStream rlp, from, to;
     rlp.push_back(ByteStream(m_version));
     from.push_back(ByteStream(m_sender_ip));
@@ -185,7 +185,7 @@ void DiscV4PingMessage::print() const
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4PongMessage::DiscV4PongMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &ack_hash)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x02)
     , m_recipient_ip(ntohl(session_handler->getPeerAddress().sin_addr.s_addr))
     , m_recipient_udp_port(ntohs(session_handler->getPeerAddress().sin_port)) 
     , m_recipient_tcp_port(0) 
@@ -243,7 +243,7 @@ void DiscV4PongMessage::print() const
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4FindNodeMessage::DiscV4FindNodeMessage(const shared_ptr<const SessionHandler> session_handler)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x03)
     , m_target(getHostENR()->getPubKey())
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
@@ -274,7 +274,7 @@ void DiscV4FindNodeMessage::print() const
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4NeighborsMessage::DiscV4NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const vector<shared_ptr<const ENRV4Identity>> &neighbors_enr)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x04)
     , m_nodes(neighbors_enr)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
@@ -351,7 +351,7 @@ void DiscV4NeighborsMessage::print() const
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4ENRRequestMessage::DiscV4ENRRequestMessage(const shared_ptr<const SessionHandler> session_handler)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x05)
     , m_expiration(getUnixTimeStamp() + EXPIRATION_DELAY_IN_SEC)
 {
     RLPByteStream rlp(RLPByteStream(m_expiration), true);
@@ -377,7 +377,7 @@ void DiscV4ENRRequestMessage::print() const
 //-----------------------------------------------------------------------------------------------------
 
 DiscV4ENRResponseMessage::DiscV4ENRResponseMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &ack_hash)
-    : DiscV4SignedMessage(session_handler)
+    : DiscV4SignedMessage(session_handler, 0x06)
     , m_enr_request_hash(ack_hash)
     , m_sender_enr(getHostENR())
 {

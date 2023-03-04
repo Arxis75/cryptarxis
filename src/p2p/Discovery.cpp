@@ -60,7 +60,7 @@ const vector<uint8_t> DiscoveryServer::makeSessionKey(const struct sockaddr_in &
 {
     vector<uint8_t> key;
     key.resize(peer_id.size() + 6);
-    if (peer_id.size())
+    if( peer_id.size() )
         memcpy(&key[0], &peer_id[0], peer_id.size());
     memcpy(&key[peer_id.size()], &peer_address.sin_addr.s_addr, 4);
     memcpy(&key[peer_id.size() + 4], &peer_address.sin_port, 2);
@@ -160,25 +160,31 @@ vector<shared_ptr<const ENRV4Identity>> DiscoveryServer::findNeighbors(const Byt
 //-----------------------------------------------------------------------------------------------------------
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const DiscoveryMessage> disc_msg)
-    : SocketMessage(disc_msg), m_timestamp(disc_msg->m_timestamp)
+    : SocketMessage(disc_msg)
+    , m_timestamp(disc_msg->m_timestamp)
+    , m_sender_ID(disc_msg->m_sender_ID)
 {
 }
 
 DiscoveryMessage::DiscoveryMessage(const vector<uint8_t> &buffer)
-    : SocketMessage(buffer), m_timestamp(getUnixTimeStamp())
+    : SocketMessage(buffer)
+    , m_timestamp(getUnixTimeStamp())
+    // m_sender_ID and m_type parsed by the concrete derived classes
 {
 }
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler)
-    : SocketMessage(session_handler), m_timestamp(getUnixTimeStamp())
+    : SocketMessage(session_handler)
+    , m_timestamp(getUnixTimeStamp())
+    , m_sender_ID(getHostENR()->getID())
 {
 }
 
 const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
 {
-    auto msg = shared_ptr<const ENRV4Identity>(nullptr);
+    auto enr = shared_ptr<const ENRV4Identity>(nullptr);
     if (auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler()))
         if (auto server = dynamic_pointer_cast<const DiscoveryServer>(session->getSocketHandler()))
-            return server->getHostENR();
-    return msg;
+            enr = server->getHostENR();
+    return enr;
 }

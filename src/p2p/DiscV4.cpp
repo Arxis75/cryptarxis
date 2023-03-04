@@ -30,7 +30,7 @@ const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const vector<uin
 
 const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const
 {
-    return make_shared<DiscV4SignedMessage>(session_handler);
+    return make_shared<DiscV4SignedMessage>(session_handler, 0);
 }
 
 //------------------------------------------------------------------------------------------------------

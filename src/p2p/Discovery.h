@@ -46,12 +46,16 @@ class DiscoveryMessage: public SocketMessage
         DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler);
 
         inline const uint64_t getTimeStamp() const { return m_timestamp; }
-
+        virtual inline const vector<uint8_t> getSenderID() const { return m_sender_ID; };
+        
         virtual inline bool isValid() const = 0;
     
     protected:
         const shared_ptr<const ENRV4Identity> getHostENR() const;
     
+    protected:
+        ByteStream m_sender_ID;
+
     private:
         const uint64_t m_timestamp;
 };
