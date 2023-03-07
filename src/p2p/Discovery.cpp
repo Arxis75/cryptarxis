@@ -52,7 +52,8 @@ bool DiscoverySession::updatePeerENR(const shared_ptr<const ENRV4Identity> new_e
 
 DiscoveryServer::DiscoveryServer(const shared_ptr<const ENRV4Identity> host_enr,
                                  const int read_buffer_size, const int write_buffer_size)
-    : SocketHandler(host_enr->getUDPPort(), IPPROTO_UDP, read_buffer_size, write_buffer_size), m_host_enr(host_enr)
+    : SocketHandler(host_enr->getUDPPort(), IPPROTO_UDP, read_buffer_size, write_buffer_size)
+    , m_host_enr(host_enr)
 {
 }
 
@@ -162,29 +163,28 @@ vector<shared_ptr<const ENRV4Identity>> DiscoveryServer::findNeighbors(const Byt
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const DiscoveryMessage> disc_msg)
     : SocketMessage(disc_msg)
     , m_timestamp(disc_msg->m_timestamp)
-    , m_sender_ID(disc_msg->m_sender_ID)
 {
+    m_peer_ID = disc_msg->m_peer_ID;
 }
 
-DiscoveryMessage::DiscoveryMessage(const vector<uint8_t> &buffer)
-    : SocketMessage(buffer)
+DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress)
+    : SocketMessage(handler, buffer, peer_addr, is_ingress)
     , m_timestamp(getUnixTimeStamp())
-    // m_sender_ID and m_type parsed by the concrete derived classes
+    // m_peer_ID and m_type parsed by the concrete derived classes
 {
 }
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler)
     : SocketMessage(session_handler)
     , m_timestamp(getUnixTimeStamp())
-    , m_sender_ID(getHostENR()->getID())
 {
+    m_peer_ID = session_handler->getPeerID();
 }
 
 const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
 {
     auto enr = shared_ptr<const ENRV4Identity>(nullptr);
-    if (auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler()))
-        if (auto server = dynamic_pointer_cast<const DiscoveryServer>(session->getSocketHandler()))
-            enr = server->getHostENR();
+    if (auto server = dynamic_pointer_cast<const DiscoveryServer>(getSocketHandler()))
+        enr = server->getHostENR();
     return enr;
 }

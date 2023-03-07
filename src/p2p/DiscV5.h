@@ -6,7 +6,7 @@
 #include <crypto/bips.h>
 #include <reactor/SocketHandler.h>
 
-/*class DiscV5MaskedMessage;
+/*class DiscV5AuthMessage;
 class DiscV5PingMessage;
 class DiscV5PongMessage;
 class DiscV5FindNodeMessage;
@@ -21,7 +21,7 @@ class DiscV5Server: public DiscoveryServer
                       const int read_buffer_size = 1070, const int write_buffer_size = 1070);   //1070 = 470 header + 4800/8 ENR in NODES Response
     protected:
         virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
-        virtual const shared_ptr<SocketMessage> makeSocketMessage(const vector<uint8_t> &buffer) const;
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const;
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
 
@@ -31,6 +31,15 @@ class DiscV5Session: public DiscoverySession
         DiscV5Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
 
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
+
+        uint32_t IncrEgressMsgCounter() { return m_egress_msg_counter++; }
+        const ByteStream &getChallengeData() const { return m_challenge_data; }
+        void setChallengeData(const ByteStream &challenge_data) { m_challenge_data = challenge_data; }
+
+        const ByteStream &getHostSessionKey() const { return m_host_session_key; }
+        const ByteStream &getPeerSessionKey() const { return m_peer_session_key; }
+        void setHostSessionKey(const ByteStream &host_session_key) { m_host_session_key = host_session_key; }
+        void setPeerSessionKey(const ByteStream &peer_session_key) { m_peer_session_key = peer_session_key; }
 
         virtual void sendPing() {}
     
@@ -49,4 +58,8 @@ class DiscV5Session: public DiscoverySession
         //void sendTalkResp() const;
 
     private:
+        uint32_t m_egress_msg_counter;
+        ByteStream m_challenge_data;
+        ByteStream m_host_session_key;
+        ByteStream m_peer_session_key;
 };

@@ -15,6 +15,8 @@ add_subdirectory(p2p)
 #target_link_libraries(cryptarxis_tests PUBLIC [...] lib_reactor PRIVATE GTest::gtest)
 
 target_include_directories(cryptarxis PUBLIC ${reactor_SOURCE_DIR}/src)  #Mandatory For library use in cryptarxis
+
+#To allow gtest friend declarations, add: PRIVATE GTest::gtest
 target_link_libraries(cryptarxis PUBLIC OpenSSL::Crypto ethash::ethash gmp givaro lib_reactor)
 
 target_sources(cryptarxis_tests PUBLIC ${COMMON})

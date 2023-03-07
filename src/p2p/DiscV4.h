@@ -22,7 +22,7 @@ class DiscV4Server: public DiscoveryServer
                       const int read_buffer_size = 1374, const int write_buffer_size = 1374 );
     protected:
         virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
-        virtual const shared_ptr<SocketMessage> makeSocketMessage(const vector<uint8_t> &buffer) const;
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const;
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
 

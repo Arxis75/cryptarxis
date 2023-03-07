@@ -15,7 +15,7 @@ class DiscV4SignedMessage: public DiscoveryMessage
         //Copy Constructor
         DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMessage> signed_msg);
         //Raw msg constructor
-        DiscV4SignedMessage(const vector<uint8_t> &buffer);
+        DiscV4SignedMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress = true);
         //session-embedded empty msg
         DiscV4SignedMessage(const shared_ptr<const SessionHandler> session_handler, const uint8_t type);
 
@@ -45,6 +45,8 @@ class DiscV4SignedMessage: public DiscoveryMessage
         inline const RLPByteStream &getRLPPayload() const { return m_rlp_payload; }
 
     private:
+        // the Node ID is parsed here, but stored as m_peer_ID in SocketMessage class
+        // as it is used as key to associate to a session
         uint8_t m_type;
         ByteStream m_hash;
         Pubkey m_pub_key;

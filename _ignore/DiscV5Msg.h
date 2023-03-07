@@ -9,30 +9,30 @@
 
 using std::vector;
 
-class DiscV5MaskedMessage: public DiscoveryMessage
+class DiscV5AuthMessage: public DiscoveryMessage
 {
     public:
         enum class Flag{ORDINARY = 0, WHOAREYOU = 1, HANDSHAKE = 2};
 
         // Raw Ingress Message from Socket: shall be handled by the session to make a new message
         // by calling the copy-constructor with the peer session key to decrypt the message data
-        DiscV5MaskedMessage( const shared_ptr<const SessionHandler> session_handler );
+        DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler );
 
         // Copy Constructor
-        DiscV5MaskedMessage(const shared_ptr<const DiscV5MaskedMessage> masked_msg);
+        DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> masked_msg);
         
         // Constructor for building "whoareyou" msg to send:
         // - dest_node_id is the peer ID (pubkey keccak256) that sent the unreadble message (was src-id field in that msg)
         // - mirroring_nonce is the nonce of the unreadble message that triggered a "whoareyou" response
         // - challenge_data is returned by the constructor to be stored in the session
         // - enr_seq represents previous knownledge of peer's ent seq 
-        DiscV5MaskedMessage(const shared_ptr<const SessionHandler> session_handler, 
+        DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, 
                             const ByteStream &dest_node_id, const ByteStream &mirroring_nonce, 
                             ByteStream &challenge_data,
                             uint64_t enr_seq = 0);
         
         // Constructor for building "ordinary"/"handshake" msg to send
-        DiscV5MaskedMessage( const shared_ptr<const SessionHandler> session_handler, 
+        DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler, 
                              uint32_t &session_egress_msg_counter, const Flag flag,
                              const ByteStream &host_session_key,
                              const ByteStream &IDSignature = ByteStream(), const ByteStream &ephemeral_pubkey = ByteStream());

@@ -316,18 +316,9 @@ const Privkey Privkey::generateRandom(const EllipticCurve &curve)
 {
     int retval = -1;
     ByteStream random_buffer(Integer::zero, sizeInBytes(curve.getGeneratorOrder()));
-    Privkey random_key(ByteStream(Integer::zero, sizeInBytes(curve.getGeneratorOrder())));
-
-    retval = RAND_bytes(&random_buffer[0], random_buffer.byteSize());
-
-    while( random_buffer.as_Integer() >= curve.getGeneratorOrder() || random_buffer.as_Integer() == 0)
-    {
+    while( random_buffer.as_Integer() == 0 || random_buffer.as_Integer() >= curve.getGeneratorOrder() || retval <= 0 )
         retval = RAND_bytes(&random_buffer[0], random_buffer.byteSize());
-        if(retval <= 0)
-            break;
-    }
-    if( retval > 0 )
-        random_key = Privkey(random_buffer);
+    Privkey random_key(random_buffer);
     return random_key;
 }
 

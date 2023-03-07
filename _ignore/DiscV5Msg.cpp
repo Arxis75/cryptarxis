@@ -13,19 +13,19 @@ using std::dynamic_pointer_cast;
 #define EXPIRATION_DELAY_IN_SEC 20
 
 // Raw Ingress Message from Socket
-DiscV5MaskedMessage::DiscV5MaskedMessage( const shared_ptr<const SessionHandler> session_handler )
+DiscV5AuthMessage::DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler )
     : DiscoveryMessage(session_handler)
     , m_is_ingress(true)
 { }
 
 // Copy-constructor
-DiscV5MaskedMessage::DiscV5MaskedMessage(const shared_ptr<const DiscV5MaskedMessage> masked_msg)
+DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> masked_msg)
     : DiscoveryMessage(masked_msg)
     , m_is_ingress(masked_msg->m_is_ingress)
 { }
 
 // "WhoAreYou" Contructor
-DiscV5MaskedMessage::DiscV5MaskedMessage(const shared_ptr<const SessionHandler> session_handler,
+DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler,
                                          const ByteStream &dest_node_id, const ByteStream &mirroring_nonce,
                                          ByteStream &challenge_data,
                                          uint64_t enr_seq)
@@ -64,7 +64,7 @@ DiscV5MaskedMessage::DiscV5MaskedMessage(const shared_ptr<const SessionHandler> 
 }
 
 // "Ordinary"/"Handshake" Contructor
-DiscV5MaskedMessage::DiscV5MaskedMessage( const shared_ptr<const SessionHandler> session_handler,
+DiscV5AuthMessage::DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler,
                                           uint32_t &session_egress_msg_counter, const Flag flag,
                                           const ByteStream &host_session_key,
                                           const ByteStream &IDSignature, const ByteStream &ephemeral_pubkey)
@@ -92,7 +92,7 @@ DiscV5MaskedMessage::DiscV5MaskedMessage( const shared_ptr<const SessionHandler>
     header[21] = header.byteSize() - 23;    // update authdata-size
 }
 
-const ByteStream DiscV5MaskedMessage::getMaskingKey() const
+const ByteStream DiscV5AuthMessage::getMaskingKey() const
 {
     ByteStream masking_key;
     if( m_is_ingress )
@@ -106,17 +106,17 @@ const ByteStream DiscV5MaskedMessage::getMaskingKey() const
     return masking_key;
 }
 
-const ByteStream DiscV5MaskedMessage::getMaskingIV() const
+const ByteStream DiscV5AuthMessage::getMaskingIV() const
 {
     return ByteStream(&(*this)[0], 16);
 }
 
-const ByteStream DiscV5MaskedMessage::getMaskedHeader() const
+const ByteStream DiscV5AuthMessage::getMaskedHeader() const
 {
     return ByteStream(&(*this)[16], size() - 16);
 }
 
-const ByteStream DiscV5MaskedMessage::getHeader(uint8_t ofs, uint8_t size) const
+const ByteStream DiscV5AuthMessage::getHeader(uint8_t ofs, uint8_t size) const
 {
     ByteStream header;
     ByteStream masking_key = getMaskingKey();
@@ -151,7 +151,7 @@ const ByteStream DiscV5MaskedMessage::getHeader(uint8_t ofs, uint8_t size) const
     return header;
 }
 
-const ByteStream DiscV5MaskedMessage::getChallengeData() const
+const ByteStream DiscV5AuthMessage::getChallengeData() const
 {
     ByteStream challenge_data;
     ByteStream header = getHeader();
@@ -163,7 +163,7 @@ const ByteStream DiscV5MaskedMessage::getChallengeData() const
     return challenge_data;
 }
 
-int DiscV5MaskedMessage::generateHandshakeKeys( const Pubkey &peer_pub_key, 
+int DiscV5AuthMessage::generateHandshakeKeys( const Pubkey &peer_pub_key, 
                                                 ByteStream &ephemeral_pubkey,
                                                 ByteStream &host_session_key, ByteStream &peer_session_key,
                                                 ByteStream &IDSignature ) const
@@ -208,7 +208,7 @@ int DiscV5MaskedMessage::generateHandshakeKeys( const Pubkey &peer_pub_key,
     return retval;
 }
 
-const shared_ptr<const ENRV4Identity> DiscV5MaskedMessage::getENR() const
+const shared_ptr<const ENRV4Identity> DiscV5AuthMessage::getENR() const
 {
     ByteStream enr_record = getHeader(57 + getIDSignatureSize() + getEphemeralPubKeySize());
     if( enr_record.byteSize() )
@@ -221,17 +221,17 @@ const shared_ptr<const ENRV4Identity> DiscV5MaskedMessage::getENR() const
     return shared_ptr<const ENRV4Identity>(nullptr);
 }
 
-uint64_t DiscV5MaskedMessage::size() const
+uint64_t DiscV5AuthMessage::size() const
 {
     return m_vect.size();
 }
 
-DiscV5MaskedMessage::operator const uint8_t*() const
+DiscV5AuthMessage::operator const uint8_t*() const
 {
     return m_vect.data();
 }
 
-void DiscV5MaskedMessage::push_back(const uint8_t value)
+void DiscV5AuthMessage::push_back(const uint8_t value)
 { 
     m_vect.push_back(value);
 }

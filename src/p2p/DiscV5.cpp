@@ -23,14 +23,14 @@ const shared_ptr<SessionHandler> DiscV5Server::makeSessionHandler(const shared_p
     return make_shared<DiscV5Session>(socket_handler, peer_address, peer_id);
 }
 
-const shared_ptr<SocketMessage> DiscV5Server::makeSocketMessage(const vector<uint8_t> &buffer) const
+const shared_ptr<SocketMessage> DiscV5Server::makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const
 {
-    return make_shared<DiscV5MaskedHeader>(buffer);
+    return make_shared<DiscV5UnauthMessage>(handler, buffer, peer_addr);
 }
 
 const shared_ptr<SocketMessage> DiscV5Server::makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const
 {
-    return make_shared<DiscV5MaskedHeader>(session_handler, DiscV5MaskedHeader::Flag::ORDINARY);
+    return make_shared<DiscV5UnauthMessage>(session_handler, DiscV5UnauthMessage::Flag::ORDINARY);
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -41,10 +41,7 @@ DiscV5Session::DiscV5Session(const shared_ptr<const SocketHandler> socket_handle
 
 void DiscV5Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
 {
-    // Print the generic msg prompt
-    SessionHandler::onNewMessage(msg_in);
-
-    if( auto masked_msg = dynamic_pointer_cast<const DiscV5MaskedMessage>(msg_in) )
+    if( auto masked_msg = dynamic_pointer_cast<const DiscV5AuthMessage>(msg_in) )
     {
         /*switch( masked_msg->getType() )
         {

@@ -7,8 +7,8 @@
 #include "Common.h"
 
 #define NODE_IP 0x51430B52      //81.67.11.82
-#define NODE_UDP_PORT 8000      //40404
-#define NODE_TCP_PORT 8000      //40404
+#define NODE_UDP_PORT 40404      //40404
+#define NODE_TCP_PORT 40404      //40404
 #define NODE_SECRET "0x4bbede0846299a5893929f9ebbadcd93933b91c8f4d1f7fe8d7f485c9b168817"    //some random privkey
 
 #include <p2p/DiscV4.h>
@@ -45,7 +45,7 @@ int main(void)
 
 
     /*ByteStream challenge_data;
-    DiscV5MaskedMessage m( shared_ptr<const SessionHandler>(nullptr),
+    DiscV5AuthMessage m( shared_ptr<const SessionHandler>(nullptr),
                            ByteStream("0xbbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9", 32, 16),
                            ByteStream("0x0102030405060708090a0b0c", 12, 16),
                            challenge_data,

@@ -23,9 +23,9 @@ const shared_ptr<SessionHandler> DiscV4Server::makeSessionHandler(const shared_p
     return make_shared<DiscV4Session>(socket_handler, peer_address, peer_id);
 }
 
-const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const vector<uint8_t> &buffer) const
+const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const
 {
-    return make_shared<DiscV4SignedMessage>(buffer);
+    return make_shared<DiscV4SignedMessage>(handler, buffer, peer_addr);
 }
 
 const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const
@@ -44,9 +44,6 @@ DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handle
 
 void DiscV4Session::onNewMessage(const shared_ptr<const SocketMessage> msg_in)
 {
-    // Print the generic msg prompt
-    SessionHandler::onNewMessage(msg_in);
-
     if( auto signed_msg = dynamic_pointer_cast<const DiscV4SignedMessage>(msg_in) )
     {
         switch( signed_msg->getType() )

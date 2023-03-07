@@ -80,6 +80,8 @@ class ByteStream
         // For string representing a number in base 2 or 16
         ByteStream(const string& str_value, const uint64_t size, const uint8_t in_base) { vvalue.reserve(size); push_back(str_value, size, in_base); };
 
+        void resize(const uint32_t size, const uint8_t value = 0) { vvalue.resize(size, value); }
+
         void push_back(const ByteStream &b) { vvalue.insert(vvalue.end(), b.vvalue.begin(), b.vvalue.end()); }
         void push_back(const uint64_t value, const uint64_t size);
         void push_back_ptr(const uint8_t *p, const uint64_t size);

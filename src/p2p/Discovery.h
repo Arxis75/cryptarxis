@@ -41,20 +41,16 @@ class DiscoveryMessage: public SocketMessage
         //Copy Constructor
         DiscoveryMessage(const shared_ptr<const DiscoveryMessage> disc_msg);
         //Raw msg constructor
-        DiscoveryMessage(const vector<uint8_t> &buffer);
+        DiscoveryMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress);
         //session-embedded empty msg
         DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler);
 
         inline const uint64_t getTimeStamp() const { return m_timestamp; }
-        virtual inline const vector<uint8_t> getSenderID() const { return m_sender_ID; };
         
         virtual inline bool isValid() const = 0;
     
     protected:
         const shared_ptr<const ENRV4Identity> getHostENR() const;
-    
-    protected:
-        ByteStream m_sender_ID;
 
     private:
         const uint64_t m_timestamp;

@@ -103,7 +103,6 @@ TEST(AES_tests, GCM_DiscV5_vectors)
     ASSERT_EQ(actual, expected);
 }
 
-
 TEST(AES_tests, HKDF_DiscV5_vectors)
 {
     //https://github.com/ethereum/devp2p/blob/master/discv5/discv5-wire-test-vectors.md

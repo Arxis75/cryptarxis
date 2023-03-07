@@ -167,6 +167,24 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
 }
 
+const sockaddr_in ENRV4Identity::getUDPAddress() const
+{
+    struct sockaddr_in address;
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(getIP());
+    address.sin_port = htons(getUDPPort());
+    return address;
+}
+
+const sockaddr_in ENRV4Identity::getTCPAddress() const
+{
+    struct sockaddr_in address;
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(getIP());
+    address.sin_port = htons(getTCPPort());
+    return address;
+}
+
 bool ENRV4Identity::equals(const shared_ptr<const ENRV4Identity> enr) const
 {
     return  //m_seq == enr->m_seq &&
@@ -213,38 +231,38 @@ bool ENRV4Identity::hasValidSignature() const
 
 void ENRV4Identity::print() const
 {
-    cout << "   ENR name = " << getName() << endl;
-    cout << "   ENR scheme = " << m_scheme << endl;
-    cout << "   ENR public key = 0x" << hex << m_pubkey.getKey(Pubkey::Format::XY).as_Integer() << endl;
-    cout << "   ENR ID = 0x" << hex << m_ID << endl;
-    cout << "   ENR seq = " << dec << m_seq << endl;
-    cout << "   ENR IP = " << dec << ((m_ip >> 24) & 0xFF) << "."
-                                  << ((m_ip >> 16) & 0xFF) << "."
-                                  << ((m_ip >> 8) & 0xFF) << "."
-                                  << (m_ip & 0xFF) << endl;
-    cout << "   ENR TCP port = " << dec << m_tcp_port << endl;
-    cout << "   ENR UDP port = " << dec << m_udp_port << endl;
+    cout << "      ENR name = " << getName() << endl;
+    cout << "      ENR scheme = " << m_scheme << endl;
+    cout << "      ENR public key = 0x" << hex << m_pubkey.getKey(Pubkey::Format::XY).as_Integer() << endl;
+    cout << "      ENR ID = 0x" << hex << m_ID << endl;
+    cout << "      ENR seq = " << dec << m_seq << endl;
+    cout << "      ENR IP = " << dec << ((m_ip >> 24) & 0xFF) << "."
+                                     << ((m_ip >> 16) & 0xFF) << "."
+                                     << ((m_ip >> 8) & 0xFF) << "."
+                                     << (m_ip & 0xFF) << endl;
+    cout << "      ENR TCP port = " << dec << m_tcp_port << endl;
+    cout << "      ENR UDP port = " << dec << m_udp_port << endl;
     if( m_ip6 != Integer::zero )
     {
         Integer byte_mask = 0xFF;
-        cout << "   ENR IP6 = " << dec << ((m_ip6 >> 120) & byte_mask)
-                                    << ((m_ip6 >> 112) & byte_mask) << ":"
-                                    << ((m_ip6 >> 104) & byte_mask)
-                                    << ((m_ip6 >> 96) & byte_mask) << ":"
-                                    << ((m_ip6 >> 88) & byte_mask)
-                                    << ((m_ip6 >> 80) & byte_mask) << ":"
-                                    << ((m_ip6 >> 72) & byte_mask)
-                                    << ((m_ip6 >> 64) & byte_mask) << ":"
-                                    << ((m_ip6 >> 56) & byte_mask)
-                                    << ((m_ip6 >> 48) & byte_mask) << ":"
-                                    << ((m_ip6 >> 40) & byte_mask)
-                                    << ((m_ip6 >> 32) & byte_mask) << ":"
-                                    << ((m_ip6 >> 24) & byte_mask)
-                                    << ((m_ip6 >> 16) & byte_mask) << ":"
-                                    << ((m_ip6 >> 8) & byte_mask)
-                                    << (m_ip6 & byte_mask) << endl;
-        cout << "   ENR TCP6 port = " << dec << m_tcp6_port << endl;
-        cout << "   ENR UDP6 port = " << dec << m_udp6_port << endl;
+        cout << "      ENR IP6 = " << dec << ((m_ip6 >> 120) & byte_mask)
+                                          << ((m_ip6 >> 112) & byte_mask) << ":"
+                                          << ((m_ip6 >> 104) & byte_mask)
+                                          << ((m_ip6 >> 96) & byte_mask) << ":"
+                                          << ((m_ip6 >> 88) & byte_mask)
+                                          << ((m_ip6 >> 80) & byte_mask) << ":"
+                                          << ((m_ip6 >> 72) & byte_mask)
+                                          << ((m_ip6 >> 64) & byte_mask) << ":"
+                                          << ((m_ip6 >> 56) & byte_mask)
+                                          << ((m_ip6 >> 48) & byte_mask) << ":"
+                                          << ((m_ip6 >> 40) & byte_mask)
+                                          << ((m_ip6 >> 32) & byte_mask) << ":"
+                                          << ((m_ip6 >> 24) & byte_mask)
+                                          << ((m_ip6 >> 16) & byte_mask) << ":"
+                                          << ((m_ip6 >> 8) & byte_mask)
+                                          << (m_ip6 & byte_mask) << endl;
+        cout << "      ENR TCP6 port = " << dec << m_tcp6_port << endl;
+        cout << "      ENR UDP6 port = " << dec << m_udp6_port << endl;
     }
 }
 
