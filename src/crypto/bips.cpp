@@ -61,7 +61,6 @@ Pubkey::Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const Ell
         Element x = tmp.pop_front(32);
         Element y = tmp.pop_front(32);
         m_point = Point(x, y);
-
     }
     else //if( f == Format::XY )
     {

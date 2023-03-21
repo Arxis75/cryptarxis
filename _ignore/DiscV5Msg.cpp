@@ -151,7 +151,7 @@ const ByteStream DiscV5AuthMessage::getHeader(uint8_t ofs, uint8_t size) const
     return header;
 }
 
-const ByteStream DiscV5AuthMessage::getChallengeData() const
+/*const ByteStream DiscV5AuthMessage::getChallengeData() const
 {
     ByteStream challenge_data;
     ByteStream header = getHeader();
@@ -161,7 +161,7 @@ const ByteStream DiscV5AuthMessage::getChallengeData() const
         challenge_data.push_back(header);
     }
     return challenge_data;
-}
+}*/
 
 int DiscV5AuthMessage::generateHandshakeKeys( const Pubkey &peer_pub_key, 
                                                 ByteStream &ephemeral_pubkey,

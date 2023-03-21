@@ -12,14 +12,14 @@ using std::vector;
 class DiscV5UnauthMessage: public DiscoveryMessage
 {
     public:
-        enum class Flag{ORDINARY = 0, WHOAREYOU = 1, HANDSHAKE = 2};
+        enum class Flag{UKNOWN = -1, ORDINARY = 0, WHOAREYOU = 1, HANDSHAKE = 2};
 
         //Copy Constructor
         DiscV5UnauthMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg);
         //Raw msg constructor
         DiscV5UnauthMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress = true);
         //session-embedded empty msg
-        DiscV5UnauthMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const ByteStream &request_nonce = ByteStream());
+        DiscV5UnauthMessage(const shared_ptr<const SessionHandler> session_handler);
 
         const ByteStream &getMaskingIV() const { return m_masking_iv; }
         const ByteStream &getMaskedHeader() const { return m_masked_header; }
@@ -28,37 +28,42 @@ class DiscV5UnauthMessage: public DiscoveryMessage
         Flag getFlag() const { return m_flag; }
         const ByteStream &getNonce() const { return m_nonce; }
         uint16_t getAuthDataSize() const { return m_authdata_size; }
-        const ByteStream &getHeader() const { return m_header; }
-        const ByteStream &getMessageData() const { return m_message_data; }
+        const ByteStream &getAuthData() const { return m_authdata; }
+        virtual const ByteStream &getMessageData() const { return m_message_data; }
 
-        virtual inline bool hasValidSize() const { return getFlag() == Flag::WHOAREYOU ? size() == 63 : size() > 63 && size() <= 1280; }
+        const ByteStream getHeader() const;
+
+        inline bool hasValidSize() const { return getFlag() == Flag::WHOAREYOU ? size() == 63 : size() > 63 && size() <= 1280; }
         inline bool hasValidProtocol() const { return getProtocol() == ByteStream("discv5"); }
         inline bool hasValidVersion() const { return getVersion() == 0x0001; }
         inline bool hasValidFlag() const { return getFlag() == Flag::ORDINARY ||  getFlag() == Flag::WHOAREYOU || getFlag() == Flag::HANDSHAKE; }
         
         virtual inline bool isValid() const { return hasValidSize() && hasValidProtocol() && hasValidVersion() && hasValidFlag(); }
 
-    protected:
-        void encryptHeader();
-        virtual void encryptData() {};
-        void encryptMessage();
+        const string getName() const;
+        virtual void print() const;
 
+    protected:
+        virtual void encryptMessage();
+     
     private:
         ByteStream m_masking_iv;        // 16 bytes
         ByteStream m_masked_header;
         ByteStream m_protocol_id;       // 6 bytes
         uint16_t m_version;             // 2 bytes
+    protected:
         Flag m_flag;                    // 1 byte
         ByteStream m_nonce;             // 12 bytes
         uint16_t m_authdata_size;       // 2 bytes
-    protected:
-        ByteStream m_header;            // 23 + m_authdata_size bytes
-        ByteStream m_message_data;      // encrypted(Type + RLP)
+        ByteStream m_authdata;          // m_authdata_size bytes
+        ByteStream m_message_data;
 };
 
 class DiscV5WhoAreYouMessage: public DiscV5UnauthMessage
 {
     public:
+        //Copy Constructor
+        DiscV5WhoAreYouMessage(const shared_ptr<const DiscV5WhoAreYouMessage> way_msg);
         //Parsing Constructor
         DiscV5WhoAreYouMessage(const shared_ptr<const DiscV5UnauthMessage> masked_header);
         //session-embedded empty msg
@@ -68,7 +73,10 @@ class DiscV5WhoAreYouMessage: public DiscV5UnauthMessage
         const ByteStream &getIDNonce() const { return m_id_nonce; }
         uint64_t getENRSeq() const { return m_enr_seq; }
 
-        virtual inline bool hasValidSize() const { return size() == 63; }
+        virtual void print() const;
+
+    protected:
+        virtual void encryptMessage();
 
     private:
         ByteStream m_id_nonce;          // 16 bytes
@@ -79,7 +87,7 @@ class DiscV5AuthMessage: public DiscV5UnauthMessage
 {
     public:
         //Copy Constructor
-        DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
+        DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg, bool add_hanshake_header = false);
         //Parsing Constructor
         DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg);
         //session-embedded empty msg
@@ -94,11 +102,15 @@ class DiscV5AuthMessage: public DiscV5UnauthMessage
         inline uint8_t getType() const { return m_type; }
         inline const RLPByteStream &getRLPPayload() const { return m_rlp_payload; }
 
+        const string getName() const;
+        virtual void print() const;
+
     protected:
+        void addHandshakeHeader();
         void generateHandshakeKeys(ByteStream &IDSignature, Pubkey &ephemeral_pubkey);
         void extractHandshakeKeys();
 
-        virtual void encryptData();
+        virtual void encryptMessage();
 
     private:
         // the peer ID is parsed here, but stored as m_peer_ID in SocketMessage class
@@ -125,76 +137,31 @@ class DiscV5PingMessage : public DiscV5AuthMessage
         inline uint64_t getRequestID() const { return m_request_id; }
         inline uint64_t getENRSeq() const { return m_enr_seq; }
 
+        virtual void print() const;
+
     private:
         uint64_t m_request_id;
         uint64_t m_enr_seq;
 };
 
-/*
-        // Raw Ingress Message from Socket: shall be handled by the session to make a new message
-        // by calling the copy-constructor with the peer session key to decrypt the message data
-        DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler );
+class DiscV5PongMessage : public DiscV5AuthMessage
+{
+    public:
+        //Parsing Constructor
+        DiscV5PongMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
+        //Constructor for building msg to send
+        DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id);
 
-        // Copy Constructor
-        DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> masked_msg);
-        
-        // Constructor for building "whoareyou" msg to send:
-        // - dest_node_id is the peer ID (pubkey keccak256) that sent the unreadble message (was src-id field in that msg)
-        // - mirroring_nonce is the nonce of the unreadble message that triggered a "whoareyou" response
-        // - challenge_data is returned by the constructor to be stored in the session
-        // - enr_seq represents previous knownledge of peer's ent seq 
-        DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, 
-                            const ByteStream &dest_node_id, const ByteStream &mirroring_nonce, 
-                            ByteStream &challenge_data,
-                            uint64_t enr_seq = 0);
-        
-        // Constructor for building "ordinary"/"handshake" msg to send
-        DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler, 
-                             uint32_t &session_egress_msg_counter, const Flag flag,
-                             const ByteStream &host_session_key,
-                             const ByteStream &IDSignature = ByteStream(), const ByteStream &ephemeral_pubkey = ByteStream());
+        inline uint64_t getRequestID() const { return m_request_id; }
+        inline uint64_t getENRSeq() const { return m_enr_seq; }
+        inline uint32_t getRecipientIP() const { return m_recipient_ip; }
+        inline uint16_t getRecipientUDPPort() const { return m_recipient_udp_port; }
 
-        const bool hasValidSize() const { return m_vect.size() >= 63; }
-        const bool hasValidProtocolID() const { return getProtocolID() == "discv5"; }
-        const bool hasValidVersion() const { return getVersion() == 0x0001; }
+        virtual void print() const;
 
-        const ByteStream getMaskingKey() const;
-        const ByteStream getMaskingIV() const;
-        const ByteStream getMaskedHeader() const;
-        const ByteStream getHeader(uint8_t ofs = 0, uint8_t size = 0) const;
-        const ByteStream getChallengeData() const;
-        int generateHandshakeKeys( const Pubkey &peer_pub_key, 
-                                   ByteStream &ephemeral_pubkey,
-                                   ByteStream &host_session_key, ByteStream &peer_session_key, 
-                                   ByteStream &IDSignature ) const;
-
-        int extractSessionKeys(ByteStream &initiator_key, ByteStream &recipient_key) const;
-
-        const string getProtocolID() const { return string(getHeader(0, 6)); }
-        const uint16_t getVersion() const { return getHeader(6, 2).as_uint64(); }
-        const Flag getFlag() const { return (Flag)getHeader(8, 1).as_uint8(); }
-        const ByteStream getNonce() const { return getHeader(9, 12); }
-        const uint16_t getAuthDataSize() const { return getHeader(21, 2).as_uint64(); }
-        
-        // ORDINARY or HANDSHAKE
-        const ByteStream getSourceID() const { return getHeader(23, 32); }
-        const ByteStream getMessageData() const;
-        // WHOAREYOU
-        const ByteStream getIDNonce() const { return getHeader(23, 16); }
-        const ByteStream getENRSeq() const { return getHeader(39, 8); }
-        // HANDSHAKE
-        const uint8_t getIDSignatureSize() const { return getHeader(55, 1).as_uint8(); }
-        const uint8_t getEphemeralPubKeySize() const { return getHeader(56, 1).as_uint8(); }
-        const ByteStream getIDSignature() const { return getHeader(57, getIDSignatureSize()).as_uint8(); }
-        const ByteStream getEphemeralPubKey() const { return getHeader(57 + getIDSignatureSize(), getEphemeralPubKeySize()).as_uint8(); }
-        const shared_ptr<const ENRV4Identity> getENR() const;
-
-        //Virtual methods
-        virtual uint64_t size() const;
-        virtual operator const uint8_t*() const;
-        virtual void push_back(const uint8_t value);
-    
-    protected:
-        // Type + RLPPayload
-        const ByteStream getSignedPayload() const;
-};*/
+    private:
+        uint64_t m_request_id;
+        uint64_t m_enr_seq;
+        uint32_t m_recipient_ip;
+        uint16_t m_recipient_udp_port; 
+};

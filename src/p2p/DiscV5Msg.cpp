@@ -3,6 +3,7 @@
 #include "Network.h"
 
 #include <crypto/AES.h>
+#include <arpa/inet.h>
 
 #include <openssl/rand.h>   //RAND_bytes
 
@@ -16,29 +17,29 @@ using std::dynamic_pointer_cast;
 
 #define EXPIRATION_DELAY_IN_SEC 20
 
-DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg)
-    : DiscoveryMessage(unmasked_header_msg)
-    , m_masking_iv(unmasked_header_msg->m_masking_iv)
-    , m_masked_header(unmasked_header_msg->m_masked_header)
-    , m_protocol_id(unmasked_header_msg->m_protocol_id)
-    , m_version(unmasked_header_msg->m_version)
-    , m_flag(unmasked_header_msg->m_flag)
-    , m_nonce(unmasked_header_msg->m_nonce)
-    , m_authdata_size(unmasked_header_msg->m_authdata_size)
-    , m_header(unmasked_header_msg->m_header)
-    , m_message_data(unmasked_header_msg->m_message_data)
-{ }
+DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const DiscV5UnauthMessage> unauth_msg)
+    : DiscoveryMessage(unauth_msg)
+    , m_masking_iv(unauth_msg->m_masking_iv)
+    , m_masked_header(unauth_msg->m_masked_header)
+    , m_protocol_id(unauth_msg->m_protocol_id)
+    , m_version(unauth_msg->m_version)
+    , m_flag(unauth_msg->m_flag)
+    , m_nonce(unauth_msg->m_nonce)
+    , m_authdata_size(unauth_msg->m_authdata_size)
+    , m_authdata(unauth_msg->m_authdata)
+    , m_message_data(unauth_msg->m_message_data)
+{ 
+    //TODO: Are the session variables copied as well? (challenge_data, session_key, etc...)
+}
 
 DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress)
     : DiscoveryMessage(handler, buffer, peer_addr, is_ingress)
 {   
-    //By convention, the unknown Peer is set with an ID = 0x000..000 (over 32 bytes)
-    m_peer_ID = ByteStream(Integer::zero, 32);
-
     if( size() > 24 )
     {
         m_masking_iv = ByteStream(&buffer[0], 16);
         ByteStream masked_remainder(&buffer[16], size() - 16);
+
         ByteStream masking_key(&getHostENR()->getID()[0], 16);
 
         ByteStream unmasked_remainder;
@@ -52,106 +53,136 @@ DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const SocketHandler> h
         m_protocol_id = ByteStream(&unmasked_remainder[0], 6);
         m_version = ByteStream(&unmasked_remainder[6], 2).as_uint64();
         m_flag = (Flag)ByteStream(&unmasked_remainder[8], 1).as_uint8();
+        m_nonce = ByteStream(&unmasked_remainder[9], 12);
+        m_authdata_size = ByteStream(&unmasked_remainder[21], 2).as_uint64();
+        m_authdata = ByteStream(&unmasked_remainder[23], m_authdata_size);
 
-        if( isValid() )
-        {
-            m_nonce = ByteStream(&unmasked_remainder[9], 12);
-            m_authdata_size = ByteStream(&unmasked_remainder[21], 2).as_uint64();
+        m_masked_header = masked_remainder.pop_front(23 + m_authdata_size);
 
-            //Adjust the headers sizes according to authdata_size
-            m_masked_header = masked_remainder.pop_front(23 + m_authdata_size);
-            m_header = unmasked_remainder.pop_front(23 + m_authdata_size);
-
-            m_message_data = masked_remainder;
-        }
+        if( size() > 39 + m_authdata_size )
+            m_message_data = ByteStream(&buffer[39 + m_authdata_size], size() - (39 + m_authdata_size) );
     }
 }
 
-DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const ByteStream &request_nonce)
+DiscV5UnauthMessage::DiscV5UnauthMessage(const shared_ptr<const SessionHandler> session_handler)
     : DiscoveryMessage(session_handler)
-    , m_flag(flag)
+    , m_flag(Flag::UKNOWN)
+    , m_authdata_size(0)
 {
-    if( auto session = const_pointer_cast<DiscV5Session>(dynamic_pointer_cast<const DiscV5Session>(session_handler)) )
-    {
-        m_masking_iv = ByteStream::generateRandom(16);
-
-        m_protocol_id = ByteStream("discv5");
-        m_version = 0x0001;
-        if( m_flag == Flag::WHOAREYOU)
-            //the nonce mirrors the request packet's nonce
-            m_nonce = request_nonce;
-        else
-            // Random 12 bytes nonce = 32 bits incremental egress msg counter + random 64 bits
-            m_nonce = ByteStream((Integer(session->IncrEgressMsgCounter()) << 64) + ByteStream::generateRandom(8).as_Integer(), 12);
-        m_authdata_size = (m_flag == Flag::HANDSHAKE ? 131 + getHostENR()->getSignedRLP().byteSize() : (m_flag == Flag::WHOAREYOU ? 24 : 32));
-
-        // Update the msg content:
-        m_header.clear();
-        m_header.push_back(m_protocol_id);
-        m_header.push_back(ByteStream(Integer(m_version), 2));
-        m_header.push_back((uint8_t)m_flag);
-        m_header.push_back(m_nonce);       
-        m_header.push_back(ByteStream(Integer(m_authdata_size), 2));
-    }
+    m_masking_iv = ByteStream::generateRandom(16);
+    m_protocol_id = ByteStream("discv5");
+    m_version = 0x0001;
 }
 
-void DiscV5UnauthMessage::encryptHeader()
+const ByteStream DiscV5UnauthMessage::getHeader() const
 {
-    if( auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
-    {
-        ByteStream masking_key(&session->getENR()->getID()[0], 16);
-
-        m_masked_header.clear();
-        m_masked_header.resize(getHeader().byteSize());
-
-        ctr_encrypt( getHeader(), getHeader().byteSize(),
-                     masking_key,
-                     getMaskingIV(), getMaskingIV().byteSize(),
-                     m_masked_header );
-    }
+    ByteStream header;
+    header.push_back(m_protocol_id);
+    header.push_back(ByteStream(Integer(m_version), 2));
+    header.push_back((uint8_t)m_flag);
+    header.push_back(m_nonce);       
+    header.push_back(ByteStream(Integer(m_authdata_size), 2));
+    header.push_back(m_authdata);
+    return header;
 }
 
 void DiscV5UnauthMessage::encryptMessage()
 {
-    encryptHeader();
-    encryptData();
-
     //Fills the final DiscV5 encrypted message content
     clear();
+    
     push_back(getMaskingIV());
+
+    if( auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
+    {
+        ByteStream header = getHeader();
+        ByteStream masking_key(&session->getENR()->getID()[0], 16);
+
+        m_masked_header.clear();
+        m_masked_header.resize(header.byteSize());
+
+        ctr_encrypt( header, header.byteSize(),
+                     masking_key,
+                     getMaskingIV(), getMaskingIV().byteSize(),
+                     m_masked_header );
+    }
+
     push_back(getMaskedHeader());
-    push_back(getMessageData());
+
+    if( getMessageData().byteSize() )
+        push_back(getMessageData());
+}
+
+const string DiscV5UnauthMessage::getName() const
+{
+    switch( getFlag() )
+    {
+    case Flag::ORDINARY :
+        return "ORDINARY";
+    case Flag::WHOAREYOU :
+        return "WHOAREYOU";
+    case Flag::HANDSHAKE :
+        return "HANDSHAKE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void DiscV5UnauthMessage::print() const
+{
+    DiscoveryMessage::print();
+
+    cout << "  @UDP DiscV4 " << getName() << " MESSAGE:" <<endl;
+    //SocketMessage::print();   // Printing raw byteStream
+    cout << "    Size : " << dec << size() << endl;
+    cout << "    Masking IV : 0x" << hex << getMaskingIV() << endl;
+    cout << "    Protocol-id : " << string(getProtocol()) << endl;
+    cout << "    Version : " << dec << getVersion() << endl;
+    cout << "    Nonce : 0x" << hex << getNonce() << endl;
+    cout << "    AuthData-size : " << dec << getAuthDataSize() << endl;
 }
 
 //-----------------------------------------------------------------------------------------------------
 
+//Copy Constructor
+DiscV5WhoAreYouMessage::DiscV5WhoAreYouMessage(const shared_ptr<const DiscV5WhoAreYouMessage> way_msg)
+    : DiscV5UnauthMessage(way_msg)
+    , m_id_nonce(way_msg->m_id_nonce)
+    , m_enr_seq(way_msg->m_enr_seq)
+{ }
+
 //Parsing Constructor
-DiscV5WhoAreYouMessage::DiscV5WhoAreYouMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg)
-    : DiscV5UnauthMessage(unmasked_header_msg)
+DiscV5WhoAreYouMessage::DiscV5WhoAreYouMessage(const shared_ptr<const DiscV5UnauthMessage> unauth_msg)
+    : DiscV5UnauthMessage(unauth_msg)
 {
-    if( hasValidSize() )
-    {
-        m_id_nonce = ByteStream(&getHeader()[23], 16);
-        m_enr_seq = ByteStream(&getHeader()[39], 8).as_uint64();
-    }
+    m_id_nonce = ByteStream(&getAuthData()[0], 16);                
+    m_enr_seq = ByteStream(&getAuthData()[16], 8).as_uint64();    
 }
 
 //session-embedded empty msg
 DiscV5WhoAreYouMessage::DiscV5WhoAreYouMessage(const shared_ptr<const SessionHandler> session_handler, const ByteStream &request_nonce)
-    : DiscV5UnauthMessage(session_handler, DiscV5UnauthMessage::Flag::WHOAREYOU, request_nonce)
+    : DiscV5UnauthMessage(session_handler)
 {
-    if( auto session = dynamic_pointer_cast<const DiscV5Session>(session_handler) )
+    if( auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
     {
+        m_flag = Flag::WHOAREYOU;
+        m_nonce = request_nonce;
+        m_authdata_size = 24;
+        
         m_id_nonce = ByteStream::generateRandom(16);
         m_enr_seq = (session->getENR() ? session->getENR()->getSeq() : 0);
-        
-        // Update the msg content:
-        m_header.push_back(m_id_nonce);
-        m_header.push_back(m_enr_seq, 8);
-        m_message_data.clear();
 
         encryptMessage();
     }
+}
+
+void DiscV5WhoAreYouMessage::encryptMessage()
+{
+    m_authdata.clear();
+    m_authdata.push_back(m_id_nonce);
+    m_authdata.push_back(m_enr_seq, 8);
+    
+    DiscV5UnauthMessage::encryptMessage();
 }
 
 const ByteStream DiscV5WhoAreYouMessage::getChallengeData() const
@@ -161,51 +192,65 @@ const ByteStream DiscV5WhoAreYouMessage::getChallengeData() const
     return retval;
 }
 
+void DiscV5WhoAreYouMessage::print() const
+{
+    DiscV5UnauthMessage::print();
+
+    cout << "    Challenge-data : 0x" << hex << getChallengeData() << endl;
+    cout << "    ID-Nonce : 0x" << hex << getIDNonce() << endl;
+    cout << "    ENR-Seq : " << dec << getENRSeq() << endl;
+    cout << "-----------------------------------------------------------------------------------" << endl;
+}
+
 //-----------------------------------------------------------------------------------------------------
 
 //Copy Constructor
-DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg)
-    : DiscV5UnauthMessage(unmasked_msg)
-    , m_src_ID(unmasked_msg->m_src_ID)
-    , m_id_sig_size(unmasked_msg->m_id_sig_size)
-    , m_eph_pub_key_size(unmasked_msg->m_eph_pub_key_size)
-    , m_id_sig(unmasked_msg->m_id_sig)
-    , m_eph_pub_key(unmasked_msg->m_eph_pub_key)
-    , m_enr(unmasked_msg->m_enr)
-    , m_type(unmasked_msg->m_type)
-    , m_rlp_payload(unmasked_msg->m_rlp_payload)
+DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5AuthMessage> auth_msg, bool add_hanshake_header)
+    : DiscV5UnauthMessage(auth_msg)
+    , m_src_ID(auth_msg->m_src_ID)
+    , m_id_sig_size(auth_msg->m_id_sig_size)
+    , m_eph_pub_key_size(auth_msg->m_eph_pub_key_size)
+    , m_id_sig(auth_msg->m_id_sig)
+    , m_eph_pub_key(auth_msg->m_eph_pub_key)
+    , m_enr(auth_msg->m_enr)
+    , m_type(auth_msg->m_type)
+    , m_rlp_payload(auth_msg->m_rlp_payload)
 {
-    m_peer_ID = unmasked_msg->m_peer_ID;
+    if(getFlag() == Flag::ORDINARY && add_hanshake_header)
+    {
+        addHandshakeHeader();
+        encryptMessage();
+    }
 }
 
 //Parsing Constructor
-DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg)
-    : DiscV5UnauthMessage(unmasked_header_msg)
+DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage> unauth_msg)
+    : DiscV5UnauthMessage(unauth_msg)
     , m_id_sig_size(0)
     , m_eph_pub_key_size(0)
     , m_enr(shared_ptr<const ENRV4Identity>(nullptr))
 {
     if( auto session  = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
     {
-        m_peer_ID = ByteStream(&getHeader()[23], 32);
-        m_src_ID = (isIngress() ? ByteStream(m_peer_ID) : getHostENR()->getID());
-
+        //FIXME: we keep 0 as peer_id 
+        //m_peer_ID = ByteStream(&getHeader()[23], 32);
+        m_src_ID = ByteStream(&getAuthData()[0], 32);
+        
         if( getFlag() == Flag::HANDSHAKE )
         {
-            m_id_sig_size = getHeader()[55];
-            m_eph_pub_key_size = getHeader()[56];
+            m_id_sig_size = getAuthData()[32];
+            m_eph_pub_key_size = getAuthData()[33];
             // id_signature = r || s
-            m_id_sig = ByteStream(&getHeader()[57], m_id_sig_size);
+            m_id_sig = ByteStream(&getAuthData()[34], getIDSignatureSize());    
             // eph_pubkey = x || y
-            m_eph_pub_key = Pubkey(ByteStream(&getHeader()[121], m_eph_pub_key_size), Pubkey::Format::PREFIXED_X);
+            m_eph_pub_key = Pubkey(ByteStream(&getAuthData()[34 + getIDSignatureSize()], getEphemeralPubKeySize()), Pubkey::Format::PREFIXED_X);   
 
             extractHandshakeKeys();
 
-            if (getHeader().byteSize() > 154)
-            {
-                m_enr = make_shared<const ENRV4Identity>(RLPByteStream(&getHeader()[154], getHeader().byteSize() - 154));
-                cout << hex << m_enr->getSignedRLP().as_Integer() << endl;
-            }
+            int enr_ofs = 34 + getIDSignatureSize() + getEphemeralPubKeySize();
+            int enr_size = getAuthDataSize() - enr_ofs;
+            if( enr_size )
+                m_enr = make_shared<const ENRV4Identity>(RLPByteStream(&getAuthData()[enr_ofs], enr_size));
         }
 
         ByteStream aad;
@@ -214,7 +259,8 @@ DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage>
 
         //There is a 16-bytes Tag that is postfixed to the ciphertext
         ByteStream ciphertext(&getMessageData()[0], getMessageData().byteSize() - 16);
-        ByteStream tag(&getMessageData()[ciphertext.byteSize()], 16);
+        ByteStream tag(&getMessageData()[getMessageData().byteSize() - 16], 16);
+        //---------------------FIXME
 
         ByteStream pt = ByteStream(Integer::zero, ciphertext.byteSize());
 
@@ -232,31 +278,30 @@ DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage>
 
 //session-embedded empty msg
 DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint8_t type)
-    : DiscV5UnauthMessage(session_handler, flag)
+    : DiscV5UnauthMessage(session_handler)
     , m_type(type)
 {
-    if( auto session = dynamic_pointer_cast<const DiscV5Session>(session_handler) )
+    if( auto session = const_pointer_cast<DiscV5Session>(dynamic_pointer_cast<const DiscV5Session>(session_handler)) )
     {
-        m_peer_ID = session->getPeerID();
-        
-        m_src_ID = (isIngress() ? ByteStream(m_peer_ID) : getHostENR()->getID());
-        m_header.push_back(m_src_ID);
-
-        if( flag == Flag::HANDSHAKE && session->getENR() )
-        {
-            m_id_sig_size = 64;
-            m_eph_pub_key_size = 33;
-            generateHandshakeKeys(m_id_sig, m_eph_pub_key);
-            m_enr = getHostENR();
-            cout << hex << m_enr->getSignedRLP().as_Integer() << endl;
-
-            m_header.push_back(m_id_sig_size);
-            m_header.push_back(m_eph_pub_key_size);
-            m_header.push_back(m_id_sig);
-            m_header.push_back(m_eph_pub_key.getKey(Pubkey::Format::PREFIXED_X));
-            m_header.push_back(m_enr->getSignedRLP());
-        }
+        m_flag = flag;
+        // Random 12 bytes nonce = 32 bits incremental egress msg counter + random 64 bits
+        m_nonce = ByteStream((Integer(session->IncrEgressMsgCounter()) << 64) + ByteStream::generateRandom(8).as_Integer(), 12);
+        m_authdata_size = 32;
+        m_src_ID = getHostENR()->getID();
+        if( flag == Flag::HANDSHAKE )
+            addHandshakeHeader();
     }
+    //Encryption is done at the concrete msg level
+}
+
+void DiscV5AuthMessage::addHandshakeHeader()
+{
+    m_flag = Flag::HANDSHAKE;
+    m_id_sig_size = 64;
+    m_eph_pub_key_size = 33;
+    m_enr = getHostENR();
+    m_authdata_size = 34 + m_id_sig_size + m_eph_pub_key_size + m_enr->getSignedRLP().byteSize();
+    generateHandshakeKeys(m_id_sig, m_eph_pub_key);
 }
 
 void DiscV5AuthMessage::generateHandshakeKeys( ByteStream &IDSignature,
@@ -273,7 +318,7 @@ void DiscV5AuthMessage::generateHandshakeKeys( ByteStream &IDSignature,
         Pubkey ecdh(Secp256k1::GetInstance().p_scalar(session->getENR()->getPubKey().getPoint(), ephemeral_secret.getSecret()));
         ByteStream shared_secret = ecdh.getKey(Pubkey::Format::PREFIXED_X);
         
-        ByteStream challenge_data = session->getChallengeData();
+        ByteStream challenge_data = session->getLastReceivedWhoAreYouMsg()->getChallengeData();
 
         ByteStream kdf_info("discovery v5 key agreement");
         kdf_info.push_back(node_id_a);
@@ -281,9 +326,9 @@ void DiscV5AuthMessage::generateHandshakeKeys( ByteStream &IDSignature,
 
         ByteStream new_key(Integer::zero, 32);
         int retval = hkdf_derive( shared_secret, shared_secret.byteSize(),
-                                challenge_data, challenge_data.byteSize(),
-                                kdf_info, kdf_info.byteSize(),
-                                new_key );
+                                  challenge_data, challenge_data.byteSize(),
+                                  kdf_info, kdf_info.byteSize(),
+                                  new_key );
         if(retval > 0)
         {   
             const_pointer_cast<DiscV5Session>(session)->setHostSessionKey(ByteStream(&new_key[0], 16));
@@ -312,7 +357,7 @@ void DiscV5AuthMessage::extractHandshakeKeys()
         Pubkey ecdh(Secp256k1::GetInstance().p_scalar(getEphemeralPubKey().getPoint(), getHostENR()->getSecret()->getSecret()));
         ByteStream shared_secret = ecdh.getKey(Pubkey::Format::PREFIXED_X);
         
-        ByteStream challenge_data = session->getChallengeData();
+        ByteStream challenge_data = session->getLastSentWhoAreYouMsg()->getChallengeData();
 
         ByteStream kdf_info("discovery v5 key agreement");
         kdf_info.push_back(node_id_a);
@@ -337,8 +382,19 @@ void DiscV5AuthMessage::extractHandshakeKeys()
     }
 }
 
-void DiscV5AuthMessage::encryptData()
+void DiscV5AuthMessage::encryptMessage()
 {
+    m_authdata.clear();
+    m_authdata.push_back(getSourceID());
+    if( getFlag() == Flag::HANDSHAKE )
+    {
+        m_authdata.push_back(getIDSignatureSize());
+        m_authdata.push_back(getEphemeralPubKeySize());
+        m_authdata.push_back(getIDSignature());
+        m_authdata.push_back(getEphemeralPubKey().getKey(Pubkey::Format::PREFIXED_X));
+        m_authdata.push_back(getENR()->getSignedRLP());
+    }
+
     if( auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
     {
         //Add type in front of RLP payload
@@ -364,14 +420,56 @@ void DiscV5AuthMessage::encryptData()
         //There is a 16-bytes Tag that is postfixed to the ciphertext
         m_message_data.push_back(tag);
     }
+
+    DiscV5UnauthMessage::encryptMessage();
 }
+
+const string DiscV5AuthMessage::getName() const
+{
+    switch( getType() )
+    {
+    case 0x01:
+        return "PING";
+    case 0x02:
+        return "PONG";
+    case 0x03:
+        return "FINDNODE";
+    case 0x04:
+        return "NEIGHBORS";
+    case 0x05:
+        return "TALKREQ";
+    case 0x06:
+        return "TALKRESP";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void DiscV5AuthMessage::print() const
+{
+    DiscV5UnauthMessage::print();
+
+    cout << "    Source-ID : 0x" << hex << getSourceID() << endl;
+    if( getFlag() == Flag::HANDSHAKE )
+    {
+        cout << "    ID-Signature size : " << dec << (int)getIDSignatureSize() << endl;
+        cout << "    Ephemeral PubKey size : " << dec << (int)getEphemeralPubKeySize() << endl;
+        cout << "    ID-Signature : 0x" << hex << getIDSignature() << endl;
+        cout << "    Ephemeral PubKey : 0x" << hex << getEphemeralPubKey().getKey(Pubkey::Format::PREFIXED_X) << endl;
+        if( getENR() )
+        {
+            cout << "    ENR Record : " << endl;
+            getENR()->print();
+        }
+    }
+    cout << "    Type : " << getName() << endl;
+}
+
 //--------------------------------------------------------------------------------------------------
 
 //Parsing Constructor
-DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg)
-    : DiscV5AuthMessage(unmasked_msg)
-    , m_request_id(0)
-    , m_enr_seq(0)
+DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const DiscV5AuthMessage> auth_msg)
+    : DiscV5AuthMessage(auth_msg)
 {
     bool is_list;
     RLPByteStream rlp(getRLPPayload());
@@ -382,216 +480,67 @@ DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const DiscV5AuthMessage> u
 //Constructor for building msg to send
 DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id)
     : DiscV5AuthMessage(session_handler, flag, 0x01)
+    , m_request_id(request_id)
+    , m_enr_seq(getHostENR()->getSeq())
+{  
+    m_rlp_payload.clear();
+    m_rlp_payload.push_back(ByteStream(getRequestID()));
+    m_rlp_payload.push_back(ByteStream(getENRSeq()));
+
+    encryptMessage();
+}
+
+void DiscV5PingMessage::print() const
 {
-    if( auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler()) )
-    {
-        m_request_id = request_id;
-        m_enr_seq = getHostENR()->getSeq();
-        
-        m_rlp_payload.clear();
-        m_rlp_payload.push_back(ByteStream(getRequestID()));
-        m_rlp_payload.push_back(ByteStream(getENRSeq()));
+    DiscV5AuthMessage::print();
 
-        encryptMessage();
-    }
+    cout << "    Request-ID : " << dec << getRequestID() << endl;
+    cout << "    ENR-Seq : " << dec << getENRSeq() << endl;
+    cout << "-----------------------------------------------------------------------------------" << endl;
 }
 
-/*
-// "WhoAreYou" Contructor
-DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler,
-                                         const ByteStream &dest_node_id, const ByteStream &mirroring_nonce,
-                                         ByteStream &challenge_data,
-                                         uint64_t enr_seq)
-    : DiscoveryMessage(session_handler)
-    , m_is_ingress(false)
+//-------------------------------------------------------------------------------------------------
+
+//Parsing Constructor
+DiscV5PongMessage::DiscV5PongMessage(const shared_ptr<const DiscV5AuthMessage> auth_msg)
+    : DiscV5AuthMessage(auth_msg)
 {
-    ByteStream header;
-    header.push_back(0x646973637635);                           // protocol-id = "discv5"
-    header.push_back(0x0001, 2);                                // version = 0x0001
-    header.push_back(0x01, 1);                                  // flag = 0x01
-    header.push_back(mirroring_nonce);                          // nonce from received message
-    header.push_back(24, 2);                                    // authdata-size = 24
-    header.push_back(ByteStream::generateRandom(16));           // id-nonce
-    //header.push_back(ByteStream("0x0102030405060708090a0b0c0d0e0f10", 16, 16)); // test id-nonce
-    header.push_back(enr_seq, 8);                               // enr-seq
-
-    ByteStream masking_iv = ByteStream::generateRandom(16);     // masking-iv
-    //ByteStream masking_iv("0x00000000000000000000000000000000", 16, 16); // test masking-iv
-    ByteStream masking_key(&dest_node_id[0], 16);               // dest-id[:16]
-    ByteStream masked_header(Integer::zero, header.byteSize());
-    ctr_encrypt( header, header.byteSize(),
-                 masking_key,
-                 masking_iv, 16,
-                 masked_header );
-    
-    ByteStream packet;
-    packet.push_back(masking_iv);
-    packet.push_back(masked_header);
-    
-    m_vect.resize(packet.byteSize(), 0);
-    memcpy(&m_vect.data()[0], &packet[0], packet.byteSize());
-    
-    challenge_data.clear();
-    challenge_data.push_back(masking_iv);
-    challenge_data.push_back(header);
+    bool is_list;
+    RLPByteStream rlp(getRLPPayload());
+    m_request_id = rlp.pop_front(is_list).as_uint64();
+    m_enr_seq = rlp.pop_front(is_list).as_uint64();
+    m_recipient_ip = rlp.pop_front(is_list).as_uint64();
+    m_recipient_udp_port = rlp.pop_front(is_list).as_uint64();
 }
 
-// "Ordinary"/"Handshake" Contructor
-DiscV5AuthMessage::DiscV5AuthMessage( const shared_ptr<const SessionHandler> session_handler,
-                                          uint32_t &session_egress_msg_counter, const Flag flag,
-                                          const ByteStream &host_session_key,
-                                          const ByteStream &IDSignature, const ByteStream &ephemeral_pubkey)
-    : DiscoveryMessage(session_handler)
-    , m_is_ingress(false)
-{ 
-    assert(flag == Flag::ORDINARY || flag == Flag::HANDSHAKE);
-    ByteStream header;
-    header.push_back(0x646973637635);       // protocol-id = "discv5"
-    header.push_back(0x0001, 2);            // version = 0x0001
-    header.push_back((uint8_t)flag, 1);     // flag = 0x01
-    session_egress_msg_counter++;           // increment the session egress msg counter
-    ByteStream nonce(ByteStream::generateRandom(8).as_Integer() + (Integer(session_egress_msg_counter) << 64), 12);
-    header.push_back(nonce);                // nonce  = 32 bits egress counter || 64 bits random number = 12 Bytes
-    header.push_back(0, 2);                 // authdata-size reserve, updated at the end
-    header.push_back(getHostENR()->getID());     // src-id
-    if( flag == Flag::HANDSHAKE)
-    {
-        header.push_back(IDSignature.byteSize(), 1);                            // id-signature (r||s) size  = 64 bytes
-        header.push_back(ephemeral_pubkey.byteSize(), 1);                       // compressed secp256k1 ephemeral-pubkey size = 33 bytes
-        header.push_back(IDSignature);                                          // id-signature (r||s)
-        header.push_back(ephemeral_pubkey);                                     // compressed secp256k1 ephemeral-pubkey
-        header.push_back(getHostENR()->getSignedRLP());
-    }
-    header[21] = header.byteSize() - 23;    // update authdata-size
-}
-
-const ByteStream DiscV5AuthMessage::getMaskingKey() const
+//Constructor for building msg to send
+DiscV5PongMessage::DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id)
+    : DiscV5AuthMessage(session_handler, flag, 0x02)
+    , m_request_id(request_id)
+    , m_enr_seq(getHostENR()->getSeq())
+    , m_recipient_ip(ntohl(session_handler->getPeerAddress().sin_addr.s_addr))
+    , m_recipient_udp_port(ntohs(session_handler->getPeerAddress().sin_port))
 {
-    ByteStream masking_key;
-    if( m_is_ingress )
-        masking_key = ByteStream(&getHostENR()->getID()[0], 16);
-    else
-    {
-        auto session = dynamic_pointer_cast<const DiscV5Session>(getSessionHandler());
-        if(session && session->getENR() )
-            masking_key = ByteStream(session->getENR()->getID()[0], 16);
-    }
-    return masking_key;
+    m_rlp_payload.clear();
+    m_rlp_payload.push_back(ByteStream(getRequestID()));
+    m_rlp_payload.push_back(ByteStream(getENRSeq()));
+    m_rlp_payload.push_back(ByteStream(getRecipientIP()));
+    m_rlp_payload.push_back(ByteStream(getRecipientUDPPort()));
+
+    encryptMessage();
 }
 
-const ByteStream DiscV5AuthMessage::getMaskingIV() const
+void DiscV5PongMessage::print() const
 {
-    return ByteStream(&(*this)[0], 16);
+    DiscV5AuthMessage::print();
+
+    cout << "    Request-ID : " << dec << getRequestID() << endl;
+    cout << "    ENR-Seq : " << dec << getENRSeq() << endl;
+    char ip[INET_ADDRSTRLEN];
+    struct sockaddr_in sa;
+    sa.sin_addr.s_addr = htonl(getRecipientIP());
+    inet_ntop(AF_INET, &(sa.sin_addr), ip, INET_ADDRSTRLEN);
+    cout << "    Recipient IP : " << ip << endl;
+    cout << "    Recipient UDP Port : " << dec << getRecipientUDPPort() << endl;
+    cout << "-----------------------------------------------------------------------------------" << endl;
 }
-
-const ByteStream DiscV5AuthMessage::getMaskedHeader() const
-{
-    return ByteStream(&(*this)[16], size() - 16);
-}
-
-const ByteStream DiscV5AuthMessage::getHeader(uint8_t ofs, uint8_t size) const
-{
-    ByteStream header;
-    ByteStream masking_key = getMaskingKey();
-    if( masking_key.byteSize() )
-    {
-        // Header does not include the IV
-        ByteStream masked_header = getMaskedHeader();
-
-        // Resize header to match the masked_header size
-        header = ByteStream(Integer::zero, masked_header.byteSize());
-
-        int retval = ctr_decrypt( masked_header, masked_header.byteSize(),
-                                  masking_key,
-                                  getMaskingIV(), 16,
-                                  header);
-        
-        if( retval > 0 )
-        {
-            // Remove the message data if necessary
-            // 23  =  6 of protocol-id
-            //      + 2 of version
-            //      + 1 of flag
-            //      + 12 of nonce
-            //      + 2 of authdata-size
-            // + authdata-size of authdata 
-            header = header.pop_front(23 + ByteStream(header[21], 2).as_uint64());
-            //Apply optionnal offset and size
-            assert(ofs < header.byteSize() && (ofs + size <= header.byteSize()));
-            header = ByteStream(&header[ofs], (size ? size : header.byteSize() - ofs));
-        }
-    }
-    return header;
-}
-
-const ByteStream DiscV5AuthMessage::getChallengeData() const
-{
-    ByteStream challenge_data;
-    ByteStream header = getHeader();
-    if( header.byteSize() )
-    {
-        challenge_data.push_back(getMaskingIV());
-        challenge_data.push_back(header);
-    }
-    return challenge_data;
-}
-
-int DiscV5AuthMessage::generateHandshakeKeys( const Pubkey &peer_pub_key, 
-                                                ByteStream &ephemeral_pubkey,
-                                                ByteStream &host_session_key, ByteStream &peer_session_key,
-                                                ByteStream &IDSignature ) const
-{
-    int retval = -1;
-
-    ByteStream node_id_a(getHostENR()->getID());
-    ByteStream node_id_b(peer_pub_key.getID());
-
-    Privkey ephemeral_secret = Privkey::generateRandom();
-    ephemeral_pubkey = ephemeral_secret.getPubKey().getKey(Pubkey::Format::PREFIXED_X);
-
-    Pubkey ecdh(Secp256k1::GetInstance().p_scalar(peer_pub_key.getPoint(), ephemeral_secret.getSecret()));
-    ByteStream shared_secret = ecdh.getKey(Pubkey::Format::PREFIXED_X);
-    
-    ByteStream challenge_data = getChallengeData();
-
-    ByteStream kdf_info("discovery v5 key agreement");
-    kdf_info.push_back(node_id_a);
-    kdf_info.push_back(node_id_b);
-
-    ByteStream new_key(Integer::zero, 32);
-    int retval = hkdf_derive( shared_secret, shared_secret.byteSize(),
-                              challenge_data, challenge_data.byteSize(),
-                              kdf_info, kdf_info.byteSize(),
-                              new_key );
-    if(retval > 0)
-    {   
-        host_session_key = ByteStream(&new_key[0], 16);
-        peer_session_key = ByteStream(&new_key[16], 16);
-
-        ByteStream id_signature_input("discovery v5 identity proof");
-        id_signature_input.push_back(challenge_data);
-        id_signature_input.push_back(ephemeral_pubkey);
-        id_signature_input.push_back(node_id_b);
-        Signature sig(getHostENR()->getSecret()->sign(id_signature_input.sha256()));
-
-        IDSignature.clear();
-        IDSignature.push_back(ByteStream(sig.get_r(), 32));
-        IDSignature.push_back(ByteStream(sig.get_s(), 32));
-    }
-    return retval;
-}
-
-const shared_ptr<const ENRV4Identity> DiscV5AuthMessage::getENR() const
-{
-    ByteStream enr_record = getHeader(57 + getIDSignatureSize() + getEphemeralPubKeySize());
-    if( enr_record.byteSize() )
-    {
-        auto enr = make_shared<const ENRV4Identity>(RLPByteStream(&enr_record[0], enr_record.byteSize()));
-        //Validate the record signature against the known SourceID:
-        if( enr->getID() == getSourceID() && enr->hasValidSignature() )
-            return enr;
-    }
-    return shared_ptr<const ENRV4Identity>(nullptr);
-}
-
-*/

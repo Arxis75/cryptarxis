@@ -20,10 +20,9 @@ class DiscV4Server: public DiscoveryServer
     public:
         DiscV4Server( const shared_ptr<const ENRV4Identity> host_enr,
                       const int read_buffer_size = 1374, const int write_buffer_size = 1374 );
-    protected:
+                      
         virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
         virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const;
-        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const;
 };
 
 class DiscV4Session: public DiscoverySession
@@ -45,11 +44,11 @@ class DiscV4Session: public DiscoverySession
         void onNewENRRequest(const shared_ptr<const DiscV4ENRRequestMessage> msg);
         void onNewENRResponse(const shared_ptr<const DiscV4ENRResponseMessage> msg);
 
-        void sendPong(const ByteStream &ack_hash) const;      
-        void sendFindNode() const;
-        void sendNeighbors(const ByteStream &target_id) const;
+        void sendPong(const ByteStream &ack_hash);      
+        void sendFindNode();
+        void sendNeighbors(const ByteStream &target_id);
         void sendENRRequest();
-        void sendENRResponse(const ByteStream &ack_hash) const;
+        void sendENRResponse(const ByteStream &ack_hash);
 
         inline const ByteStream &getLastSentPingHash() const { return m_last_sent_ping_hash; }
         inline const ByteStream &getLastSentENRRequestHash() const { return m_last_sent_enr_request_hash; }

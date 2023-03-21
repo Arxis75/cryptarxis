@@ -113,8 +113,7 @@ class ByteStream
         inline bool operator<=(const ByteStream &b) const { return Integer(*this) <= Integer(b); }
         inline bool operator>=(const ByteStream &b) const { return Integer(*this) >= Integer(b); }
 
-        //Unaligned operators
-        //inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue[offset], size); };
+        inline const ByteStream at(const uint64_t offset, const uint64_t size) const { return ByteStream(&vvalue[offset], size); };
         inline const uint8_t as_uint8() const { return (byteSize()>0 ? vvalue[0] : 0); }
         const uint64_t as_uint64() const;
         const Integer as_Integer() const { return a2Integer(vvalue.data(), vvalue.size()); }

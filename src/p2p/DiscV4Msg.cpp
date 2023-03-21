@@ -71,7 +71,6 @@ void DiscV4SignedMessage::addTypeSignAndHash(const RLPByteStream &rlp_payload)
 
 const string DiscV4SignedMessage::getName() const
 {
-    string retval;
     switch( getType() )
     {
     case 0x01:
@@ -93,12 +92,7 @@ const string DiscV4SignedMessage::getName() const
 
 void DiscV4SignedMessage::print() const
 {
-    cout << "UDP: "<< (isIngress() ? "RECEIVING " : "SENDING ") << dec << size() << " Bytes " << (isIngress() ? "FROM" : "TO") << " @"
-         << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port)
-         << ", Peer ID = " << hex << ByteStream(getPeerID());
-    if( auto socket = getSocketHandler() )
-        cout << " (socket = " << socket->getSocket() << ")";
-    cout << endl;
+    DiscoveryMessage::print();
 
     cout << "  @UDP DiscV4 " << getName() << " MESSAGE:" <<endl;
     //SocketMessage::print();   // Printing raw byteStream

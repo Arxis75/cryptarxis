@@ -14,7 +14,7 @@ DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_
 {
 }
 
-void DiscoverySession::sendMessage(std::shared_ptr<const SocketMessage> msg_out) const
+void DiscoverySession::sendMessage(std::shared_ptr<const SocketMessage> msg_out)
 {
     SessionHandler::sendMessage(msg_out);
     msg_out->print();
@@ -163,23 +163,17 @@ vector<shared_ptr<const ENRV4Identity>> DiscoveryServer::findNeighbors(const Byt
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const DiscoveryMessage> disc_msg)
     : SocketMessage(disc_msg)
     , m_timestamp(disc_msg->m_timestamp)
-{
-    m_peer_ID = disc_msg->m_peer_ID;
-}
+{ }
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress)
     : SocketMessage(handler, buffer, peer_addr, is_ingress)
     , m_timestamp(getUnixTimeStamp())
-    // m_peer_ID and m_type parsed by the concrete derived classes
-{
-}
+{ }
 
 DiscoveryMessage::DiscoveryMessage(const shared_ptr<const SessionHandler> session_handler)
     : SocketMessage(session_handler)
     , m_timestamp(getUnixTimeStamp())
-{
-    m_peer_ID = session_handler->getPeerID();
-}
+{ }
 
 const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
 {
@@ -187,4 +181,14 @@ const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
     if (auto server = dynamic_pointer_cast<const DiscoveryServer>(getSocketHandler()))
         enr = server->getHostENR();
     return enr;
+}
+
+void DiscoveryMessage::print() const
+{
+    cout << "UDP: "<< (isIngress() ? "RECEIVING " : "SENDING ") << dec << size() << " Bytes " << (isIngress() ? "FROM" : "TO") << " @"
+        << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port)
+        << ", Peer ID = " << hex << ByteStream(getPeerID());
+    if( auto socket = getSocketHandler() )
+        cout << " (socket = " << socket->getSocket() << ")";
+    cout << endl;
 }

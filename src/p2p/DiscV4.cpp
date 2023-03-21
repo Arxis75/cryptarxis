@@ -28,11 +28,6 @@ const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr
     return make_shared<DiscV4SignedMessage>(handler, buffer, peer_addr);
 }
 
-const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SessionHandler> session_handler) const
-{
-    return make_shared<DiscV4SignedMessage>(session_handler, 0);
-}
-
 //------------------------------------------------------------------------------------------------------
 
 DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
@@ -191,19 +186,19 @@ void DiscV4Session::sendPing()
     sendMessage(msg_out);
 }
 
-void DiscV4Session::sendPong(const ByteStream &ack_hash) const
+void DiscV4Session::sendPong(const ByteStream &ack_hash)
 {
     auto msg_out = make_shared<const DiscV4PongMessage>(shared_from_this(), ack_hash);
     sendMessage(msg_out);
 }
 
-void DiscV4Session::sendFindNode() const
+void DiscV4Session::sendFindNode()
 {
     auto msg_out = make_shared<const DiscV4FindNodeMessage>(shared_from_this());
     sendMessage(msg_out);
 }
 
-void DiscV4Session::sendNeighbors(const ByteStream &target_id) const
+void DiscV4Session::sendNeighbors(const ByteStream &target_id)
 {
     if( auto server = dynamic_pointer_cast<const DiscV4Server>(getSocketHandler()) )
     {
@@ -219,7 +214,7 @@ void DiscV4Session::sendENRRequest()
     sendMessage(msg_out);
 }
 
-void DiscV4Session::sendENRResponse(const ByteStream &ack_hash) const
+void DiscV4Session::sendENRResponse(const ByteStream &ack_hash)
 {
     auto msg_out = make_shared<const DiscV4ENRResponseMessage>(shared_from_this(), ack_hash);
     sendMessage(msg_out);

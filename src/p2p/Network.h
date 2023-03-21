@@ -47,9 +47,9 @@ class ENRV4Identity
         const sockaddr_in getUDPAddress() const;
         const sockaddr_in getTCPAddress() const;
 
-        const string getName() const { return base64_url_encode(getSignedRLP()); }
+        const string getName() const { return string("enr:") + base64_url_encode(getSignedRLP()); }
 
-        bool hasValidSignature() const;
+        bool hasValidSignature(ByteStream incomp_sig = ByteStream(), ByteStream data = ByteStream()) const;
         bool equals(const shared_ptr<const ENRV4Identity> enr) const;
         void print() const;
 

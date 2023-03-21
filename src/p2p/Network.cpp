@@ -120,7 +120,8 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     , m_pubkey(m_secret->getPubKey())
     , m_ID(m_pubkey.getID())
     , m_is_signed(true)
-{ 
+{
+    //The key/value pairs must be sorted by key and must be unique, i.e. any key may be present only once
     m_unsigned_rlp.push_back(ByteStream(m_seq));
     m_unsigned_rlp.push_back(ByteStream("id"));
     m_unsigned_rlp.push_back(ByteStream(m_scheme.c_str()));
@@ -128,10 +129,10 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     m_unsigned_rlp.push_back(ByteStream(m_ip));                //assumes 4-bytes ip here (ip cannot start with 0)
     m_unsigned_rlp.push_back(ByteStream("secp256k1"));
     m_unsigned_rlp.push_back(m_pubkey.getKey(Pubkey::Format::PREFIXED_X));
-    m_unsigned_rlp.push_back(ByteStream("udp"));
-    m_unsigned_rlp.push_back(ByteStream(m_udp_port, 2));
     m_unsigned_rlp.push_back(ByteStream("tcp"));
     m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
+    m_unsigned_rlp.push_back(ByteStream("udp"));
+    m_unsigned_rlp.push_back(ByteStream(m_udp_port, 2));
 
     Signature sig = m_secret->sign(m_unsigned_rlp.keccak256());
 
@@ -154,6 +155,7 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     , m_ID(m_pubkey.getID())
     , m_is_signed(false)
 { 
+    //The key/value pairs must be sorted by key and must be unique, i.e. any key may be present only once
     m_unsigned_rlp.push_back(ByteStream(m_seq));
     m_unsigned_rlp.push_back(ByteStream("id"));
     m_unsigned_rlp.push_back(ByteStream(m_scheme.c_str()));
@@ -161,10 +163,10 @@ ENRV4Identity::ENRV4Identity(const uint64_t seq, const uint32_t ip, const uint16
     m_unsigned_rlp.push_back(ByteStream(m_ip));                //assumes 4-bytes ip here (ip cannot start with 0)
     m_unsigned_rlp.push_back(ByteStream("secp256k1"));
     m_unsigned_rlp.push_back(m_pubkey.getKey(Pubkey::Format::PREFIXED_X));
-    m_unsigned_rlp.push_back(ByteStream("udp"));
-    m_unsigned_rlp.push_back(ByteStream(m_udp_port, 2));
     m_unsigned_rlp.push_back(ByteStream("tcp"));
     m_unsigned_rlp.push_back(ByteStream(m_tcp_port, 2));
+    m_unsigned_rlp.push_back(ByteStream("udp"));
+    m_unsigned_rlp.push_back(ByteStream(m_udp_port, 2));
 }
 
 const sockaddr_in ENRV4Identity::getUDPAddress() const
@@ -202,28 +204,37 @@ const Signature ENRV4Identity::sign(const ByteStream &hash) const
     return retval;
 }
 
-bool ENRV4Identity::hasValidSignature() const
+bool ENRV4Identity::hasValidSignature(ByteStream incomp_sig, ByteStream h) const
 {
     bool retval = false;
     if( isSigned() )
     {
-        bool is_list;
         Pubkey key_0, key_1;
 
-        // Retrieves the incomplete Signature
-        // of the ENR record (64 bytes only)
-        RLPByteStream tmp = m_signed_rlp;
-        ByteStream incomp_sig = tmp.pop_front(is_list);
+        if( !incomp_sig.byteSize() || !h.byteSize())
+        {
+            // By default verifies the incomplete Signature
+            // of the ENR record itself (64 bytes only)
+
+            bool is_list;
+            RLPByteStream tmp = m_signed_rlp;
+            incomp_sig = tmp.pop_front(is_list);
+
+            h = m_unsigned_rlp.keccak256();
+        }
+
+        assert(incomp_sig.byteSize() == 64);
+        assert(h.byteSize() == 32);
 
         //Builds 2 complete candidate signatures
         Signature sig_0(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), false);
         Signature sig_1(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), true);
 
-        sig_0.ecrecover(key_0, m_unsigned_rlp.keccak256());
-        sig_1.ecrecover(key_1, m_unsigned_rlp.keccak256());
+        sig_0.ecrecover(key_0, h);
+        sig_1.ecrecover(key_1, h);
 
         // Verifies that the pubkey who built the ENR is
-        // matching one of the ENR signature ecrecover candidates
+        // matching one of the signature ecrecover candidates
         retval = (m_pubkey == key_0 || m_pubkey == key_1);
     }
     return retval; 
@@ -233,7 +244,7 @@ void ENRV4Identity::print() const
 {
     cout << "      ENR name = " << getName() << endl;
     cout << "      ENR scheme = " << m_scheme << endl;
-    cout << "      ENR public key = 0x" << hex << m_pubkey.getKey(Pubkey::Format::XY).as_Integer() << endl;
+    cout << "      ENR public key = 0x" << hex << m_pubkey.getKey(Pubkey::Format::PREFIXED_X).as_Integer() << endl;
     cout << "      ENR ID = 0x" << hex << m_ID << endl;
     cout << "      ENR seq = " << dec << m_seq << endl;
     cout << "      ENR IP = " << dec << ((m_ip >> 24) & 0xFF) << "."
@@ -304,8 +315,8 @@ void Network::start( const uint32_t ip, const uint16_t udp_port, const uint16_t 
 
             // Main event loop that handles client
             // logging records and connection requests.
-            while(true)
-                Initiation_Dispatcher::GetInstance().handle_events();
+            //while(true)
+            //    Initiation_Dispatcher::GetInstance().handle_events();
         //}
     }
 }

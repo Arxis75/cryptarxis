@@ -18,6 +18,9 @@ add_executable(cryptarxis_tests main.cpp)
 target_include_directories(cryptarxis_tests PUBLIC ${reactor_SOURCE_DIR}/src)  #Mandatory For library use in cryptarxis
 target_link_libraries(cryptarxis_tests PUBLIC OpenSSL::Crypto ethash::ethash gmp givaro lib_reactor PRIVATE GTest::gtest)
 
+# To be able to run CTest tests properly from the CMake extension, 
+# number of parallel jobs (CTEST_PARALLEL_LEVEL) should be = 1 in Preference/Settings/ctest
+# NOTA: running the test project in debug mode will always work, whatever parallelism is set
 add_subdirectory(unit_tests)
 
 include(GoogleTest)

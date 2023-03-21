@@ -48,6 +48,8 @@ class DiscoveryMessage: public SocketMessage
         inline const uint64_t getTimeStamp() const { return m_timestamp; }
         
         virtual inline bool isValid() const = 0;
+
+        virtual void print() const;
     
     protected:
         const shared_ptr<const ENRV4Identity> getHostENR() const;
@@ -61,7 +63,7 @@ class DiscoverySession: public SessionHandler
     public:
         DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
 
-        virtual void sendMessage(std::shared_ptr<const SocketMessage> msg_out) const;
+        virtual void sendMessage(std::shared_ptr<const SocketMessage> msg_out);
 
         inline const shared_ptr<const ENRV4Identity> &getENR() const { return m_ENR; }
         

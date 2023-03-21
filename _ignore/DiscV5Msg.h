@@ -45,7 +45,7 @@ class DiscV5AuthMessage: public DiscoveryMessage
         const ByteStream getMaskingIV() const;
         const ByteStream getMaskedHeader() const;
         const ByteStream getHeader(uint8_t ofs = 0, uint8_t size = 0) const;
-        const ByteStream getChallengeData() const;
+        //const ByteStream getChallengeData() const;
         int generateHandshakeKeys( const Pubkey &peer_pub_key, 
                                    ByteStream &ephemeral_pubkey,
                                    ByteStream &host_session_key, ByteStream &peer_session_key, 
