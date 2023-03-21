@@ -174,8 +174,8 @@ void DiscV5Session::sendAuthPing(bool with_handshake)
     RAND_bytes(reinterpret_cast<unsigned char*>(&m_last_ping_request_id), 8);
 
     auto msg_out = make_shared<const DiscV5PingMessage>( shared_from_this(), 
-                                                            with_handshake ? DiscV5PingMessage::Flag::HANDSHAKE : DiscV5PingMessage::Flag::ORDINARY,
-                                                            m_last_ping_request_id );
+                                                         with_handshake ? DiscV5PingMessage::Flag::HANDSHAKE : DiscV5PingMessage::Flag::ORDINARY,
+                                                         m_last_ping_request_id );
     sendMessage(msg_out);
 }
 
@@ -184,8 +184,8 @@ void DiscV5Session::sendAuthPong(bool with_handshake)
     RAND_bytes(reinterpret_cast<unsigned char*>(&m_last_pong_request_id), 8);
 
     auto msg_out = make_shared<const DiscV5PongMessage>( shared_from_this(), 
-                                                        with_handshake ? DiscV5PongMessage::Flag::HANDSHAKE : DiscV5PongMessage::Flag::ORDINARY,
-                                                        m_last_pong_request_id );
+                                                         with_handshake ? DiscV5PongMessage::Flag::HANDSHAKE : DiscV5PongMessage::Flag::ORDINARY,
+                                                         m_last_pong_request_id );
     sendMessage(msg_out);
 }
 
