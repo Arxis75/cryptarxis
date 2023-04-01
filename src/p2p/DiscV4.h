@@ -20,15 +20,15 @@ class DiscV4Server: public DiscoveryServer
     public:
         DiscV4Server( const shared_ptr<const ENRV4Identity> host_enr,
                       const int read_buffer_size = 1374, const int write_buffer_size = 1374 );
-                      
-        virtual const shared_ptr<SessionHandler> makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
-        virtual const shared_ptr<SocketMessage> makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const;
+    private:          
+        virtual const shared_ptr<SessionHandler> makeSessionHandler(const struct sockaddr_in &peer_address);
+        virtual const shared_ptr<SocketMessage> makeSocketMessage(const vector<uint8_t> buffer, const struct sockaddr_in &peer_address) const;
 };
 
 class DiscV4Session: public DiscoverySession
 {
     public:
-        DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
+        DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
 
         virtual void onNewMessage(const shared_ptr<const SocketMessage> msg_in);
 

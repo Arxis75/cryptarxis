@@ -16,7 +16,7 @@ class DiscoveryServer: public SocketHandler
         DiscoveryServer( const shared_ptr<const ENRV4Identity> host_enr,
                          const int read_buffer_size = 4096, const int write_buffer_size = 4096);
 
-        virtual const vector<uint8_t> makeSessionKey(const struct sockaddr_in &peer_addr, const vector<uint8_t> &peer_id) const;
+        //virtual const vector<uint8_t> makeSessionKey(const struct sockaddr_in &peer_addr, const vector<uint8_t> &peer_id) const;
 
         const shared_ptr<const ENRV4Identity> getHostENR() const { return m_host_enr; }
         
@@ -61,7 +61,7 @@ class DiscoveryMessage: public SocketMessage
 class DiscoverySession: public SessionHandler
 {
     public:
-        DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id);
+        DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address);
 
         virtual void sendMessage(std::shared_ptr<const SocketMessage> msg_out);
 

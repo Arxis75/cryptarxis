@@ -49,9 +49,9 @@ Pubkey::Pubkey(const ByteStream &formated_key, const Pubkey::Format f, const Ell
     ByteStream tmp(formated_key);
     if( f == Format::PREFIXED_X )
     {
-        assert(tmp.byteSize() == 33);
+        assert(tmp.byteSize() <= 33);
         bool y_imparity = (tmp.pop_front(1).as_uint8() % 2);
-        Element x = tmp.pop_front(32).as_Integer();
+        Element x = tmp.as_Integer();
         m_point = m_ecc.getPointFromX(x, y_imparity);
     }
     else if( f == Format::PREFIXED_XY )

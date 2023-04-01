@@ -91,7 +91,7 @@ class DiscV5AuthMessage: public DiscV5UnauthMessage
         //Parsing Constructor
         DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage> unmasked_header_msg);
         //session-embedded empty msg
-        DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint8_t type);
+        DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, const bool with_handshake, const uint8_t type);
 
         inline const ByteStream &getSourceID() const { return m_src_ID; }
         inline uint8_t getIDSignatureSize() const { return m_id_sig_size; }
@@ -132,7 +132,7 @@ class DiscV5PingMessage : public DiscV5AuthMessage
         //Parsing Constructor
         DiscV5PingMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
         //Constructor for building msg to send
-        DiscV5PingMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id);
+        DiscV5PingMessage(const shared_ptr<const SessionHandler> session_handler, const bool with_handshake = false);
 
         inline uint64_t getRequestID() const { return m_request_id; }
         inline uint64_t getENRSeq() const { return m_enr_seq; }
@@ -150,7 +150,7 @@ class DiscV5PongMessage : public DiscV5AuthMessage
         //Parsing Constructor
         DiscV5PongMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
         //Constructor for building msg to send
-        DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id);
+        DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const uint64_t request_id, const bool with_handshake = false);
 
         inline uint64_t getRequestID() const { return m_request_id; }
         inline uint64_t getENRSeq() const { return m_enr_seq; }
@@ -164,4 +164,42 @@ class DiscV5PongMessage : public DiscV5AuthMessage
         uint64_t m_enr_seq;
         uint32_t m_recipient_ip;
         uint16_t m_recipient_udp_port; 
+};
+
+class DiscV5FindNodeMessage : public DiscV5AuthMessage
+{
+    public:
+        //Parsing Constructor
+        DiscV5FindNodeMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
+        //Constructor for building msg to send
+        DiscV5FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const vector<uint16_t> &log2_distance_list, const bool with_handshake = false);
+
+        inline uint64_t getRequestID() const { return m_request_id; }
+        inline const vector<uint16_t> getLog2DistanceList() const { return m_log2_distance_list; }
+
+        virtual void print() const;
+
+    private:
+        uint64_t m_request_id;
+        vector<uint16_t> m_log2_distance_list;
+};
+
+class DiscV5NeighborsMessage : public DiscV5AuthMessage
+{
+    public:
+        //Parsing Constructor
+        DiscV5NeighborsMessage(const shared_ptr<const DiscV5AuthMessage> unmasked_msg);
+        //Constructor for building msg to send
+        DiscV5NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const uint64_t request_id, const vector<shared_ptr<const ENRV4Identity>> &enr_list, const bool with_handshake = false);
+
+        inline uint64_t getRequestID() const { return m_request_id; }
+        inline uint64_t getTotal() const { return m_total; }
+        inline const vector<shared_ptr<const ENRV4Identity>> getENRList() const { return m_enr_list; }
+
+        virtual void print() const;
+
+    private:
+        uint64_t m_request_id;
+        uint64_t m_total;
+        vector<shared_ptr<const ENRV4Identity>> m_enr_list;
 };

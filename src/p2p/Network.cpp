@@ -62,7 +62,7 @@ ENRV4Identity::ENRV4Identity(const RLPByteStream &signed_rlp)
         else if( field == "secp256k1" )
         {
             field = tmp.pop_front(is_list);
-            assert(field.byteSize() == 33);
+            //assert(field.byteSize() == 33);
             m_pubkey = Pubkey(field, Pubkey::Format::PREFIXED_X);
             m_ID = ByteStream(m_pubkey.getID());
         }
@@ -223,19 +223,19 @@ bool ENRV4Identity::hasValidSignature(ByteStream incomp_sig, ByteStream h) const
             h = m_unsigned_rlp.keccak256();
         }
 
-        assert(incomp_sig.byteSize() == 64);
-        assert(h.byteSize() == 32);
+        if(incomp_sig.byteSize() == 64 && h.byteSize() == 32 )
+        {
+            //Builds 2 complete candidate signatures
+            Signature sig_0(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), false);
+            Signature sig_1(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), true);
 
-        //Builds 2 complete candidate signatures
-        Signature sig_0(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), false);
-        Signature sig_1(ByteStream(&(incomp_sig)[0], 32).as_Integer(), ByteStream(&(incomp_sig)[32], 32).as_Integer(), true);
+            sig_0.ecrecover(key_0, h);
+            sig_1.ecrecover(key_1, h);
 
-        sig_0.ecrecover(key_0, h);
-        sig_1.ecrecover(key_1, h);
-
-        // Verifies that the pubkey who built the ENR is
-        // matching one of the signature ecrecover candidates
-        retval = (m_pubkey == key_0 || m_pubkey == key_1);
+            // Verifies that the pubkey who built the ENR is
+            // matching one of the signature ecrecover candidates
+            retval = (m_pubkey == key_0 || m_pubkey == key_1);
+        }
     }
     return retval; 
 }

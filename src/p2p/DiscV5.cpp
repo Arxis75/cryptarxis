@@ -19,27 +19,24 @@ DiscV5Server::DiscV5Server( const shared_ptr<const ENRV4Identity> host_enr,
     : DiscoveryServer(host_enr, read_buffer_size, write_buffer_size)
 { }
 
-const shared_ptr<SessionHandler> DiscV5Server::makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
+const shared_ptr<SessionHandler> DiscV5Server::makeSessionHandler(const struct sockaddr_in &peer_address)
 {
-    return make_shared<DiscV5Session>(socket_handler, peer_address, peer_id);
+    return make_shared<DiscV5Session>(shared_from_this(), peer_address);
 }
 
-const shared_ptr<SocketMessage> DiscV5Server::makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const
+const shared_ptr<SocketMessage> DiscV5Server::makeSocketMessage(const vector<uint8_t> buffer, const struct sockaddr_in &peer_address) const
 {
-    return make_shared<DiscV5UnauthMessage>(handler, buffer, peer_addr);
+    return make_shared<DiscV5UnauthMessage>(shared_from_this(), buffer, peer_address);
 }
 
 //------------------------------------------------------------------------------------------------------
 
-DiscV5Session::DiscV5Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
-    : DiscoverySession(socket_handler, peer_address, peer_id)
+DiscV5Session::DiscV5Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
+    : DiscoverySession(socket_handler, peer_address)
     , m_egress_msg_counter(0)
     , m_last_ping_request_id(0)
-    , m_last_pong_request_id(0)
-    /*, m_last_findnodes_request_id(0)
-    , m_last_neighbors_request_id(0)
-    , m_last_talkreq_request_id(0)
-    , m_last_talkresp_request_id(0)*/
+    , m_last_findnode_request_id(0)
+    //, m_last_talkreq_request_id(0)
     , m_last_sent_ordinary_msg_type(0)
 { }
 
@@ -81,13 +78,13 @@ void DiscV5Session::onNewOrdinaryMessage(const shared_ptr<const DiscV5AuthMessag
     case 0x02:
         onNewPong(make_shared<const DiscV5PongMessage>(auth_msg));
         break;
-    /*case 0x03:
+    case 0x03:
         onNewFindNode(make_shared<const DiscV5FindNodeMessage>(auth_msg));
         break;
     case 0x04:
         onNewNeighbors(make_shared<const DiscV5NeighborsMessage>(auth_msg));
         break;
-    case 0x05:
+    /*case 0x05:
         onNewTalkReq(make_shared<const DiscV5TalkReqMessage>(auth_msg));
         break;
     case 0x06:
@@ -109,13 +106,13 @@ void DiscV5Session::onNewWhoAreYouMessage(const shared_ptr<const DiscV5WhoAreYou
     case 0x02:
         sendAuthPong(true);
         break;
-    /*case 0x03:
+    case 0x03:
         sendAuthFindNode(true);
         break;
     case 0x04:
         sendAuthNeighbors(true);
         break;
-    case 0x05:
+    /*case 0x05:
         sendAuthTalkReq(true);
         break;
     case 0x06:
@@ -133,26 +130,46 @@ void DiscV5Session::onNewPing(const shared_ptr<const DiscV5PingMessage> msg)
         sendWhoAreYou();
     else
     {
-        sendAuthPong();
+        sendAuthPong(msg->getRequestID());
         sendAuthPing();
     }
 }
 
 void DiscV5Session::onNewPong(const shared_ptr<const DiscV5PongMessage> msg)
 {
-    msg->print();
-    //sendAuthFindNode();
+    if( msg->getRequestID() == getLastPingRequestID() )
+    {
+        m_last_ping_request_id = 0;
+        msg->print();
+        
+        sendAuthFindNode(false);
+    }
 }
 
-/*void DiscV5Session::onNewFindNode(const shared_ptr<const DiscV5FindNodeMessage> msg)
+void DiscV5Session::onNewFindNode(const shared_ptr<const DiscV5FindNodeMessage> msg)
 {
+    msg->print();
+    if( !getPeerSessionKey().byteSize() )
+        sendWhoAreYou();
+    else
+        sendAuthNeighbors(msg->getRequestID());
 }
 
 void DiscV5Session::onNewNeighbors(const shared_ptr<const DiscV5NeighborsMessage> msg)
 {
+    if( msg->getRequestID() == getLastFindNodeRequestID() )
+    {
+        msg->print();
+
+        if( auto server = dynamic_pointer_cast<const DiscV5Server>(getSocketHandler()) )
+        {
+            msg->print();
+            const_pointer_cast<DiscV5Server>(server)->onNewNodeCandidates(msg->getENRList());
+        }
+    }
 }
 
-void DiscV5Session::onNewTalkReq(const shared_ptr<const DiscV5TalkReqMessage> msg)
+/*void DiscV5Session::onNewTalkReq(const shared_ptr<const DiscV5TalkReqMessage> msg)
 {
 }
 
@@ -165,7 +182,9 @@ void DiscV5Session::onNewTalkResp(const shared_ptr<const DiscV5TalkRespMessage> 
 void DiscV5Session::sendWhoAreYou()
 {
     auto msg_out = make_shared<const DiscV5WhoAreYouMessage>(shared_from_this(), getLastReceivedNonce());
+
     m_last_sent_whoareyou_msg = msg_out;
+
     sendMessage(msg_out);
 }
 
@@ -173,31 +192,51 @@ void DiscV5Session::sendAuthPing(bool with_handshake)
 {
     RAND_bytes(reinterpret_cast<unsigned char*>(&m_last_ping_request_id), 8);
 
-    auto msg_out = make_shared<const DiscV5PingMessage>( shared_from_this(), 
-                                                         with_handshake ? DiscV5PingMessage::Flag::HANDSHAKE : DiscV5PingMessage::Flag::ORDINARY,
-                                                         m_last_ping_request_id );
+    auto msg_out = make_shared<const DiscV5PingMessage>(shared_from_this(), with_handshake);
+    
+    m_last_ping_request_id = msg_out->getRequestID();
+
     sendMessage(msg_out);
 }
 
-void DiscV5Session::sendAuthPong(bool with_handshake)
+void DiscV5Session::sendAuthPong(uint64_t request_id, bool with_handshake)
 {
-    RAND_bytes(reinterpret_cast<unsigned char*>(&m_last_pong_request_id), 8);
-
-    auto msg_out = make_shared<const DiscV5PongMessage>( shared_from_this(), 
-                                                         with_handshake ? DiscV5PongMessage::Flag::HANDSHAKE : DiscV5PongMessage::Flag::ORDINARY,
-                                                         m_last_pong_request_id );
+    auto msg_out = make_shared<const DiscV5PongMessage>( shared_from_this(), request_id, with_handshake);
+    
     sendMessage(msg_out);
 }
 
-/*void DiscV5Session::sendFindNode() const
+void DiscV5Session::sendAuthFindNode(bool with_handshake)
 {
+    RAND_bytes(reinterpret_cast<unsigned char*>(&m_last_findnode_request_id), 8);
+
+    if( auto server = dynamic_pointer_cast<const DiscV5Server>(getSocketHandler()) )
+    {
+        cout << hex << server->getHostENR()->getID().as_Integer() << endl;
+        cout << hex << getENR()->getID().as_Integer() << endl;
+        
+        //vector<uint16_t> log2_distance_list = {{(uint16_t)(server->getHostENR()->getID().as_Integer() ^ getENR()->getID().as_Integer()).bitsize()}};
+        vector<uint16_t> log2_distance_list = {{256}, {255}, {254}, {253}, {252}, {251}, {250}, {249}, {248}, {247}, {246}, {245}, {243}, {242}, {241}, {240} };
+
+        auto msg_out = make_shared<const DiscV5FindNodeMessage>(shared_from_this(), log2_distance_list, with_handshake);
+
+        m_last_findnode_request_id = msg_out->getRequestID();
+
+        sendMessage(msg_out);
+    }
 }
 
-void DiscV5Session::sendNeighbors() const
+void DiscV5Session::sendAuthNeighbors(uint64_t request_id, bool with_handshake) const
 {
+    //vector<ENRV4Identity> enr_list = getHostENR();
+    //auto msg_out = make_shared<const DiscV5NeighborsMessage>( shared_from_this(), 
+    //                                                          with_handshake ? DiscV5PongMessage::Flag::HANDSHAKE : DiscV5PongMessage::Flag::ORDINARY,
+    //                                                          request_id,
+    //                                                          enr_list );
+    //sendMessage(msg_out);
 }
 
-void DiscV5Session::sendTalkReq() const
+/*void DiscV5Session::sendTalkReq() const
 {
 }
 
@@ -207,7 +246,8 @@ void DiscV5Session::sendTalkResp() const
 
 void DiscV5Session::sendMessage(shared_ptr<const SocketMessage> msg_out)
 {
-    if( auto msg = dynamic_pointer_cast<const DiscV5AuthMessage>(msg_out) ; msg->getFlag() == DiscV5UnauthMessage::Flag::ORDINARY )
+    auto msg = dynamic_pointer_cast<const DiscV5AuthMessage>(msg_out);
+    if( msg && msg->getFlag() == DiscV5UnauthMessage::Flag::ORDINARY )
         // Store the last Ordinary msg sent in case of a resend with handshake is needed
         m_last_sent_ordinary_msg_type = msg->getType();
     

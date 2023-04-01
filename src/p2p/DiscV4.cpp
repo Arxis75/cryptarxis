@@ -18,20 +18,20 @@ DiscV4Server::DiscV4Server( const shared_ptr<const ENRV4Identity> host_enr,
     : DiscoveryServer(host_enr, read_buffer_size, write_buffer_size)
 { }
 
-const shared_ptr<SessionHandler> DiscV4Server::makeSessionHandler(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
+const shared_ptr<SessionHandler> DiscV4Server::makeSessionHandler(const struct sockaddr_in &peer_address)
 {
-    return make_shared<DiscV4Session>(socket_handler, peer_address, peer_id);
+    return make_shared<DiscV4Session>(shared_from_this(), peer_address);
 }
 
-const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr) const
+const shared_ptr<SocketMessage> DiscV4Server::makeSocketMessage(const vector<uint8_t> buffer, const struct sockaddr_in &peer_address) const
 {
-    return make_shared<DiscV4SignedMessage>(handler, buffer, peer_addr);
+    return make_shared<DiscV4SignedMessage>(shared_from_this(), buffer, peer_address);
 }
 
 //------------------------------------------------------------------------------------------------------
 
-DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
-    : DiscoverySession(socket_handler, peer_address, peer_id)
+DiscV4Session::DiscV4Session(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
+    : DiscoverySession(socket_handler, peer_address)
     , m_last_verified_pong_timestamp(0)
     , m_last_sent_ping_hash()
     , m_last_sent_enr_request_hash()

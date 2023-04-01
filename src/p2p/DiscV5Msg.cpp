@@ -133,7 +133,7 @@ void DiscV5UnauthMessage::print() const
     DiscoveryMessage::print();
 
     cout << "  @UDP DiscV4 " << getName() << " MESSAGE:" <<endl;
-    //SocketMessage::print();   // Printing raw byteStream
+    SocketMessage::print();   // Printing raw byteStream
     cout << "    Size : " << dec << size() << endl;
     cout << "    Masking IV : 0x" << hex << getMaskingIV() << endl;
     cout << "    Protocol-id : " << string(getProtocol()) << endl;
@@ -277,18 +277,18 @@ DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const DiscV5UnauthMessage>
 }
 
 //session-embedded empty msg
-DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint8_t type)
+DiscV5AuthMessage::DiscV5AuthMessage(const shared_ptr<const SessionHandler> session_handler, const bool with_handshake, const uint8_t type)
     : DiscV5UnauthMessage(session_handler)
     , m_type(type)
 {
     if( auto session = const_pointer_cast<DiscV5Session>(dynamic_pointer_cast<const DiscV5Session>(session_handler)) )
     {
-        m_flag = flag;
+        m_flag = (with_handshake ? Flag::HANDSHAKE : Flag::ORDINARY);
         // Random 12 bytes nonce = 32 bits incremental egress msg counter + random 64 bits
         m_nonce = ByteStream((Integer(session->IncrEgressMsgCounter()) << 64) + ByteStream::generateRandom(8).as_Integer(), 12);
         m_authdata_size = 32;
         m_src_ID = getHostENR()->getID();
-        if( flag == Flag::HANDSHAKE )
+        if( with_handshake )
             addHandshakeHeader();
     }
     //Encryption is done at the concrete msg level
@@ -478,11 +478,12 @@ DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const DiscV5AuthMessage> a
 }
 
 //Constructor for building msg to send
-DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id)
-    : DiscV5AuthMessage(session_handler, flag, 0x01)
-    , m_request_id(request_id)
+DiscV5PingMessage::DiscV5PingMessage(const shared_ptr<const SessionHandler> session_handler, const bool with_handshake)
+    : DiscV5AuthMessage(session_handler, with_handshake, 0x01)
     , m_enr_seq(getHostENR()->getSeq())
 {  
+    RAND_bytes(reinterpret_cast<unsigned char*>(&m_request_id), 8);
+
     m_rlp_payload.clear();
     m_rlp_payload.push_back(ByteStream(getRequestID()));
     m_rlp_payload.push_back(ByteStream(getENRSeq()));
@@ -514,8 +515,8 @@ DiscV5PongMessage::DiscV5PongMessage(const shared_ptr<const DiscV5AuthMessage> a
 }
 
 //Constructor for building msg to send
-DiscV5PongMessage::DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const Flag flag, const uint64_t request_id)
-    : DiscV5AuthMessage(session_handler, flag, 0x02)
+DiscV5PongMessage::DiscV5PongMessage(const shared_ptr<const SessionHandler> session_handler, const uint64_t request_id, const bool with_handshake)
+    : DiscV5AuthMessage(session_handler, with_handshake, 0x02)
     , m_request_id(request_id)
     , m_enr_seq(getHostENR()->getSeq())
     , m_recipient_ip(ntohl(session_handler->getPeerAddress().sin_addr.s_addr))
@@ -542,5 +543,89 @@ void DiscV5PongMessage::print() const
     inet_ntop(AF_INET, &(sa.sin_addr), ip, INET_ADDRSTRLEN);
     cout << "    Recipient IP : " << ip << endl;
     cout << "    Recipient UDP Port : " << dec << getRecipientUDPPort() << endl;
+    cout << "-----------------------------------------------------------------------------------" << endl;
+}
+
+//----------------------------------------------------------------------------------------------------------
+
+//Parsing Constructor
+DiscV5FindNodeMessage::DiscV5FindNodeMessage(const shared_ptr<const DiscV5AuthMessage> auth_msg)
+    : DiscV5AuthMessage(auth_msg)
+{
+    bool is_list;
+    RLPByteStream rlp(getRLPPayload());
+    m_request_id = rlp.pop_front(is_list).as_uint64();
+    while( rlp.byteSize() > 1 )
+        m_log2_distance_list.push_back(rlp.pop_front(is_list).as_uint8());
+}
+
+//Constructor for building msg to send
+DiscV5FindNodeMessage::DiscV5FindNodeMessage(const shared_ptr<const SessionHandler> session_handler, const vector<uint16_t> &log2_distance_list, const bool with_handshake)
+    : DiscV5AuthMessage(session_handler, with_handshake, 0x03)
+    , m_log2_distance_list(log2_distance_list)
+{
+    RAND_bytes(reinterpret_cast<unsigned char*>(&m_request_id), 8);
+
+    m_rlp_payload.clear();
+    m_rlp_payload.push_back(ByteStream(), true);
+    for(int i=0;i<m_log2_distance_list.size();i++)
+        m_rlp_payload.push_back(m_log2_distance_list[i] ? ByteStream(m_log2_distance_list[i]) : ByteStream());
+    m_rlp_payload.push_front(ByteStream(getRequestID()), true);
+    cout << m_rlp_payload << endl;
+
+    encryptMessage();
+}
+
+void DiscV5FindNodeMessage::print() const
+{
+    DiscV5AuthMessage::print();
+
+    cout << "    Request-ID : " << dec << getRequestID() << endl;
+    cout << "    Log2 Distance List : ";
+    for(int i=0;i<m_log2_distance_list.size();i++)
+        cout << dec << (int)m_log2_distance_list[i] << " ";
+    cout << endl;
+    cout << "-----------------------------------------------------------------------------------" << endl;
+}
+
+//----------------------------------------------------------------------------------------------------------
+
+//Parsing Constructor
+DiscV5NeighborsMessage::DiscV5NeighborsMessage(const shared_ptr<const DiscV5AuthMessage> auth_msg)
+    : DiscV5AuthMessage(auth_msg)
+{
+    bool is_list;
+    RLPByteStream rlp(getRLPPayload());
+    m_request_id = rlp.pop_front(is_list).as_uint64();
+    m_total = rlp.pop_front(is_list).as_uint64();
+    RLPByteStream enr_list = rlp.pop_front(is_list);
+    while( enr_list.byteSize() > 2 )
+        m_enr_list.push_back(make_shared<ENRV4Identity>(enr_list.pop_front(is_list)));
+}
+
+//Constructor for building msg to send
+DiscV5NeighborsMessage::DiscV5NeighborsMessage(const shared_ptr<const SessionHandler> session_handler, const uint64_t request_id, const vector<shared_ptr<const ENRV4Identity>> &enr_list, const bool with_handshake)
+    : DiscV5AuthMessage(session_handler, with_handshake, 0x04)
+    , m_request_id(request_id)
+    , m_total(enr_list.size())
+    , m_enr_list(enr_list)
+{  
+    m_rlp_payload.clear();
+    for(int i=0;i<m_enr_list.size();i++)
+        m_rlp_payload.push_back(m_enr_list[i]->getSignedRLP());
+    m_rlp_payload.push_front(ByteStream(getTotal()), true);
+    m_rlp_payload.push_front(ByteStream(getRequestID()), true);
+
+    encryptMessage();
+}
+
+void DiscV5NeighborsMessage::print() const
+{
+    DiscV5AuthMessage::print();
+
+    cout << "    Request-ID : " << dec << getRequestID() << endl;
+    cout << "    Total : " << dec << getTotal() << endl;
+    for(int i=0;i<m_enr_list.size();i++)
+        m_enr_list[i]->print();
     cout << "-----------------------------------------------------------------------------------" << endl;
 }

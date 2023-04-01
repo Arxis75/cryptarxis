@@ -8,8 +8,8 @@ using std::endl;
 using std::hex;
 using std::min;
 
-DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id)
-    : SessionHandler(socket_handler, peer_address, peer_id)
+DiscoverySession::DiscoverySession(const shared_ptr<const SocketHandler> socket_handler, const struct sockaddr_in &peer_address)
+    : SessionHandler(socket_handler, peer_address)
     , m_ENR(shared_ptr<const ENRV4Identity>(nullptr))
 {
 }
@@ -57,7 +57,7 @@ DiscoveryServer::DiscoveryServer(const shared_ptr<const ENRV4Identity> host_enr,
 {
 }
 
-const vector<uint8_t> DiscoveryServer::makeSessionKey(const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id) const
+/*const vector<uint8_t> DiscoveryServer::makeSessionKey(const struct sockaddr_in &peer_address, const vector<uint8_t> &peer_id) const
 {
     vector<uint8_t> key;
     key.resize(peer_id.size() + 6);
@@ -66,7 +66,7 @@ const vector<uint8_t> DiscoveryServer::makeSessionKey(const struct sockaddr_in &
     memcpy(&key[peer_id.size()], &peer_address.sin_addr.s_addr, 4);
     memcpy(&key[peer_id.size() + 4], &peer_address.sin_port, 2);
     return key;
-}
+}*/
 
 void DiscoveryServer::dispatchMessage(const shared_ptr<const SocketMessage> msg)
 {
@@ -117,12 +117,11 @@ void DiscoveryServer::onNewNodeCandidates(const vector<std::shared_ptr<const ENR
 
                 if( !isInternalAddress(peer_address) && !isBlacklisted(peer_address) )
                 {
-                    auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler(makeSessionKey(peer_address, node_i->getID())));
-                    if (!session)
+                    auto session = dynamic_pointer_cast<const DiscoverySession>(getSessionHandler(makeSessionKey(peer_address)));
+                    if( !session && (*it)->hasValidSignature())
                     {
-                        session = dynamic_pointer_cast<const DiscoverySession>(registerSessionHandler(peer_address, node_i->getID()));
-
-                        // Ping the peer
+                        session = dynamic_pointer_cast<const DiscoverySession>(registerSessionHandler(peer_address));
+                        const_pointer_cast<DiscoverySession>(session)->updatePeerENR(*it);
                         const_pointer_cast<DiscoverySession>(session)->sendPing();
                     }
                 }
@@ -186,8 +185,7 @@ const shared_ptr<const ENRV4Identity> DiscoveryMessage::getHostENR() const
 void DiscoveryMessage::print() const
 {
     cout << "UDP: "<< (isIngress() ? "RECEIVING " : "SENDING ") << dec << size() << " Bytes " << (isIngress() ? "FROM" : "TO") << " @"
-        << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port)
-        << ", Peer ID = " << hex << ByteStream(getPeerID());
+        << inet_ntoa(getPeerAddress().sin_addr) << ":" << ntohs(getPeerAddress().sin_port);
     if( auto socket = getSocketHandler() )
         cout << " (socket = " << socket->getSocket() << ")";
     cout << endl;

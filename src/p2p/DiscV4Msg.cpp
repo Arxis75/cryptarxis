@@ -18,12 +18,11 @@ DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const DiscV4SignedMess
     , m_type(signed_msg->m_type)
     , m_hash(signed_msg->m_hash)
     , m_pub_key(signed_msg->m_pub_key)
+    //, m_peer_ID(signed_msg->m_peer_ID)
     , m_hashed_payload(signed_msg->m_hashed_payload)
     , m_signed_payload(signed_msg->m_signed_payload)
     , m_rlp_payload(signed_msg->m_rlp_payload)
-{
-    m_peer_ID = signed_msg->m_peer_ID;
-}
+{ }
 
 DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SocketHandler> handler, const vector<uint8_t> buffer, const struct sockaddr_in &peer_addr, const bool is_ingress)
     : DiscoveryMessage(handler, buffer, peer_addr, is_ingress)
@@ -38,7 +37,7 @@ DiscV4SignedMessage::DiscV4SignedMessage(const shared_ptr<const SocketHandler> h
             m_signed_payload = ByteStream(&buffer[97], size() - 97);
             Signature sig(ByteStream(&buffer[32], 32).as_Integer(), ByteStream(&buffer[64], 32).as_Integer(), ByteStream(&buffer[96], 1).as_bool());
             sig.ecrecover(m_pub_key, m_signed_payload.keccak256());
-            m_peer_ID = m_pub_key.getID();
+            //m_peer_ID = m_pub_key.getID();
             m_rlp_payload = RLPByteStream(&buffer[98], size() - 98);
         }
     }
